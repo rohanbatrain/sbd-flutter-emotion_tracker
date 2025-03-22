@@ -35,7 +35,7 @@ jobs:
 
       - name: Generate Keystore
         run: |
-          keytool -genkey -v -keystore $HOME/keystore.jks -storetype JKS -keyalg RSA -keysize 2048 -validity 10000 -alias "$ANDROID_KEY_ALIAS" -dname "CN=Rohan Batra, OU=Open Source, O=Rohan Batra, L=San Francisco, ST=CA, C=US" -storepass $ANDROID_KEYSTORE_PASSWORD -keypass $ANDROID_KEY_PASSWORD
+          keytool -genkey -v -keystore $HOME/keystore.jks -storetype JKS -keyalg RSA -keysize 2048 -validity 10000 -alias "$ANDROID_KEY_ALIAS" -dname "CN=Rohan Batra, OU=Open Source, O=Second Brain Database, L=Bidholi, ST=UK, C=IN" -storepass $ANDROID_KEYSTORE_PASSWORD -keypass $ANDROID_KEY_PASSWORD
         env:
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
