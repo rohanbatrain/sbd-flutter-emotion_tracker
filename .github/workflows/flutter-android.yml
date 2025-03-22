@@ -33,17 +33,14 @@ jobs:
         run: |
           flutter pub get
 
-
-
       - name: Generate Keystore
         run: |
-          keytool -genkey -v -keystore $HOME/keystore.jks -storetype JKS -keyalg RSA -keysize 2048 -validity 10000 -alias "$ANDROID_KEY_ALIAS" -dname "CN=Rohan Batra, OU=Open Source, O=Rohan Batra, L=Bidholi, ST=Uttrakhand, C=IN" -storepass "$ANDROID_KEYSTORE_PASSWORD" -keypass "$ANDROID_KEY_PASSWORD"
+          keytool -genkey -v -keystore $HOME/keystore.jks -storetype JKS -keyalg RSA -keysize 2048 -validity 10000 -alias "$ANDROID_KEY_ALIAS" -dname "CN=Rohan Batra, OU=Open Source, O=Rohan Batra, L=San Francisco, ST=CA, C=US" -storepass $ANDROID_KEYSTORE_PASSWORD -keypass $ANDROID_KEY_PASSWORD
         env:
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
 
-      
       # Build APK for release
       - name: Build APK for release
         run: flutter build apk --release --no-shrink
@@ -62,11 +59,11 @@ jobs:
             ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
             ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
 
-      # Extract the release version from the branch name (e.g., release/v0.0.1 -> v0.0.1)
+      # Extract the release version from the branch name (e.g., refs/heads/v0.0.1 -> v0.0.1)
       - name: Extract release version
         id: extract_version
         run: |
-          VERSION=$(echo ${GITHUB_REF} | sed 's/refs\/heads\/release\///')
+          VERSION=$(echo ${GITHUB_REF} | sed 's/refs\/heads\///')
           echo "VERSION=${VERSION}" >> $GITHUB_ENV
 
       - name: Print Current Directory
@@ -75,7 +72,6 @@ jobs:
           pwd
           echo "Listing contents of the current directory:"
           ls -la
-
 
       # Create a GitHub Release for the given version
       - name: Create GitHub Release
@@ -88,4 +84,3 @@ jobs:
             --repo $GITHUB_REPOSITORY
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
