@@ -33,48 +33,42 @@ jobs:
         run: |
           flutter pub get
 
-
-
-      - name: Generate Keystore
+      # Decode keystore and set it up
+      - name: Decode keystore and set it up
         run: |
-          keytool -genkey -v -keystore $HOME/keystore.jks -storetype JKS -keyalg RSA -keysize 2048 -validity 10000 -alias "$ANDROID_KEY_ALIAS" -dname "CN=Rohan Batra, OU=Open Source, O=Rohan Batra, L=Bidholi, ST=Uttrakhand, C=IN" -storepass "$ANDROID_KEYSTORE_PASSWORD" -keypass "$ANDROID_KEY_PASSWORD"
+          echo "$ANDROID_KEYSTORE" | base64 --decode > $HOME/keystore.jks
         env:
+          ANDROID_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
 
-      
+
+
       # Build APK for release
       - name: Build APK for release
-        run: flutter build apk --release --no-shrink
-        env:
-            ANDROID_KEYSTORE: $HOME/keystore.jks
-            ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-            ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-            ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: flutter build apk --release --no-shrink --scan
 
       # Build AAB for release
       - name: Build AAB for release
-        run: flutter build appbundle --release
-        env:
-            ANDROID_KEYSTORE: $HOME/keystore.jks
-            ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-            ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-            ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: flutter build appbundle --release --scan
 
       # Extract the release version from the branch name (e.g., release/v0.0.1 -> v0.0.1)
       - name: Extract release version
         id: extract_version
         run: |
-          VERSION=$(echo ${GITHUB_REF} | sed 's/refs\/heads\/release\///')
+          VERSION=$(echo ${GITHUB_REF#refs/heads/release/})
+          # Ensure the version is valid for a GitHub release tag (e.g., remove any leading or trailing spaces)
+          VERSION=$(echo $VERSION | sed 's/^[^a-zA-Z0-9]*//;s/[^a-zA-Z0-9]*$//')
           echo "VERSION=${VERSION}" >> $GITHUB_ENV
+
 
       # Create a GitHub Release for the given version
       - name: Create GitHub Release
         run: |
           gh release create $VERSION \
-            /home/runner/work/emotion_tracker/emotion_tracker/android/app/build/outputs/bundle/release/app-release.aab \
-            /home/runner/work/emotion_tracker/emotion_tracker/android/app/build/outputs/flutter-apk/app-release.apk \
+            android/app/build/outputs/flutter-apk/app-release.apk \
+            android/app/build/outputs/bundle/release/app-release.aab \
             --title "Release $VERSION" \
             --notes "Release $VERSION for branch $GITHUB_REF" \
             --repo $GITHUB_REPOSITORY
