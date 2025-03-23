@@ -127,8 +127,13 @@ jobs:
             gh release edit $VERSION \
               --title "Release $VERSION" \
               --notes "Release $VERSION for branch $GITHUB_REF" \
-              --repo $GITHUB_REPOSITORY \
-              --assets "build/app/outputs/bundle/release/app-release.aab,build/app/outputs/flutter-apk/app-release.apk,release/emotion_tracker-${{ env.VERSION }}.tar.gz"
+              --repo $GITHUB_REPOSITORY
+            gh release upload $VERSION \
+              build/app/outputs/bundle/release/app-release.aab \
+              build/app/outputs/flutter-apk/app-release.apk \
+              release/emotion_tracker-${{ env.VERSION }}.tar.gz \
+              --repo $GITHUB_REPOSITORY
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
