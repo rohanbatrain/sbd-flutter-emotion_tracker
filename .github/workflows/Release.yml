@@ -72,6 +72,13 @@ jobs:
       - name: Build Linux version (Linux)
         run: flutter build linux --release
 
+      - name : copy build to 
+        run: cp -r build/linux/x64/release/bundle/ Emotion-Tracker.AppDir/
+
+      - name : downloading appimagetool
+        run : wget -p Emotion-Tracker.AppDir https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage 
+
+
       - name: Create tar.gz archive for Linux executable
         run: |
           mkdir -p release
