@@ -125,7 +125,7 @@ jobs:
         run: |
           if [ -f "build/app/outputs/bundle/release/app-release.aab" ] && \
              [ -f "build/app/outputs/flutter-apk/app-release.apk" ] && \
-             [ -f "appimage/Emotion_Tracker.appimage" ] && \
+             [ -f "appimage/Emotion_Tracker.Appimage" ] && \
              [ -f "release/emotion_tracker-${{ env.VERSION }}.tar.gz" ]; then
             echo "All files exist"
           else
