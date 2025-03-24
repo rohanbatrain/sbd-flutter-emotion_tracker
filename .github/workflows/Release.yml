@@ -116,58 +116,58 @@ jobs:
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-# --- Create or Update GitHub Release ---
-- name: Check if Release Exists
-  id: check_release
-  run: |
-    release_exists=$(gh release view $VERSION --json name --jq '.name' || echo "")
-    if [ -z "$release_exists" ]; then
-      echo "Release does not exist, creating a new one"
-      echo "create=true" >> $GITHUB_ENV
-    else
-      echo "Release exists, updating the existing release"
-      echo "create=false" >> $GITHUB_ENV
-    fi
-  env:
-    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-- name: Verify Files Exist
-  id: verify_files
-  run: |
-    if [ -f "build/app/outputs/bundle/release/app-release.aab" ] && \
-       [ -f "build/app/outputs/flutter-apk/app-release.apk" ] && \
-       [ -f "appimage/Emotion_Tracker.appimage" ] && \
-       [ -f "release/emotion_tracker-${{ env.VERSION }}.tar.gz" ]; then
-      echo "All files exist"
-    else
-      echo "One or more files do not exist"
-      exit 1
-    fi
-
-  - name: Create or Update GitHub Release
-    run: |
-      echo "Checking if release exists..."
-      release_exists=$(gh release view $VERSION --json name --jq '.name' || echo "")
       
-      if [ -n "$release_exists" ]; then
-        echo "Release exists, deleting the existing release..."
-        gh release delete $VERSION --yes --repo $GITHUB_REPOSITORY
-      else
-        echo "Release does not exist, creating a new release."
-      fi
+      # --- Create or Update GitHub Release ---
+      - name: Check if Release Exists
+        id: check_release
+        run: |
+          release_exists=$(gh release view $VERSION --json name --jq '.name' || echo "")
+          if [ -z "$release_exists" ]; then
+            echo "Release does not exist, creating a new one"
+            echo "create=true" >> $GITHUB_ENV
+          else
+            echo "Release exists, updating the existing release"
+            echo "create=false" >> $GITHUB_ENV
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       
-      # Create the new release and upload the assets
-      echo "Creating a new release and uploading assets..."
-      gh release create $VERSION \
-        build/app/outputs/bundle/release/app-release.aab \
-        build/app/outputs/flutter-apk/app-release.apk \
-        appimage/Emotion_Tracker.appimage \
-        release/emotion_tracker-${{ env.VERSION }}.tar.gz \
-        --title "Release $VERSION" \
-        --notes "Release $VERSION for branch $GITHUB_REF" \
-        --repo $GITHUB_REPOSITORY
-    env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-
+      - name: Verify Files Exist
+        id: verify_files
+        run: |
+          if [ -f "build/app/outputs/bundle/release/app-release.aab" ] && \
+             [ -f "build/app/outputs/flutter-apk/app-release.apk" ] && \
+             [ -f "appimage/Emotion_Tracker.appimage" ] && \
+             [ -f "release/emotion_tracker-${{ env.VERSION }}.tar.gz" ]; then
+            echo "All files exist"
+          else
+            echo "One or more files do not exist"
+            exit 1
+          fi
+      
+      - name: Create or Update GitHub Release
+        run: |
+          echo "Checking if release exists..."
+          release_exists=$(gh release view $VERSION --json name --jq '.name' || echo "")
+          
+          if [ -n "$release_exists" ]; then
+            echo "Release exists, deleting the existing release..."
+            gh release delete $VERSION --yes --repo $GITHUB_REPOSITORY
+          else
+            echo "Release does not exist, creating a new release."
+          fi
+          
+          # Create the new release and upload the assets
+          echo "Creating a new release and uploading assets..."
+          gh release create $VERSION \
+            build/app/outputs/bundle/release/app-release.aab \
+            build/app/outputs/flutter-apk/app-release.apk \
+            appimage/Emotion_Tracker.appimage \
+            release/emotion_tracker-${{ env.VERSION }}.tar.gz \
+            --title "Release $VERSION" \
+            --notes "Release $VERSION for branch $GITHUB_REF" \
+            --repo $GITHUB_REPOSITORY
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      
