@@ -79,7 +79,7 @@ jobs:
         run: cp -r build/linux/x64/release/bundle/* appimage/Emotion-Tracker.AppDir/
 
       - name: Run appimagetool
-        run: ./appimage/appimagetool-x86_64.AppImage ./appimage/Emotion-Tracker.AppDir ./appimage/Emotion_Tracker.appimage
+        run: ./appimage/appimagetool-x86_64.AppImage ./appimage/Emotion-Tracker.AppDir ./appimage/Emotion_Tracker.Appimage
 
       - name: Create tar.gz archive for Linux executable
         run: |
@@ -150,7 +150,7 @@ jobs:
           gh release create $VERSION \
             build/app/outputs/bundle/release/app-release.aab \
             build/app/outputs/flutter-apk/app-release.apk \
-            appimage/Emotion_Tracker.appimage \
+            appimage/Emotion_Tracker.Appimage \
             release/emotion_tracker-${{ env.VERSION }}.tar.gz \
             --title "Release $VERSION" \
             --notes "Release $VERSION for branch $GITHUB_REF" \
