@@ -101,21 +101,6 @@ jobs:
           target_branch: gh-pages
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      # --- Create or Update GitHub Release ---
-      - name: Check if Release Exists
-        id: check_release
-        run: |
-          release_exists=$(gh release view $VERSION --json name --jq '.name' || echo "")
-          if [ -z "$release_exists" ]; then
-            echo "Release does not exist, creating a new one"
-            echo "create=true" >> $GITHUB_ENV
-          else
-            echo "Release exists, updating the existing release"
-            echo "create=false" >> $GITHUB_ENV
-          fi
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       
       # --- Create or Update GitHub Release ---
       - name: Check if Release Exists
