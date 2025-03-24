@@ -72,10 +72,13 @@ jobs:
       - name: Build Linux version (Linux)
         run: flutter build linux --release
 
-      - name : copy build to appimage
-        run: cp -r build/linux/x64/release/bundle/ appimage/Emotion-Tracker.AppDir/
+      - name: Copy Linux binary to AppDir
+        run: cp build/linux/x64/release/bundle/emotion_tracker appimage/Emotion-Tracker.AppDir/
 
-      - name : running appimagetool
+      - name: Copy build to AppDir
+        run: cp -r build/linux/x64/release/bundle/* appimage/Emotion-Tracker.AppDir/
+
+      - name: Run appimagetool
         run: ./appimage/appimagetool-x86_64.AppImage ./appimage/Emotion-Tracker.AppDir ./appimage/Emotion_Tracker.appimage
 
       - name: Create tar.gz archive for Linux executable
@@ -154,5 +157,5 @@ jobs:
             --repo $GITHUB_REPOSITORY
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      
-      
+
+
