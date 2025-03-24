@@ -158,4 +158,13 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-
+      - name: Cleanup Temporary Files and Environment Variables
+              run: |
+                echo "Cleaning up temporary files..."
+                rm -rf $HOME/keystore.jks  # Remove sensitive files like keystore
+                rm -rf build/              # Remove build artifacts
+                rm -rf release/            # Remove release artifacts
+                unset ANDROID_KEY_ALIAS    # Unset environment variables
+                unset ANDROID_KEY_PASSWORD
+                unset ANDROID_KEYSTORE_PASSWORD
+        
