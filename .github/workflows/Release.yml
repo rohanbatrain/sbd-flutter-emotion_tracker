@@ -86,6 +86,6 @@ jobs:
           git add data/emotion_tracker-${{ env.VERSION }}.txt
           git commit -m "Add Emotion Tracker AppImage ${VERSION}"
           git push origin add-${{ env.VERSION }}-appimage
-          gh pr create --title "Add Emotion Tracker AppImage ${VERSION}" --body "This PR adds the Emotion Tracker AppImage for version ${VERSION}" --base master --head add-${{ env.VERSION }}-appimage
+          gh pr create --title "Add Emotion Tracker AppImage ${VERSION}" --body "This PR adds the Emotion Tracker AppImage for version ${VERSION}, This is a PR created by github action at time of release, so if anything is wrong kindly wait for manual review from the maintainers." --base master --head add-${{ env.VERSION }}-appimage
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
