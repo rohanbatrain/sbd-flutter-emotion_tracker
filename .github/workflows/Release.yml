@@ -30,13 +30,6 @@ jobs:
           VERSION=$(echo ${GITHUB_REF} | sed 's/refs\/heads\///')
           echo "VERSION=${VERSION}" >> $GITHUB_ENV
 
-      # Print Current Directory
-      - name: Print Current Directory
-        run: |
-          echo "Current directory:"
-          pwd
-          echo "Listing contents of the current directory:"
-          ls -la
 
       # --- Android release steps ---
       - name: Generate Keystore (Android)
@@ -84,7 +77,7 @@ jobs:
       - name: Create tar.gz archive for Linux executable
         run: |
           mkdir -p release
-          tar -czvf "release/emotion_tracker-${{ env.VERSION }}.tar.gz" -C build/linux/x64/release bundle
+          tar -czvf "release/Emotion-Tracker-Linux-x86-64-${{ env.VERSION }}.tar.gz" -C build/linux/x64/release bundle
           ls -la release
 
       # --- Web release steps ---
@@ -126,7 +119,7 @@ jobs:
           if [ -f "build/app/outputs/bundle/release/app-release.aab" ] && \
              [ -f "build/app/outputs/flutter-apk/app-release.apk" ] && \
              [ -f "appimage/Emotion_Tracker.Appimage" ] && \
-             [ -f "release/emotion_tracker-${{ env.VERSION }}.tar.gz" ]; then
+             [ -f "Emotion-Tracker-Linux-x86-64-${{ env.VERSION }}.tar.gz" ]; then
             echo "All files exist"
           else
             echo "One or more files do not exist"
@@ -151,7 +144,7 @@ jobs:
             build/app/outputs/bundle/release/app-release.aab \
             build/app/outputs/flutter-apk/app-release.apk \
             appimage/Emotion_Tracker.Appimage \
-            release/emotion_tracker-${{ env.VERSION }}.tar.gz \
+            Emotion-Tracker-Linux-x86-64-${{ env.VERSION }}.tar.gz \
             --title "Release $VERSION" \
             --notes "Release $VERSION for branch $GITHUB_REF" \
             --repo $GITHUB_REPOSITORY
