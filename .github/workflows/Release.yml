@@ -72,7 +72,7 @@ jobs:
         run: cp -r build/linux/x64/release/bundle/* appimage/Emotion-Tracker.AppDir/
 
       - name: Run appimagetool
-        run: ./appimage/appimagetool-x86_64.AppImage ./appimage/Emotion-Tracker.AppDir ./appimage/Emotion_Tracker.Appimage
+        run: ./appimage/appimagetool-x86_64.AppImage ./appimage/Emotion-Tracker.AppDir ./appimage/Emotion-Tracker.Appimage
 
       - name: Create tar.gz archive for Linux executable
         run: |
@@ -118,7 +118,7 @@ jobs:
         run: |
           if [ -f "build/app/outputs/bundle/release/app-release.aab" ] && \
              [ -f "build/app/outputs/flutter-apk/app-release.apk" ] && \
-             [ -f "appimage/Emotion_Tracker.Appimage" ] && \
+             [ -f "appimage/Emotion-Tracker.Appimage" ] && \
              [ -f "Emotion-Tracker-Linux-x86-64-${{ env.VERSION }}.tar.gz" ]; then
             echo "All files exist"
           else
@@ -143,7 +143,7 @@ jobs:
           gh release create $VERSION \
             build/app/outputs/bundle/release/app-release.aab \
             build/app/outputs/flutter-apk/app-release.apk \
-            appimage/Emotion_Tracker.Appimage \
+            appimage/Emotion-Tracker.Appimage \
             Emotion-Tracker-Linux-x86-64-${{ env.VERSION }}.tar.gz \
             --title "Release $VERSION" \
             --notes "Release $VERSION for branch $GITHUB_REF" \
@@ -152,7 +152,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Cleanup Temporary Files and Environment Variables
-              run: |
+        run: |
                 echo "Cleaning up temporary files..."
                 rm -rf $HOME/keystore.jks  # Remove sensitive files like keystore
                 rm -rf build/              # Remove build artifacts
