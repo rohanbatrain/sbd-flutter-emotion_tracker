@@ -37,14 +37,13 @@ class _LogEmotionScreenState extends State<LogEmotionScreen> {
     if (backendUrl.isNotEmpty && authToken.isNotEmpty) {
       // Generate a unique note ID and prepare the note data
       final String noteId = DateTime.now().millisecondsSinceEpoch.toString();
-      final List<String> noteIds = [noteId];
 
       await _emotionService.sendEmotionData(
         backendUrl,
         authToken,
         emotionFelt,
         emotionIntensity,
-        noteIds,
+        noteContent, // Changed from noteIds to noteContent
       );
 
       // Optionally, save the note content locally or send it to the backend
