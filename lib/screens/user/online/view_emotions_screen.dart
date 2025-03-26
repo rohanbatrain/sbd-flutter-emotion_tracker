@@ -80,7 +80,12 @@ class ViewEmotionDetailsScreen extends StatelessWidget {
     final String emotionFelt = emotion['emotion_felt'] ?? 'Unknown';
     final int intensity = emotion['emotion_intensity'] ?? 'Unknown';
     final String date = emotion['timestamp'] ?? 'Unknown'; // Assume you have 'date' key in your data
-    final String note = emotion['note'] ?? 'No note available'; // Assume you have 'note' key in your data
+    final dynamic noteData = emotion['note_ids'];
+
+    // Handle note_ids as a list or string
+    final List<String> notes = noteData is List
+        ? noteData.map((e) => e.toString()).toList() // Convert list elements to strings
+        : (noteData != null ? [noteData.toString()] : []); // Wrap single note in a list or use empty list
 
     return Scaffold(
       appBar: AppBar(
@@ -105,11 +110,39 @@ class ViewEmotionDetailsScreen extends StatelessWidget {
               'Date: $date',
               style: Theme.of(context).textTheme.bodyLarge,
             ),
-            SizedBox(height: 8),
-            Text(
-              'Note: $note',
-              style: Theme.of(context).textTheme.bodyLarge,
-            ),
+            SizedBox(height: 16),
+            if (notes.isNotEmpty) ...[
+              Text(
+                'Notes:',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              SizedBox(height: 8),
+              GridView.builder(
+                shrinkWrap: true,
+                physics: NeverScrollableScrollPhysics(),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2, // Adjust the number of columns as needed
+                  crossAxisSpacing: 8,
+                  mainAxisSpacing: 8,
+                ),
+                itemCount: notes.length,
+                itemBuilder: (context, index) {
+                  return Card(
+                    elevation: 2,
+                    child: Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Center(
+                        child: Text(
+                          notes[index],
+                          style: Theme.of(context).textTheme.bodyMedium,
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
           ],
         ),
       ),

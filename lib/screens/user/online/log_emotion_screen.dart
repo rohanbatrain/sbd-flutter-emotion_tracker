@@ -20,9 +20,9 @@ class _LogEmotionScreenState extends State<LogEmotionScreen> {
   void _logEmotion() async {
     final String emotionFelt = _emotionController.text;
     final int emotionIntensity = _intensity.toInt();
-    final String note = _noteController.text;
+    final String noteContent = _noteController.text;
 
-    if (emotionFelt.isEmpty || emotionIntensity == 0 || note.isEmpty) {
+    if (emotionFelt.isEmpty || emotionIntensity == 0 || noteContent.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text('Please fill all fields correctly!'),
         backgroundColor: Colors.red,
@@ -35,13 +35,19 @@ class _LogEmotionScreenState extends State<LogEmotionScreen> {
     final authToken = prefs.getString('auth_token') ?? '';
 
     if (backendUrl.isNotEmpty && authToken.isNotEmpty) {
+      // Generate a unique note ID and prepare the note data
+      final String noteId = DateTime.now().millisecondsSinceEpoch.toString();
+      final List<String> noteIds = [noteId];
+
       await _emotionService.sendEmotionData(
         backendUrl,
         authToken,
         emotionFelt,
         emotionIntensity,
-        note,
+        noteIds,
       );
+
+      // Optionally, save the note content locally or send it to the backend
       _emotionController.clear();
       _noteController.clear();
       setState(() {
