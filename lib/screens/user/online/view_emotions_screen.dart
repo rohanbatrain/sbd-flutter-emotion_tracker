@@ -275,11 +275,8 @@ class _ViewEmotionDetailsScreenState extends State<ViewEmotionDetailsScreen> {
         return ListView.builder(
           shrinkWrap: true,
           physics: NeverScrollableScrollPhysics(),
-          itemCount: _notes.length + 1,
+          itemCount: _notes.length,
           itemBuilder: (context, index) {
-            if (index == _notes.length) {
-              return _buildAddNoteButton();
-            }
             return Padding(
               padding: const EdgeInsets.symmetric(vertical: 4.0),
               child: _AnimatedNoteCard(note: _notes[index]),
@@ -292,19 +289,13 @@ class _ViewEmotionDetailsScreenState extends State<ViewEmotionDetailsScreen> {
             SizedBox(
               height: 200,
               child: PageView.builder(
-                itemCount: _notes.length + 1,
+                itemCount: _notes.length,
                 onPageChanged: (index) {
                   setState(() {
                     _currentPage = index;
                   });
                 },
                 itemBuilder: (context, index) {
-                  if (index == _notes.length) {
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                      child: _buildAddNoteButton(),
-                    );
-                  }
                   return Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16.0),
                     child: _AnimatedNoteCard(note: _notes[index]),
@@ -316,7 +307,7 @@ class _ViewEmotionDetailsScreenState extends State<ViewEmotionDetailsScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: List.generate(
-                _notes.length + 1,
+                _notes.length,
                 (index) => AnimatedContainer(
                   duration: Duration(milliseconds: 300),
                   margin: EdgeInsets.symmetric(horizontal: 4.0),
@@ -338,14 +329,8 @@ class _ViewEmotionDetailsScreenState extends State<ViewEmotionDetailsScreen> {
           height: 150,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
-            itemCount: _notes.length + 1,
+            itemCount: _notes.length,
             itemBuilder: (context, index) {
-              if (index == _notes.length) {
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                  child: _buildAddNoteButton(),
-                );
-              }
               return Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 8.0),
                 child: _AnimatedNoteCard(note: _notes[index]),
@@ -358,11 +343,8 @@ class _ViewEmotionDetailsScreenState extends State<ViewEmotionDetailsScreen> {
           spacing: 8,
           runSpacing: 8,
           children: List.generate(
-            _notes.length + 1,
+            _notes.length,
             (index) {
-              if (index == _notes.length) {
-                return _buildAddNoteButton();
-              }
               return SizedBox(
                 width: (index % 3 == 0) ? 150 : 100, // Staggered sizes
                 child: _AnimatedNoteCard(note: _notes[index]),
@@ -380,36 +362,12 @@ class _ViewEmotionDetailsScreenState extends State<ViewEmotionDetailsScreen> {
             crossAxisSpacing: 8,
             mainAxisSpacing: 8,
           ),
-          itemCount: _notes.length + 1,
+          itemCount: _notes.length,
           itemBuilder: (context, index) {
-            if (index == _notes.length) {
-              return _buildAddNoteButton();
-            }
             return _AnimatedNoteCard(note: _notes[index]);
           },
         );
     }
-  }
-
-  Widget _buildAddNoteButton() {
-    return InkWell(
-      onTap: _addNewNote,
-      child: Container(
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: Theme.of(context).colorScheme.primary,
-          ),
-        ),
-        child: Center(
-          child: Icon(
-            Icons.add,
-            color: Theme.of(context).colorScheme.primary,
-          ),
-        ),
-      ),
-    );
   }
 
   @override
@@ -480,6 +438,10 @@ class _ViewEmotionDetailsScreenState extends State<ViewEmotionDetailsScreen> {
                   ],
                 ),
               ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _addNewNote,
+        child: Icon(Icons.add),
       ),
     );
   }
