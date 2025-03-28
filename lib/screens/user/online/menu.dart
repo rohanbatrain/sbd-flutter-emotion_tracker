@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'settings_screen.dart'; // Import the SettingsScreen
+import 'debug_screen.dart'; // Import the DebugScreen
 
 class Menu extends StatelessWidget {
   final VoidCallback onLogout;
@@ -17,8 +18,20 @@ class Menu extends StatelessWidget {
     await prefs.remove('backend_url');
   }
 
+  Future<bool> _isDebugEnabled() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool('is_debug_enabled') ?? false;
+  }
+
   void _navigateToBackendUrlScreen(BuildContext context) {
     Navigator.pushNamedAndRemoveUntil(context, '/backend_url', (route) => false);
+  }
+
+  void _navigateToDebugScreen(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const DebugScreen()),
+    );
   }
 
   Future<void> _showResetBackendUrlConfirmationDialog(BuildContext context) async {
@@ -66,33 +79,51 @@ class Menu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PopupMenuButton<String>(
-      icon: CircleAvatar(
-        child: Icon(Icons.person),
-      ),
-      onSelected: (String result) {
-        if (result == 'logout') {
-          onLogout(); // Ensure this is correctly calling the logout function
-        } else if (result == 'reset_backend_url') {
-          _showResetBackendUrlConfirmationDialog(context);
-        } else if (result == 'settings') {
-          _navigateToSettingsScreen(context);
+    return FutureBuilder<bool>(
+      future: _isDebugEnabled(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const CircularProgressIndicator();
         }
+
+        bool isDebugEnabled = snapshot.data ?? false;
+
+        return PopupMenuButton<String>(
+          icon: CircleAvatar(
+            child: Icon(Icons.person),
+          ),
+          onSelected: (String result) {
+            if (result == 'logout') {
+              onLogout();
+            } else if (result == 'reset_backend_url') {
+              _showResetBackendUrlConfirmationDialog(context);
+            } else if (result == 'settings') {
+              _navigateToSettingsScreen(context);
+            } else if (result == 'debug') {
+              _navigateToDebugScreen(context);
+            }
+          },
+          itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+            const PopupMenuItem<String>(
+              value: 'logout',
+              child: Text('Logout'),
+            ),
+            const PopupMenuItem<String>(
+              value: 'reset_backend_url',
+              child: Text('Reset Backend URL'),
+            ),
+            const PopupMenuItem<String>(
+              value: 'settings',
+              child: Text('Settings'),
+            ),
+            if (isDebugEnabled)
+              const PopupMenuItem<String>(
+                value: 'debug',
+                child: Text('Debug Screen'),
+              ),
+          ],
+        );
       },
-      itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-        const PopupMenuItem<String>(
-          value: 'logout',
-          child: Text('Logout'),
-        ),
-        const PopupMenuItem<String>(
-          value: 'reset_backend_url',
-          child: Text('Reset Backend URL'),
-        ),
-        const PopupMenuItem<String>(
-          value: 'settings',
-          child: Text('Settings'),
-        ),
-      ],
     );
   }
 }
