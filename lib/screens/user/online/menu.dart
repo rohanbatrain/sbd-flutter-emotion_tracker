@@ -72,11 +72,11 @@ class Menu extends StatelessWidget {
       ),
       onSelected: (String result) {
         if (result == 'logout') {
-          onLogout();
+          onLogout(); // Ensure this is correctly calling the logout function
         } else if (result == 'reset_backend_url') {
           _showResetBackendUrlConfirmationDialog(context);
         } else if (result == 'settings') {
-          _navigateToSettingsScreen(context); // Navigate to Settings screen
+          _navigateToSettingsScreen(context);
         }
       },
       itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[

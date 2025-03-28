@@ -14,6 +14,7 @@ class ViewEmotionsScreen extends StatefulWidget {
 class _ViewEmotionsScreenState extends State<ViewEmotionsScreen> {
   final EmotionService _emotionService = EmotionService();
   List<Map<String, dynamic>> _emotions = [];
+  String _selectedFilter = 'Timestamp'; // Default filter
 
   @override
   void initState() {
@@ -29,19 +30,67 @@ class _ViewEmotionsScreenState extends State<ViewEmotionsScreen> {
     if (backendUrl.isNotEmpty && authToken.isNotEmpty) {
       final emotions = await _emotionService.fetchEmotions(backendUrl, authToken);
 
-      // Check if the widget is still mounted before calling setState
       if (mounted) {
         setState(() {
-          _emotions = emotions.reversed.toList();  // Reverse to show the latest first
+          _emotions = _applyFilter(emotions);
         });
       }
     }
   }
 
+  List<Map<String, dynamic>> _applyFilter(List<Map<String, dynamic>> emotions) {
+    switch (_selectedFilter) {
+      case 'Name (A-Z)':
+        emotions.sort((a, b) => (a['emotion_felt'] ?? '').compareTo(b['emotion_felt'] ?? ''));
+        break;
+      case 'Name (Z-A)':
+        emotions.sort((a, b) => (b['emotion_felt'] ?? '').compareTo(a['emotion_felt'] ?? ''));
+        break;
+      case 'Intensity (High to Low)':
+        emotions.sort((a, b) => (b['emotion_intensity'] ?? 0).compareTo(a['emotion_intensity'] ?? 0));
+        break;
+      case 'Intensity (Low to High)':
+        emotions.sort((a, b) => (a['emotion_intensity'] ?? 0).compareTo(b['emotion_intensity'] ?? 0));
+        break;
+      case 'Timestamp':
+      default:
+        emotions.sort((a, b) => (b['timestamp'] ?? '').compareTo(a['timestamp'] ?? ''));
+        break;
+    }
+    return emotions;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('View Emotions')),
+      appBar: AppBar(
+        title: Text('View Emotions'),
+        actions: [
+          DropdownButton<String>(
+            value: _selectedFilter,
+            items: [
+              'Timestamp',
+              'Name (A-Z)',
+              'Name (Z-A)',
+              'Intensity (High to Low)',
+              'Intensity (Low to High)'
+            ]
+                .map((filter) => DropdownMenuItem(
+                      value: filter,
+                      child: Text(filter),
+                    ))
+                .toList(),
+            onChanged: (value) {
+              if (value != null) {
+                setState(() {
+                  _selectedFilter = value;
+                  _emotions = _applyFilter(_emotions); // Reapply filter
+                });
+              }
+            },
+          ),
+        ],
+      ),
       body: _emotions.isEmpty
           ? Center(child: Text('No emotions logged yet.'))
           : ListView.builder(
@@ -52,9 +101,8 @@ class _ViewEmotionsScreenState extends State<ViewEmotionsScreen> {
                   child: ListTile(
                     title: Text(emotion['emotion_felt']),
                     subtitle: Text('Intensity: ${emotion['emotion_intensity']}'),
-                    onTap: () {
-                      // Navigate to a new screen with emotion details
-                      Navigator.push(
+                    onTap: () async {
+                      final refresh = await Navigator.push(
                         context,
                         MaterialPageRoute(
                           builder: (context) => ViewEmotionDetailsScreen(
@@ -62,6 +110,9 @@ class _ViewEmotionsScreenState extends State<ViewEmotionsScreen> {
                           ),
                         ),
                       );
+                      if (refresh == true) {
+                        _fetchEmotions(); // Refresh emotions when returning from the details screen
+                      }
                     },
                   ),
                 );
@@ -83,6 +134,8 @@ class ViewEmotionDetailsScreen extends StatefulWidget {
 class _ViewEmotionDetailsScreenState extends State<ViewEmotionDetailsScreen> {
   List<String> _notes = [];
   bool _isLoading = true;
+  String _selectedView = 'Grid View'; // Default view
+  int _currentPage = 0; // Track the current page in the carousel
 
   @override
   void initState() {
@@ -102,7 +155,7 @@ class _ViewEmotionDetailsScreenState extends State<ViewEmotionDetailsScreen> {
     final authToken = prefs.getString('auth_token') ?? '';
 
     for (String id in noteIds) {
-      final url = Uri.parse('$backendUrl/user/v1/notes/get/$id');
+      final url = Uri.parse('$backendUrl/user/v1/notes/basic/get/$id');
       final response = await http.get(
         url,
         headers: {
@@ -112,7 +165,7 @@ class _ViewEmotionDetailsScreenState extends State<ViewEmotionDetailsScreen> {
       );
 
       if (response.statusCode == 200) {
-        final noteContent = response.body; // Assuming the response body contains the note content as plain text or JSON
+        final noteContent = response.body;
         fetchedNotes.add(noteContent);
       } else {
         fetchedNotes.add('Error fetching note for ID: $id');
@@ -127,6 +180,238 @@ class _ViewEmotionDetailsScreenState extends State<ViewEmotionDetailsScreen> {
     }
   }
 
+  Future<void> _addNewNote() async {
+    final TextEditingController noteController = TextEditingController();
+    final prefs = await SharedPreferences.getInstance();
+    final backendUrl = prefs.getString('backend_url') ?? '';
+    final authToken = prefs.getString('auth_token') ?? '';
+    final emotionId = widget.emotion['_id'];
+
+    if (emotionId == null || backendUrl.isEmpty || authToken.isEmpty) {
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Row(
+            children: [
+              Text('Add New Note'),
+              Spacer(),
+              IconButton(
+                icon: Icon(Icons.info_outline, color: Theme.of(context).colorScheme.primary),
+                onPressed: () {
+                  showDialog(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: Text('Notice'),
+                      content: Text(
+                        'New notes will appear after reloading the "View Emotions" screen. This reduces backend costs by minimizing GET requests.',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: Text('OK'),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+          content: TextField(
+            controller: noteController,
+            decoration: InputDecoration(
+              hintText: 'Enter your note here',
+              border: OutlineInputBorder(),
+            ),
+            maxLines: 3,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final noteContent = noteController.text.trim();
+                if (noteContent.isNotEmpty) {
+                  final url = Uri.parse('$backendUrl/user/v1/emotion_tracker/append_note/$emotionId');
+                  final response = await http.post(
+                    url,
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': 'Bearer $authToken',
+                    },
+                    body: jsonEncode({'note': noteContent}),
+                  );
+
+                  if (response.statusCode == 200) {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Note added successfully')),
+                    );
+                  } else {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Failed to add note')),
+                    );
+                  }
+                }
+              },
+              child: Text('Add'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildNotesView() {
+    switch (_selectedView) {
+      case 'List View':
+        return ListView.builder(
+          shrinkWrap: true,
+          physics: NeverScrollableScrollPhysics(),
+          itemCount: _notes.length + 1,
+          itemBuilder: (context, index) {
+            if (index == _notes.length) {
+              return _buildAddNoteButton();
+            }
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4.0),
+              child: _AnimatedNoteCard(note: _notes[index]),
+            );
+          },
+        );
+      case 'Carousel View':
+        return Column(
+          children: [
+            SizedBox(
+              height: 200,
+              child: PageView.builder(
+                itemCount: _notes.length + 1,
+                onPageChanged: (index) {
+                  setState(() {
+                    _currentPage = index;
+                  });
+                },
+                itemBuilder: (context, index) {
+                  if (index == _notes.length) {
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                      child: _buildAddNoteButton(),
+                    );
+                  }
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    child: _AnimatedNoteCard(note: _notes[index]),
+                  );
+                },
+              ),
+            ),
+            SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(
+                _notes.length + 1,
+                (index) => AnimatedContainer(
+                  duration: Duration(milliseconds: 300),
+                  margin: EdgeInsets.symmetric(horizontal: 4.0),
+                  width: _currentPage == index ? 12.0 : 8.0,
+                  height: 8.0,
+                  decoration: BoxDecoration(
+                    color: _currentPage == index
+                        ? Theme.of(context).colorScheme.primary
+                        : Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
+                    borderRadius: BorderRadius.circular(4.0),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      case 'Horizontal List View':
+        return SizedBox(
+          height: 150,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: _notes.length + 1,
+            itemBuilder: (context, index) {
+              if (index == _notes.length) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                  child: _buildAddNoteButton(),
+                );
+              }
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                child: _AnimatedNoteCard(note: _notes[index]),
+              );
+            },
+          ),
+        );
+      case 'Staggered Grid View':
+        return Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: List.generate(
+            _notes.length + 1,
+            (index) {
+              if (index == _notes.length) {
+                return _buildAddNoteButton();
+              }
+              return SizedBox(
+                width: (index % 3 == 0) ? 150 : 100, // Staggered sizes
+                child: _AnimatedNoteCard(note: _notes[index]),
+              );
+            },
+          ),
+        );
+      case 'Grid View':
+      default:
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: NeverScrollableScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: 8,
+            mainAxisSpacing: 8,
+          ),
+          itemCount: _notes.length + 1,
+          itemBuilder: (context, index) {
+            if (index == _notes.length) {
+              return _buildAddNoteButton();
+            }
+            return _AnimatedNoteCard(note: _notes[index]);
+          },
+        );
+    }
+  }
+
+  Widget _buildAddNoteButton() {
+    return InkWell(
+      onTap: _addNewNote,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: Theme.of(context).colorScheme.primary,
+          ),
+        ),
+        child: Center(
+          child: Icon(
+            Icons.add,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final String emotionFelt = widget.emotion['emotion_felt'] ?? 'Unknown';
@@ -136,12 +421,36 @@ class _ViewEmotionDetailsScreenState extends State<ViewEmotionDetailsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text('Emotion Details'),
+        actions: [
+          DropdownButton<String>(
+            value: _selectedView,
+            items: [
+              'Grid View',
+              'List View',
+              'Carousel View',
+              'Horizontal List View',
+              'Staggered Grid View'
+            ]
+                .map((view) => DropdownMenuItem(
+                      value: view,
+                      child: Text(view),
+                    ))
+                .toList(),
+            onChanged: (value) {
+              if (value != null) {
+                setState(() {
+                  _selectedView = value;
+                });
+              }
+            },
+          ),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: _isLoading
             ? Center(child: CircularProgressIndicator())
-            : SingleChildScrollView( // Wrap the content in a SingleChildScrollView
+            : SingleChildScrollView(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -166,19 +475,7 @@ class _ViewEmotionDetailsScreenState extends State<ViewEmotionDetailsScreen> {
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                       SizedBox(height: 8),
-                      GridView.builder(
-                        shrinkWrap: true,
-                        physics: NeverScrollableScrollPhysics(),
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          crossAxisSpacing: 8,
-                          mainAxisSpacing: 8,
-                        ),
-                        itemCount: _notes.length,
-                        itemBuilder: (context, index) {
-                          return _AnimatedNoteCard(note: _notes[index]);
-                        },
-                      ),
+                      _buildNotesView(),
                     ],
                   ],
                 ),
@@ -204,7 +501,6 @@ class _AnimatedNoteCardState extends State<_AnimatedNoteCard> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    // Parse the JSON and extract the "content" key
     String content;
     try {
       final Map<String, dynamic> noteJson = widget.note.isNotEmpty
@@ -216,9 +512,7 @@ class _AnimatedNoteCardState extends State<_AnimatedNoteCard> {
     }
 
     return InkWell(
-      onTap: () {
-        // Handle card tap if needed
-      },
+      onTap: () {},
       onHover: (hovering) {
         setState(() {
           _isHovered = hovering;

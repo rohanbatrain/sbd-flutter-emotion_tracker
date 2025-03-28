@@ -14,6 +14,8 @@ class LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   String _errorMessage = '';
+  final String _testUserEmail = 'testuser@example.com';
+  final String _testUserPassword = 'password123';
 
   Future<void> _login(String email, String password) async {
     final prefs = await SharedPreferences.getInstance();
@@ -139,12 +141,18 @@ class LoginScreenState extends State<LoginScreen> {
                 onSelected: (String result) {
                   if (result == 'reset_backend_url') {
                     _showResetBackendUrlConfirmationDialog(context);
+                  } else if (result == 'login_test_user') {
+                    _login(_testUserEmail, _testUserPassword);
                   }
                 },
                 itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
                   const PopupMenuItem<String>(
                     value: 'reset_backend_url',
                     child: Text('Reset Backend URL'),
+                  ),
+                  const PopupMenuItem<String>(
+                    value: 'login_test_user',
+                    child: Text('Login as Test User'),
                   ),
                 ],
               ),

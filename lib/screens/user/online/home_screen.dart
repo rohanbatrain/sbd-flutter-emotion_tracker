@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'log_emotion_screen.dart';
 import 'view_emotions_screen.dart';
 import 'analytics_screen.dart';
@@ -26,8 +27,12 @@ class HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  void _logout() {
-    // Implement logout functionality
+  void _logout() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('auth_token');
+    await prefs.remove('role');
+    if (!context.mounted) return;
+    Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
   }
 
   void _resetBackendUrl() {
