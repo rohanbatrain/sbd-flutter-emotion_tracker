@@ -3,6 +3,7 @@ import 'emotion_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:encrypt/encrypt.dart' as encrypt;
 
 class ViewEmotionsScreen extends StatefulWidget {
   const ViewEmotionsScreen({super.key});
@@ -60,12 +61,36 @@ class _ViewEmotionsScreenState extends State<ViewEmotionsScreen> {
     return emotions;
   }
 
+  Future<String> _encryptNote(String note, String encryptionKey) async {
+    final key = encrypt.Key.fromUtf8(encryptionKey.padRight(32, ' ')); // AES key needs to be 32 bytes
+    final iv = encrypt.IV.fromLength(16); // Random 16-byte IV for AES
+    final encrypter = encrypt.Encrypter(encrypt.AES(key));
+    final encrypted = encrypter.encrypt(note, iv: iv);
+    return '${encrypted.base64}:${iv.base64}';
+  }
+
+  Future<String> _decryptNote(String encryptedNote, String encryptionKey) async {
+    final key = encrypt.Key.fromUtf8(encryptionKey.padRight(32, ' ')); // AES key needs to be 32 bytes
+    try {
+      final parts = encryptedNote.split(':');
+      if (parts.length != 2) throw Exception('Invalid encrypted note format');
+      final encryptedData = encrypt.Encrypted.fromBase64(parts[0]);
+      final iv = encrypt.IV.fromBase64(parts[1]);
+      final encrypter = encrypt.Encrypter(encrypt.AES(key));
+      return encrypter.decrypt(encryptedData, iv: iv);
+    } catch (e) {
+      return 'Invalid note format';
+    }
+  }
+
   Future<void> _addNewNoteToEmotion(Map<String, dynamic> emotion) async {
     final TextEditingController noteController = TextEditingController();
     final prefs = await SharedPreferences.getInstance();
     final backendUrl = prefs.getString('backend_url') ?? '';
     final authToken = prefs.getString('auth_token') ?? '';
     final emotionId = emotion['_id'];
+    final isEncryptionEnabled = prefs.getBool('is_encryption_enabled') ?? false;
+    final encryptionKey = prefs.getString('encryption_key');
 
     if (emotionId == null || backendUrl.isEmpty || authToken.isEmpty) {
       return;
@@ -103,6 +128,11 @@ class _ViewEmotionsScreenState extends State<ViewEmotionsScreen> {
     );
 
     if (newNote != null) {
+      String noteToSend = newNote;
+      if (isEncryptionEnabled && encryptionKey != null && encryptionKey.isNotEmpty) {
+        noteToSend = await _encryptNote(newNote, encryptionKey);
+      }
+
       final url = Uri.parse('$backendUrl/user/v1/emotion_tracker/append_note/$emotionId');
       final response = await http.post(
         url,
@@ -110,7 +140,7 @@ class _ViewEmotionsScreenState extends State<ViewEmotionsScreen> {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $authToken',
         },
-        body: jsonEncode({'note': newNote}),
+        body: jsonEncode({'note': noteToSend}),
       );
 
       if (response.statusCode == 200) {
@@ -210,6 +240,81 @@ class ViewEmotionDetailsScreen extends StatefulWidget {
 }
 
 class _ViewEmotionDetailsScreenState extends State<ViewEmotionDetailsScreen> {
+  Future<void> _addNewNoteToEmotion(Map<String, dynamic> emotion) async {
+    final TextEditingController noteController = TextEditingController();
+    final prefs = await SharedPreferences.getInstance();
+    final backendUrl = prefs.getString('backend_url') ?? '';
+    final authToken = prefs.getString('auth_token') ?? '';
+    final emotionId = emotion['_id'];
+    final isEncryptionEnabled = prefs.getBool('is_encryption_enabled') ?? false;
+    final encryptionKey = prefs.getString('encryption_key');
+
+    if (emotionId == null || backendUrl.isEmpty || authToken.isEmpty) {
+      return;
+    }
+
+    final newNote = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Add New Note'),
+          content: TextField(
+            controller: noteController,
+            decoration: const InputDecoration(
+              labelText: 'Enter your note',
+              border: OutlineInputBorder(),
+            ),
+            maxLines: 3,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (noteController.text.isNotEmpty) {
+                  Navigator.pop(context, noteController.text);
+                }
+              },
+              child: const Text('Add'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (newNote != null) {
+      String noteToSend = newNote;
+      if (isEncryptionEnabled && encryptionKey != null && encryptionKey.isNotEmpty) {
+        final key = encrypt.Key.fromUtf8(encryptionKey.padRight(32, ' '));
+        final iv = encrypt.IV.fromLength(16);
+        final encrypter = encrypt.Encrypter(encrypt.AES(key));
+        final encrypted = encrypter.encrypt(newNote, iv: iv);
+        noteToSend = '${encrypted.base64}:${iv.base64}';
+      }
+
+      final url = Uri.parse('$backendUrl/user/v1/emotion_tracker/append_note/$emotionId');
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $authToken',
+        },
+        body: jsonEncode({'note': noteToSend}),
+      );
+
+      if (response.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Note added successfully')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to add note')),
+        );
+      }
+    }
+  }
   List<String> _notes = [];
   bool _isLoading = true;
   String _selectedView = 'Grid View'; // Default view
@@ -256,95 +361,6 @@ class _ViewEmotionDetailsScreenState extends State<ViewEmotionDetailsScreen> {
         _isLoading = false;
       });
     }
-  }
-
-  Future<void> _addNewNote() async {
-    final TextEditingController noteController = TextEditingController();
-    final prefs = await SharedPreferences.getInstance();
-    final backendUrl = prefs.getString('backend_url') ?? '';
-    final authToken = prefs.getString('auth_token') ?? '';
-    final emotionId = widget.emotion['_id'];
-
-    if (emotionId == null || backendUrl.isEmpty || authToken.isEmpty) {
-      return;
-    }
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Row(
-            children: [
-              Text('Add New Note'),
-              Spacer(),
-              IconButton(
-                icon: Icon(Icons.info_outline, color: Theme.of(context).colorScheme.primary),
-                onPressed: () {
-                  showDialog(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      title: Text('Notice'),
-                      content: Text(
-                        'New notes will appear after reloading the "View Emotions" screen. This reduces backend costs by minimizing GET requests.',
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: Text('OK'),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ],
-          ),
-          content: TextField(
-            controller: noteController,
-            decoration: InputDecoration(
-              hintText: 'Enter your note here',
-              border: OutlineInputBorder(),
-            ),
-            maxLines: 3,
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final noteContent = noteController.text.trim();
-                if (noteContent.isNotEmpty) {
-                  final url = Uri.parse('$backendUrl/user/v1/emotion_tracker/append_note/$emotionId');
-                  final response = await http.post(
-                    url,
-                    headers: {
-                      'Content-Type': 'application/json',
-                      'Authorization': 'Bearer $authToken',
-                    },
-                    body: jsonEncode({'note': noteContent}),
-                  );
-
-                  if (response.statusCode == 200) {
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Note added successfully')),
-                    );
-                  } else {
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Failed to add note')),
-                    );
-                  }
-                }
-              },
-              child: Text('Add'),
-            ),
-          ],
-        );
-      },
-    );
   }
 
   Widget _buildNotesView() {
@@ -459,7 +475,7 @@ class _ViewEmotionDetailsScreenState extends State<ViewEmotionDetailsScreen> {
   @override
   Widget build(BuildContext context) {
     final String emotionFelt = widget.emotion['emotion_felt'] ?? 'Unknown';
-    final int intensity = widget.emotion['emotion_intensity'] ?? 'Unknown';
+    final String intensity = widget.emotion['emotion_intensity']?.toString() ?? 'Unknown';
     final String date = widget.emotion['timestamp'] ?? 'Unknown';
 
     return Scaffold(
@@ -526,7 +542,7 @@ class _ViewEmotionDetailsScreenState extends State<ViewEmotionDetailsScreen> {
               ),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: _addNewNote,
+        onPressed: () => _addNewNoteToEmotion(widget.emotion), // Reuse the same logic
         child: Icon(Icons.add),
       ),
     );

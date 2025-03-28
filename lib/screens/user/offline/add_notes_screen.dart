@@ -10,10 +10,14 @@ class AddNotesScreen extends StatelessWidget {
   final TextEditingController _noteController = TextEditingController();
 
   Future<String> _encryptNote(String note, String key) async {
-    final encrypt.Key aesKey = encrypt.Key.fromUtf8(key.padRight(32, ' '));
+    if (key.length < 32) {
+      key = key.padRight(32, ' '); // Ensure the key is 32 characters long
+    }
+    final encrypt.Key aesKey = encrypt.Key.fromUtf8(key);
     final encrypt.IV iv = encrypt.IV.fromLength(16);
     final encrypter = encrypt.Encrypter(encrypt.AES(aesKey));
     final encrypted = encrypter.encrypt(note, iv: iv);
+    print('Encrypted Note: ${encrypted.base64}:${iv.base64}'); // Debug log
     return '${encrypted.base64}:${iv.base64}';
   }
 
@@ -41,16 +45,22 @@ class AddNotesScreen extends StatelessWidget {
             SizedBox(height: 20),
             ElevatedButton(
               onPressed: () async {
+                final prefs = await SharedPreferences.getInstance();
+                final bool isEncryptionEnabled = prefs.getBool('is_encryption_enabled') ?? false;
+                final String? encryptionKey = prefs.getString('encryption_key');
+
                 final notes = List<String>.from(emotion['notes'] ?? []);
                 if (_noteController.text.isNotEmpty) {
                   String noteToAdd = _noteController.text;
 
                   if (isEncryptionEnabled && encryptionKey != null) {
-                    noteToAdd = await _encryptNote(noteToAdd, encryptionKey);
+                    noteToAdd = await _encryptNote(noteToAdd, encryptionKey); // Ensure encryption
                   }
 
                   notes.add(noteToAdd);
                 }
+
+                emotion['notes'] = notes; // Update the emotion's notes
                 Navigator.pop(context, notes);
               },
               child: Text('Save Note'),
