@@ -1,3 +1,4 @@
+import 'package:emotion_tracker/main.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -15,6 +16,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final TextEditingController _encryptionKeyController = TextEditingController();
   bool _isKeyVisible = false; // Tracks whether the encryption key is visible
   bool _isDebugEnabled = false; // Debug mode flag
+  bool _isDarkMode = false; // Dark mode flag
 
   @override
   void initState() {
@@ -22,13 +24,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _loadSettings();
   }
 
-  // Load the encryption status, key, and debug mode from SharedPreferences
+  // Load the encryption status, key, debug mode, and dark mode from SharedPreferences
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _isEncryptionEnabled = prefs.getBool('is_encryption_enabled') ?? false;
       _encryptionKeyController.text = prefs.getString('encryption_key') ?? '';
-      _isDebugEnabled = prefs.getBool('is_debug_enabled') ?? false; // Load debug mode setting
+      _isDebugEnabled = prefs.getBool('is_debug_enabled') ?? false;
+      _isDarkMode = prefs.getBool('is_dark_mode') ?? false; // Load dark mode setting
     });
   }
 
@@ -188,6 +191,74 @@ class _SettingsScreenState extends State<SettingsScreen> {
     await _saveSettings();
   }
 
+  // Save dark mode setting
+  Future<void> _saveDarkModeSetting(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('is_dark_mode', value);
+  }
+
+  void _toggleDarkMode(bool value) async {
+    setState(() {
+      _isDarkMode = value;
+    });
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('is_dark_mode', value);
+
+    // Notify the app to update the theme
+    (context.findAncestorWidgetOfExactType<MyApp>()?.isDarkModeNotifier)?.value = value;
+  }
+
+  Future<void> _clearAllData() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    // List of keys to keep (e.g., 'encryption_key')
+    const List<String> keysToKeep = ['encryption_key', 'is_encryption_enabled', 'is_debug_enabled', 'is_dark_mode'];
+
+    // Get all keys stored in SharedPreferences
+    final keys = prefs.getKeys();
+
+    // Loop through all keys and remove those that are not in the keysToKeep list
+    for (String key in keys) {
+      if (!keysToKeep.contains(key)) {
+        await prefs.remove(key);
+      }
+    }
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('All data cleared successfully, except encryption settings!')),
+    );
+  }
+
+  Future<void> _showClearDataConfirmationDialog() async {
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Clear All Data Confirmation'),
+          content: const Text('Are you sure you want to clear all data? This action cannot be undone.'),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton(
+              child: const Text('Clear Data'),
+              onPressed: () async {
+                Navigator.of(context).pop();
+                await _clearAllData();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   // Save all settings to SharedPreferences
   Future<void> _saveSettings() async {
     final prefs = await SharedPreferences.getInstance();
@@ -198,6 +269,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       await prefs.remove('encryption_key');
     }
     await prefs.setBool('is_debug_enabled', _isDebugEnabled);
+    await prefs.setBool('is_dark_mode', _isDarkMode);
   }
 
   @override
@@ -340,6 +412,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             const SizedBox(height: 20),
 
+            // Section Header: Appearance Settings
+            const Text(
+              'Appearance Settings',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const Divider(thickness: 1, height: 20),
+
+            // Dark Mode
+            SwitchListTile(
+              title: const Text(
+                'Enable Dark Mode',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+              ),
+              value: _isDarkMode,
+              onChanged: (bool value) {
+                _toggleDarkMode(value);
+              },
+            ),
+            const SizedBox(height: 24), // Adjusted spacing for uniformity
+
             // Section Header: App Information
             const Text(
               'App Information',
@@ -427,6 +519,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   },
                 );
               },
+            ),
+            const SizedBox(height: 10),
+
+            // Clear All Data
+            ListTile(
+              leading: const Icon(Icons.delete_forever, color: Colors.red),
+              title: const Text(
+                'Clear All Data',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+              ),
+              onTap: _showClearDataConfirmationDialog,
             ),
             const SizedBox(height: 10),
 

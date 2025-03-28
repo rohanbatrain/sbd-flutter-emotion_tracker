@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/services.dart';
 
 class DebugScreen extends StatefulWidget {
   const DebugScreen({super.key});
@@ -43,6 +44,16 @@ class _DebugScreenState extends State<DebugScreen> {
                   child: ListTile(
                     title: SelectableText(entry.key),
                     subtitle: SelectableText(entry.value.toString()),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.copy),
+                      onPressed: () {
+                        final dataToCopy = '${entry.key}: ${entry.value}';
+                        Clipboard.setData(ClipboardData(text: dataToCopy));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Copied: $dataToCopy')),
+                        );
+                      },
+                    ),
                   ),
                 );
               }).toList(),

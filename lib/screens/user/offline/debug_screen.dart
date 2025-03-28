@@ -1,6 +1,7 @@
 import 'package:emotion_tracker/screens/user/offline/settings_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/services.dart';
 
 class DebugScreen extends StatefulWidget {
   const DebugScreen({super.key});
@@ -152,6 +153,16 @@ class _DebugScreenState extends State<DebugScreen> {
                         child: ListTile(
                           title: SelectableText(entry.key), // Making the key text copyable
                           subtitle: SelectableText(entry.value.toString()), // Making the value copyable
+                          trailing: IconButton(
+                            icon: const Icon(Icons.copy),
+                            onPressed: () {
+                              final dataToCopy = '${entry.key}: ${entry.value}';
+                              Clipboard.setData(ClipboardData(text: dataToCopy));
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Copied: $dataToCopy')),
+                              );
+                            },
+                          ),
                         ),
                       );
               }).toList(),
