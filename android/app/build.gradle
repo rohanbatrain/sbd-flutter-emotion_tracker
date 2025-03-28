@@ -5,8 +5,6 @@ plugins {
     id "dev.flutter.flutter-gradle-plugin"
 }
 
-
-
 android {
     namespace = "com.example.emotion_tracker"
     compileSdk = flutter.compileSdkVersion
@@ -31,21 +29,21 @@ android {
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
-signingConfigs {
-    release {
-        if (project.hasProperty("storeFile")) {
-            storeFile file(project.storeFile)
-            storePassword project.storePassword
-            keyAlias project.keyAlias
-            keyPassword project.keyPassword
+
+    signingConfigs {
+        release {
+            storeFile file(System.getenv('HOME') + '/keystore.jks')  // Reference to the keystore file
+            storePassword System.getenv('ANDROID_KEYSTORE_PASSWORD')  // Password from the secret
+            keyAlias System.getenv('ANDROID_KEY_ALIAS')  // Key alias from the secret
+            keyPassword System.getenv('ANDROID_KEY_PASSWORD')  // Key password from the secret
         }
     }
-}
+
     buildTypes {
         release {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.debug
+            signingConfig = signingConfigs.release
         }
     }
 }

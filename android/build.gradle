@@ -6,14 +6,13 @@ allprojects {
 }
 
 rootProject.buildDir = "../build"
+
+// Consolidate both `subprojects` blocks into one
 subprojects {
     project.buildDir = "${rootProject.buildDir}/${project.name}"
-}
-subprojects {
-    project.evaluationDependsOn(":app")
+    project.evaluationDependsOn(":app") // Ensure :app is evaluated for all subprojects
 }
 
 tasks.register("clean", Delete) {
     delete rootProject.buildDir
 }
-
