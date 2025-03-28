@@ -295,15 +295,51 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const Divider(thickness: 1, height: 20),
 
             // Toggle Encryption
-            SwitchListTile(
-              title: const Text(
-                'Enable Encryption',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
-              ),
-              value: _isEncryptionEnabled,
-              onChanged: (bool value) {
-                _toggleEncryption(value);
-              },
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Enable Encryption',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+                ),
+                Row(
+                  children: [
+                    Switch(
+                      value: _isEncryptionEnabled,
+                      onChanged: (bool value) {
+                        _toggleEncryption(value);
+                      },
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.info_outline, color: Colors.blue),
+                      onPressed: () {
+                        showDialog(
+                          context: context,
+                          builder: (BuildContext context) {
+                            return AlertDialog(
+                              title: const Text('Encryption Warning'),
+                              content: const Text(
+                            'Turning off encryption after enabling it may cause abnormal behavior. '
+                            'We recommend not disabling encryption once it is enabled, as edge cases are not yet fully tested.'
+                            'If you need to disable it, please clear all data first.'
+                            
+                          ),
+                              actions: <Widget>[
+                                TextButton(
+                                  onPressed: () {
+                                    Navigator.of(context).pop();
+                                  },
+                                  child: const Text('Close'),
+                                ),
+                              ],
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ],
             ),
             const SizedBox(height: 10),
 
