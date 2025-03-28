@@ -560,20 +560,54 @@ class _AnimatedNoteCard extends StatefulWidget {
 
 class _AnimatedNoteCardState extends State<_AnimatedNoteCard> {
   bool _isHovered = false;
+  String _decryptedContent = 'Loading...';
+
+  @override
+  void initState() {
+    super.initState();
+    _decryptNoteContent();
+  }
+
+  Future<void> _decryptNoteContent() async {
+    final prefs = await SharedPreferences.getInstance();
+    final isEncryptionEnabled = prefs.getBool('is_encryption_enabled') ?? false;
+    final encryptionKey = prefs.getString('encryption_key');
+
+    if (isEncryptionEnabled && encryptionKey != null && encryptionKey.isNotEmpty) {
+      _decryptedContent = await _decryptNote(widget.note, encryptionKey);
+    } else {
+      _decryptedContent = widget.note;
+    }
+
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  Future<String> _decryptNote(String noteJsonString, String encryptionKey) async {
+    final key = encrypt.Key.fromUtf8(encryptionKey.padRight(32, ' ')); // AES key needs to be 32 bytes
+    try {
+      final Map<String, dynamic> noteJson = jsonDecode(noteJsonString);
+      final String encryptedContent = noteJson['content'] ?? '';
+
+      if (encryptedContent.isEmpty) {
+        throw Exception('No encrypted content found');
+      }
+
+      final parts = encryptedContent.split(':');
+      if (parts.length != 2) throw Exception('Invalid encrypted content format');
+      final encryptedData = encrypt.Encrypted.fromBase64(parts[0]);
+      final iv = encrypt.IV.fromBase64(parts[1]);
+      final encrypter = encrypt.Encrypter(encrypt.AES(key));
+      return encrypter.decrypt(encryptedData, iv: iv);
+    } catch (e) {
+      return 'Invalid note format or decryption failed';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-
-    String content;
-    try {
-      final Map<String, dynamic> noteJson = widget.note.isNotEmpty
-          ? Map<String, dynamic>.from(jsonDecode(widget.note))
-          : {};
-      content = noteJson['content'] ?? 'No content available';
-    } catch (e) {
-      content = 'Invalid note format';
-    }
 
     return InkWell(
       onTap: () {},
@@ -610,7 +644,7 @@ class _AnimatedNoteCardState extends State<_AnimatedNoteCard> {
           padding: const EdgeInsets.all(8.0),
           child: Center(
             child: Text(
-              content,
+              _decryptedContent,
               style: Theme.of(context).textTheme.bodyMedium,
               textAlign: TextAlign.center,
             ),
