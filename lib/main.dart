@@ -44,6 +44,7 @@ class MyApp extends StatelessWidget {
             '/admin_home': (context) => AdminHomeScreen(),
             '/logout': (context) => LogoutScreen(),
             '/offline/home_screen': (context) => OfflineHomeScreen(),
+            '/offline_home': (context) => const OfflineHomeScreen(), // Add offline home route
           },
         );
       },

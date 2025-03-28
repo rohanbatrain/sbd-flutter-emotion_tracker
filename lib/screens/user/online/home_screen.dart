@@ -39,6 +39,24 @@ class HomeScreenState extends State<HomeScreen> {
     // Implement reset backend URL functionality
   }
 
+  void _checkOfflineMode() async {
+    final prefs = await SharedPreferences.getInstance();
+    final bool isOfflineMode = prefs.getBool('offline_mode') ?? false;
+    if (isOfflineMode) {
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        '/offline_home', // Ensure this route is defined in your app
+        (route) => false,
+      );
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _checkOfflineMode(); // Check offline mode on app start
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(

@@ -300,11 +300,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 'Load Offline Version',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
               ),
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Offline version loading...')),
+              onTap: () async {
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.setBool('offline_mode', true); // Enable offline mode
+                if (!mounted) return;
+
+                // Navigate to the offline home screen
+                Navigator.pushNamedAndRemoveUntil(
+                  context,
+                  '/offline_home', // Ensure this route is defined in your app
+                  (route) => false,
                 );
-                // Add logic to load offline version here
               },
             ),
             const SizedBox(height: 10),
