@@ -314,7 +314,13 @@ class _OfflineSettingsScreenState extends State<OfflineSettingsScreen> {
                 final prefs = await SharedPreferences.getInstance();
                 await prefs.setBool('offline_mode', false); // Disable offline mode
                 if (!mounted) return;
-                Navigator.pushReplacementNamed(context, '/backend_url'); // Redirect to backend URL screen
+
+                // Restart the app and navigate to the backend URL screen
+                Navigator.pushNamedAndRemoveUntil(
+                  context,
+                  '/backend_url',
+                  (route) => false, // Clear the navigation stack
+                );
               },
             ),
             const SizedBox(height: 24), // Adjusted spacing for uniformity
