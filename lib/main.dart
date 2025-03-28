@@ -8,101 +8,111 @@ import 'screens/admin/admin_home_screen.dart';
 import 'screens/auth/logout_screen.dart';
 import 'screens/user/offline/home_screen.dart'; // Import OfflineHomeScreen
 
-void main() {
-  runApp(MyApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final prefs = await SharedPreferences.getInstance();
+  final isDarkMode = prefs.getBool('is_dark_mode') ?? false;
+  runApp(MyApp(isDarkMode: isDarkMode));
 }
 
-class MyApp extends StatefulWidget {
-  const MyApp({super.key});
+class MyApp extends StatelessWidget {
+  final ValueNotifier<bool> isDarkModeNotifier;
 
-  @override
-  MyAppState createState() => MyAppState();
-}
-
-class MyAppState extends State<MyApp> {
-  Widget _initialScreen = SplashScreen(); // Use the splash screen as the initial screen
-
-  @override
-  void initState() {
-    super.initState();
-    _checkIfBackendUrlSaved();
-  }
-
-  Future<void> _checkIfBackendUrlSaved() async {
-    // Simulate a splash screen delay by waiting for 3 seconds
-    await Future.delayed(Duration(seconds: 3));
-
-    final prefs = await SharedPreferences.getInstance();
-    final backendUrl = prefs.getString('backend_url');
-    final authToken = prefs.getString('auth_token');
-    if (!mounted) return;
-
-    setState(() {
-      if (backendUrl == null || backendUrl.isEmpty) {
-        _initialScreen = BackendUrlScreen();
-      } else if (authToken != null && authToken.isNotEmpty) {
-        _initialScreen = HomeScreen();
-      } else {
-        _initialScreen = RegisterScreen();
-      }
-    });
-  }
+  MyApp({super.key, required bool isDarkMode})
+      : isDarkModeNotifier = ValueNotifier<bool>(isDarkMode);
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Emotion Tracker',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-      ),
-      initialRoute: '/',
-      routes: {
-        '/': (context) => _initialScreen,
-        '/login': (context) => login.LoginScreen(),
-        '/register': (context) => RegisterScreen(),
-        '/home': (context) => HomeScreen(),
-        '/backend_url': (context) => BackendUrlScreen(),
-        '/admin_home': (context) => AdminHomeScreen(),
-        '/logout': (context) => LogoutScreen(),
-        '/offline/home_screen': (context) => OfflineHomeScreen(), // Add this route
+    return ValueListenableBuilder<bool>(
+      valueListenable: isDarkModeNotifier,
+      builder: (context, isDarkMode, child) {
+        return MaterialApp(
+          title: 'Emotion Tracker',
+          theme: ThemeData(
+            primarySwatch: Colors.blue,
+            brightness: isDarkMode ? Brightness.dark : Brightness.light,
+          ),
+          darkTheme: ThemeData.dark(),
+          themeMode: isDarkMode ? ThemeMode.dark : ThemeMode.light,
+          initialRoute: '/',
+          routes: {
+            '/': (context) => SplashScreen(), // Start with the splash screen
+            '/login': (context) => login.LoginScreen(),
+            '/register': (context) => RegisterScreen(),
+            '/home': (context) => HomeScreen(),
+            '/backend_url': (context) => BackendUrlScreen(),
+            '/admin_home': (context) => AdminHomeScreen(),
+            '/logout': (context) => LogoutScreen(),
+            '/offline/home_screen': (context) => OfflineHomeScreen(),
+          },
+        );
       },
     );
   }
 }
 
-
-class SplashScreen extends StatelessWidget {
+class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
   @override
+  SplashScreenState createState() => SplashScreenState();
+}
+
+class SplashScreenState extends State<SplashScreen> {
+  @override
+  void initState() {
+    super.initState();
+    _navigateToInitialScreen();
+  }
+
+  Future<void> _navigateToInitialScreen() async {
+    await Future.delayed(Duration(seconds: 3)); // Simulate splash screen delay
+
+    final prefs = await SharedPreferences.getInstance();
+    final backendUrl = prefs.getString('backend_url');
+    final authToken = prefs.getString('auth_token');
+    final isOfflineMode = prefs.getBool('offline_mode') ?? false;
+
+    if (!mounted) return;
+
+    if (isOfflineMode) {
+      Navigator.pushReplacementNamed(context, '/offline/home_screen');
+    } else if (backendUrl == null || backendUrl.isEmpty) {
+      Navigator.pushReplacementNamed(context, '/backend_url');
+    } else if (authToken != null && authToken.isNotEmpty) {
+      Navigator.pushReplacementNamed(context, '/home');
+    } else {
+      Navigator.pushReplacementNamed(context, '/register');
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: Colors.white, // Set the background color to white
+      backgroundColor: isDarkMode ? Colors.black : Colors.white, // Dynamic color
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Display the logo with proper aspect ratio
             Image.asset(
               'assets/splash.png', // Replace with your logo image
-              width: 250, // Adjust width to keep aspect ratio intact
-              height: 187.5, // Adjust height based on aspect ratio (250 * 3/4 = 187.5)
+              width: 250,
+              height: 187.5,
             ),
-            SizedBox(height: 30), // Space between logo and text
-            // Title of the application
+            SizedBox(height: 30),
             Text(
               'Emotion Tracker',
               style: TextStyle(
-                fontSize: 32, // Larger font for a more professional feel
-                fontWeight: FontWeight.w600, // Use a lighter weight for modern style
-                color: Colors.blue, // You can change the color to match your branding
-                letterSpacing: 1.5, // Add spacing for a cleaner look
-                fontFamily: 'Roboto', // Consider using a modern, clean font
+                fontSize: 32,
+                fontWeight: FontWeight.w600,
+                color: Colors.blue,
+                letterSpacing: 1.5,
+                fontFamily: 'Roboto',
               ),
             ),
-            SizedBox(height: 20), // Additional spacing for balance
-            // A loading indicator for a smooth transition
+            SizedBox(height: 20),
             CircularProgressIndicator(
               valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
             ),

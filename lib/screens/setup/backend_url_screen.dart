@@ -15,13 +15,20 @@ class BackendUrlScreenState extends State<BackendUrlScreen> {
   Future<void> _saveUrl(String url) async {
     final prefs = await SharedPreferences.getInstance();
     prefs.setString('backend_url', url);
-    if (mounted) {
+
+    // Check if offline_mode is true and navigate accordingly
+    final isOfflineMode = prefs.getBool('offline_mode') ?? false;
+    if (isOfflineMode) {
+      Navigator.pushReplacementNamed(context, '/offline/home_screen');
+    } else if (mounted) {
       Navigator.pushReplacementNamed(context, '/login');
     }
   }
 
   // Navigate to offline home screen
-  void _useOffline() {
+  Future<void> _useOffline() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('offline_mode', true); // Store offline mode preference
     Navigator.pushReplacementNamed(context, '/offline/home_screen');
   }
 

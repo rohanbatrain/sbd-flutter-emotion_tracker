@@ -13,7 +13,7 @@ class EmotionService {
     String authToken,
     String emotionFelt,
     int emotionIntensity,
-    String note,
+    String note, // Changed from List<String> noteIds to String note
   ) async {
     final url = Uri.parse('$backendUrl/user/v1/emotion_tracker/add');
     
@@ -25,7 +25,7 @@ class EmotionService {
     final body = json.encode({
       'emotion_felt': emotionFelt,
       'emotion_intensity': emotionIntensity,
-      'note': note,
+      'note': note, // Changed from 'note_ids': noteIds to 'note': note
     });
 
     try {
