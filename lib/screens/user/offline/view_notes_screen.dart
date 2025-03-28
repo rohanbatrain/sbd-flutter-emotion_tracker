@@ -2,11 +2,12 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:encrypt/encrypt.dart' as encrypt;
+import 'package:flutter/services.dart';
 
 class ViewNotesScreen extends StatefulWidget {
   final Map<String, dynamic> emotion;
 
-  const ViewNotesScreen({required this.emotion});
+  const ViewNotesScreen({super.key, required this.emotion});
 
   @override
   _ViewNotesScreenState createState() => _ViewNotesScreenState();
@@ -62,19 +63,22 @@ class _ViewNotesScreenState extends State<ViewNotesScreen> {
   Widget _buildNotesView(List<String> notes) {
     switch (_selectedView) {
       case 'Grid View':
-        return SizedBox(
-          height: 300, // Provide a fixed height
-          child: GridView.builder(
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              crossAxisSpacing: 8.0,
-              mainAxisSpacing: 8.0,
-            ),
-            itemCount: notes.length,
-            itemBuilder: (context, index) {
-              return _AnimatedNoteCard(note: notes[index]);
-            },
+        return GridView.builder(
+          shrinkWrap: true, // Allow the grid to shrink and expand dynamically
+          physics: NeverScrollableScrollPhysics(), // Prevent internal scrolling
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: 16.0, // Increased spacing for better layout
+            mainAxisSpacing: 16.0, // Increased spacing for better layout
+            childAspectRatio: 3 / 2, // Adjusted aspect ratio for better card fit
           ),
+          itemCount: notes.length,
+          itemBuilder: (context, index) {
+            return Padding(
+              padding: const EdgeInsets.all(8.0), // Added padding around cards
+              child: _AnimatedNoteCard(note: notes[index]),
+            );
+          },
         );
       case 'Carousel View':
         return SizedBox(
@@ -125,7 +129,7 @@ class _ViewNotesScreenState extends State<ViewNotesScreen> {
           child: ListView.builder(
             itemCount: notes.length,
             itemBuilder: (context, index) {
-              return _AnimatedNoteCard(note: notes[index]);
+              return _NoteCardWithCopy(note: notes[index]);
             },
           ),
         );
@@ -206,7 +210,7 @@ class _ViewNotesScreenState extends State<ViewNotesScreen> {
           final bool isEncryptionEnabled = prefs.getBool('is_encryption_enabled') ?? false;
           final String? encryptionKey = prefs.getString('encryption_key');
 
-          final TextEditingController _noteController = TextEditingController();
+          final TextEditingController noteController = TextEditingController();
 
           final newNote = await showDialog<String>(
             context: context,
@@ -214,7 +218,7 @@ class _ViewNotesScreenState extends State<ViewNotesScreen> {
               return AlertDialog(
                 title: Text('Add New Note'),
                 content: TextField(
-                  controller: _noteController,
+                  controller: noteController,
                   decoration: InputDecoration(
                     labelText: 'Enter your note',
                     border: OutlineInputBorder(),
@@ -228,8 +232,8 @@ class _ViewNotesScreenState extends State<ViewNotesScreen> {
                   ),
                   ElevatedButton(
                     onPressed: () {
-                      if (_noteController.text.isNotEmpty) {
-                        Navigator.pop(context, _noteController.text);
+                      if (noteController.text.isNotEmpty) {
+                        Navigator.pop(context, noteController.text);
                       }
                     },
                     child: Text('Add'),
@@ -248,7 +252,7 @@ class _ViewNotesScreenState extends State<ViewNotesScreen> {
 
             setState(() {
               _decryptedNotes.add(newNote);
-              widget.emotion['notes'] = _decryptedNotes;
+              widget.emotion['notes'] = List<String>.from(widget.emotion['notes'] ?? [])..add(noteToAdd);
             });
 
             // Update SharedPreferences
@@ -289,6 +293,31 @@ class _AnimatedNoteCard extends StatelessWidget {
         child: Text(
           note,
           style: TextStyle(fontSize: 16),
+        ),
+      ),
+    );
+  }
+}
+
+class _NoteCardWithCopy extends StatelessWidget {
+  final String note;
+
+  const _NoteCardWithCopy({required this.note});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+      child: ListTile(
+        title: Text(note),
+        trailing: IconButton(
+          icon: const Icon(Icons.copy),
+          onPressed: () {
+            Clipboard.setData(ClipboardData(text: note));
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Note copied to clipboard')),
+            );
+          },
         ),
       ),
     );

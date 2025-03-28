@@ -14,6 +14,7 @@ class OfflineViewEmotionsScreen extends StatefulWidget {
 
 class _OfflineViewEmotionsScreenState extends State<OfflineViewEmotionsScreen> {
   List<Map<String, dynamic>> _emotions = [];
+  String _selectedFilter = 'Timestamp';
 
   @override
   void initState() {
@@ -46,7 +47,7 @@ class _OfflineViewEmotionsScreenState extends State<OfflineViewEmotionsScreen> {
     }
 
     setState(() {
-      _emotions = tempEmotions;
+      _emotions = _applyFilter(tempEmotions);
     });
   }
 
@@ -57,7 +58,10 @@ class _OfflineViewEmotionsScreenState extends State<OfflineViewEmotionsScreen> {
     return encryptedNotes.map((encryptedNoteWithIv) {
       try {
         final parts = encryptedNoteWithIv.split(':');
-        if (parts.length != 2) throw Exception('Invalid format');
+        if (parts.length != 2) {
+          print('Invalid format for encrypted note: $encryptedNoteWithIv');
+          return 'Invalid note format';
+        }
         final encryptedNote = encrypt.Encrypted.fromBase64(parts[0]);
         final iv = encrypt.IV.fromBase64(parts[1]);
         return encrypter.decrypt(encryptedNote, iv: iv);
@@ -73,7 +77,7 @@ class _OfflineViewEmotionsScreenState extends State<OfflineViewEmotionsScreen> {
     final bool isEncryptionEnabled = prefs.getBool('is_encryption_enabled') ?? false;
     final String? encryptionKey = prefs.getString('encryption_key');
 
-    final TextEditingController _noteController = TextEditingController();
+    final TextEditingController noteController = TextEditingController();
 
     final newNote = await showDialog<String>(
       context: context,
@@ -81,7 +85,7 @@ class _OfflineViewEmotionsScreenState extends State<OfflineViewEmotionsScreen> {
         return AlertDialog(
           title: const Text('Add New Note'),
           content: TextField(
-            controller: _noteController,
+            controller: noteController,
             decoration: const InputDecoration(
               labelText: 'Enter your note',
               border: OutlineInputBorder(),
@@ -95,8 +99,8 @@ class _OfflineViewEmotionsScreenState extends State<OfflineViewEmotionsScreen> {
             ),
             ElevatedButton(
               onPressed: () {
-                if (_noteController.text.isNotEmpty) {
-                  Navigator.pop(context, _noteController.text);
+                if (noteController.text.isNotEmpty) {
+                  Navigator.pop(context, noteController.text);
                 }
               },
               child: const Text('Add'),
@@ -114,7 +118,7 @@ class _OfflineViewEmotionsScreenState extends State<OfflineViewEmotionsScreen> {
       }
 
       setState(() {
-        emotion['notes'].add(noteToAdd);
+        emotion['notes'] = List<String>.from(emotion['notes'] ?? [])..add(noteToAdd);
       });
 
       // Update SharedPreferences
@@ -145,12 +149,41 @@ class _OfflineViewEmotionsScreenState extends State<OfflineViewEmotionsScreen> {
   }
 
   void _navigateToViewNotesScreen(Map<String, dynamic> emotion) {
+    final validNotes = (emotion['notes'] as List<String>)
+        .where((note) => note != 'Invalid note format')
+        .toList();
+
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => ViewNotesScreen(emotion: emotion),
+        builder: (context) => ViewNotesScreen(emotion: {
+          ...emotion,
+          'notes': validNotes,
+        }),
       ),
     );
+  }
+
+  List<Map<String, dynamic>> _applyFilter(List<Map<String, dynamic>> emotions) {
+    switch (_selectedFilter) {
+      case 'Name (A-Z)':
+        emotions.sort((a, b) => (a['emotion_felt'] ?? '').compareTo(b['emotion_felt'] ?? ''));
+        break;
+      case 'Name (Z-A)':
+        emotions.sort((a, b) => (b['emotion_felt'] ?? '').compareTo(a['emotion_felt'] ?? ''));
+        break;
+      case 'Intensity (High to Low)':
+        emotions.sort((a, b) => (b['emotion_intensity'] ?? 0).compareTo(a['emotion_intensity'] ?? 0));
+        break;
+      case 'Intensity (Low to High)':
+        emotions.sort((a, b) => (a['emotion_intensity'] ?? 0).compareTo(b['emotion_intensity'] ?? 0));
+        break;
+      case 'Timestamp':
+      default:
+        emotions.sort((a, b) => (b['timestamp'] ?? '').compareTo(a['timestamp'] ?? ''));
+        break;
+    }
+    return emotions;
   }
 
   @override
@@ -158,6 +191,31 @@ class _OfflineViewEmotionsScreenState extends State<OfflineViewEmotionsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('View Emotions'),
+        actions: [
+          DropdownButton<String>(
+            value: _selectedFilter,
+            items: [
+              'Timestamp',
+              'Name (A-Z)',
+              'Name (Z-A)',
+              'Intensity (High to Low)',
+              'Intensity (Low to High)'
+            ]
+                .map((filter) => DropdownMenuItem(
+                      value: filter,
+                      child: Text(filter),
+                    ))
+                .toList(),
+            onChanged: (value) {
+              if (value != null) {
+                setState(() {
+                  _selectedFilter = value;
+                  _emotions = _applyFilter(_emotions);
+                });
+              }
+            },
+          ),
+        ],
       ),
       body: _emotions.isEmpty
           ? const Center(child: Text('No emotions logged yet.'))
@@ -175,7 +233,64 @@ class _OfflineViewEmotionsScreenState extends State<OfflineViewEmotionsScreen> {
                       children: [
                         IconButton(
                           icon: const Icon(Icons.add),
-                          onPressed: () => _addNewNoteToEmotion(emotion),
+                          onPressed: () async {
+                            final prefs = await SharedPreferences.getInstance();
+                            final bool isEncryptionEnabled = prefs.getBool('is_encryption_enabled') ?? false;
+                            final String? encryptionKey = prefs.getString('encryption_key');
+
+                            final TextEditingController noteController = TextEditingController();
+
+                            final newNote = await showDialog<String>(
+                              context: context,
+                              builder: (context) {
+                                return AlertDialog(
+                                  title: const Text('Add New Note'),
+                                  content: TextField(
+                                    controller: noteController,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Enter your note',
+                                      border: OutlineInputBorder(),
+                                    ),
+                                    maxLines: 3,
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(context),
+                                      child: const Text('Cancel'),
+                                    ),
+                                    ElevatedButton(
+                                      onPressed: () {
+                                        if (noteController.text.isNotEmpty) {
+                                          Navigator.pop(context, noteController.text);
+                                        }
+                                      },
+                                      child: const Text('Add'),
+                                    ),
+                                  ],
+                                );
+                              },
+                            );
+
+                            if (newNote != null) {
+                              String noteToAdd = newNote;
+
+                              if (isEncryptionEnabled && encryptionKey != null) {
+                                noteToAdd = await _encryptNote(newNote, encryptionKey);
+                              }
+
+                              setState(() {
+                                emotion['notes'] = List<String>.from(emotion['notes'] ?? [])..add(noteToAdd);
+                              });
+
+                              // Update SharedPreferences
+                              final List<String> emotions = prefs.getStringList('offline_emotions') ?? [];
+                              final index = emotions.indexWhere((e) => jsonDecode(e)['timestamp'] == emotion['timestamp']);
+                              if (index != -1) {
+                                emotions[index] = jsonEncode(emotion);
+                                await prefs.setStringList('offline_emotions', emotions);
+                              }
+                            }
+                          },
                         ),
                         IconButton(
                           icon: const Icon(Icons.arrow_forward),

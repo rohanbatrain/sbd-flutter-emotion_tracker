@@ -60,6 +60,71 @@ class _ViewEmotionsScreenState extends State<ViewEmotionsScreen> {
     return emotions;
   }
 
+  Future<void> _addNewNoteToEmotion(Map<String, dynamic> emotion) async {
+    final TextEditingController noteController = TextEditingController();
+    final prefs = await SharedPreferences.getInstance();
+    final backendUrl = prefs.getString('backend_url') ?? '';
+    final authToken = prefs.getString('auth_token') ?? '';
+    final emotionId = emotion['_id'];
+
+    if (emotionId == null || backendUrl.isEmpty || authToken.isEmpty) {
+      return;
+    }
+
+    final newNote = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Add New Note'),
+          content: TextField(
+            controller: noteController,
+            decoration: const InputDecoration(
+              labelText: 'Enter your note',
+              border: OutlineInputBorder(),
+            ),
+            maxLines: 3,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (noteController.text.isNotEmpty) {
+                  Navigator.pop(context, noteController.text);
+                }
+              },
+              child: const Text('Add'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (newNote != null) {
+      final url = Uri.parse('$backendUrl/user/v1/emotion_tracker/append_note/$emotionId');
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $authToken',
+        },
+        body: jsonEncode({'note': newNote}),
+      );
+
+      if (response.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Note added successfully')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to add note')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -98,22 +163,35 @@ class _ViewEmotionsScreenState extends State<ViewEmotionsScreen> {
               itemBuilder: (context, index) {
                 final emotion = _emotions[index];
                 return Card(
+                  margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
                   child: ListTile(
-                    title: Text(emotion['emotion_felt']),
-                    subtitle: Text('Intensity: ${emotion['emotion_intensity']}'),
-                    onTap: () async {
-                      final refresh = await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => ViewEmotionDetailsScreen(
-                            emotion: emotion,
-                          ),
+                    title: Text(emotion['emotion_felt'] ?? 'No emotion'),
+                    subtitle: Text('Intensity: ${emotion['emotion_intensity'] ?? 'N/A'}'),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.add),
+                          onPressed: () => _addNewNoteToEmotion(emotion), // Add new note logic
                         ),
-                      );
-                      if (refresh == true) {
-                        _fetchEmotions(); // Refresh emotions when returning from the details screen
-                      }
-                    },
+                        IconButton(
+                          icon: const Icon(Icons.arrow_forward),
+                          onPressed: () async {
+                            final refresh = await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => ViewEmotionDetailsScreen(
+                                  emotion: emotion,
+                                ),
+                              ),
+                            );
+                            if (refresh == true) {
+                              _fetchEmotions(); // Refresh emotions when returning
+                            }
+                          },
+                        ),
+                      ],
+                    ),
                   ),
                 );
               },
@@ -362,21 +440,18 @@ class _ViewEmotionDetailsScreenState extends State<ViewEmotionDetailsScreen> {
         );
       case 'Grid View':
       default:
-        return SizedBox(
-          height: 300, // Provide a fixed height
-          child: GridView.builder(
-            shrinkWrap: true,
-            physics: NeverScrollableScrollPhysics(),
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              crossAxisSpacing: 8,
-              mainAxisSpacing: 8,
-            ),
-            itemCount: _notes.length,
-            itemBuilder: (context, index) {
-              return _AnimatedNoteCard(note: _notes[index]);
-            },
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: 8,
+            mainAxisSpacing: 8,
           ),
+          itemCount: _notes.length,
+          itemBuilder: (context, index) {
+            return _AnimatedNoteCard(note: _notes[index]);
+          },
         );
     }
   }
