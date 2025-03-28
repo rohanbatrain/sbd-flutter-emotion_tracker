@@ -272,61 +272,66 @@ class _ViewEmotionDetailsScreenState extends State<ViewEmotionDetailsScreen> {
   Widget _buildNotesView() {
     switch (_selectedView) {
       case 'List View':
-        return ListView.builder(
-          shrinkWrap: true,
-          physics: NeverScrollableScrollPhysics(),
-          itemCount: _notes.length,
-          itemBuilder: (context, index) {
-            return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4.0),
-              child: _AnimatedNoteCard(note: _notes[index]),
-            );
-          },
+        return SizedBox(
+          height: 300, // Provide a fixed height
+          child: ListView.builder(
+            shrinkWrap: true,
+            physics: NeverScrollableScrollPhysics(),
+            itemCount: _notes.length,
+            itemBuilder: (context, index) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4.0),
+                child: _AnimatedNoteCard(note: _notes[index]),
+              );
+            },
+          ),
         );
       case 'Carousel View':
-        return Column(
-          children: [
-            SizedBox(
-              height: 200,
-              child: PageView.builder(
-                itemCount: _notes.length,
-                onPageChanged: (index) {
-                  setState(() {
-                    _currentPage = index;
-                  });
-                },
-                itemBuilder: (context, index) {
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                    child: _AnimatedNoteCard(note: _notes[index]),
-                  );
-                },
+        return SizedBox(
+          height: 300, // Provide a fixed height
+          child: Column(
+            children: [
+              Expanded(
+                child: PageView.builder(
+                  itemCount: _notes.length,
+                  onPageChanged: (index) {
+                    setState(() {
+                      _currentPage = index;
+                    });
+                  },
+                  itemBuilder: (context, index) {
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                      child: _AnimatedNoteCard(note: _notes[index]),
+                    );
+                  },
+                ),
               ),
-            ),
-            SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(
-                _notes.length,
-                (index) => AnimatedContainer(
-                  duration: Duration(milliseconds: 300),
-                  margin: EdgeInsets.symmetric(horizontal: 4.0),
-                  width: _currentPage == index ? 12.0 : 8.0,
-                  height: 8.0,
-                  decoration: BoxDecoration(
-                    color: _currentPage == index
-                        ? Theme.of(context).colorScheme.primary
-                        : Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
-                    borderRadius: BorderRadius.circular(4.0),
+              SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(
+                  _notes.length,
+                  (index) => AnimatedContainer(
+                    duration: Duration(milliseconds: 300),
+                    margin: EdgeInsets.symmetric(horizontal: 4.0),
+                    width: _currentPage == index ? 12.0 : 8.0,
+                    height: 8.0,
+                    decoration: BoxDecoration(
+                      color: _currentPage == index
+                          ? Theme.of(context).colorScheme.primary
+                          : Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
+                      borderRadius: BorderRadius.circular(4.0),
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         );
       case 'Horizontal List View':
         return SizedBox(
-          height: 150,
+          height: 150, // Provide a fixed height
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             itemCount: _notes.length,
@@ -339,33 +344,39 @@ class _ViewEmotionDetailsScreenState extends State<ViewEmotionDetailsScreen> {
           ),
         );
       case 'Staggered Grid View':
-        return Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: List.generate(
-            _notes.length,
-            (index) {
-              return SizedBox(
-                width: (index % 3 == 0) ? 150 : 100, // Staggered sizes
-                child: _AnimatedNoteCard(note: _notes[index]),
-              );
-            },
+        return SizedBox(
+          height: 300, // Provide a fixed height
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: List.generate(
+              _notes.length,
+              (index) {
+                return SizedBox(
+                  width: (index % 3 == 0) ? 150 : 100, // Staggered sizes
+                  child: _AnimatedNoteCard(note: _notes[index]),
+                );
+              },
+            ),
           ),
         );
       case 'Grid View':
       default:
-        return GridView.builder(
-          shrinkWrap: true,
-          physics: NeverScrollableScrollPhysics(),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            crossAxisSpacing: 8,
-            mainAxisSpacing: 8,
+        return SizedBox(
+          height: 300, // Provide a fixed height
+          child: GridView.builder(
+            shrinkWrap: true,
+            physics: NeverScrollableScrollPhysics(),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 8,
+              mainAxisSpacing: 8,
+            ),
+            itemCount: _notes.length,
+            itemBuilder: (context, index) {
+              return _AnimatedNoteCard(note: _notes[index]);
+            },
           ),
-          itemCount: _notes.length,
-          itemBuilder: (context, index) {
-            return _AnimatedNoteCard(note: _notes[index]);
-          },
         );
     }
   }

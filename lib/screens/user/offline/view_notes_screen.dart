@@ -59,11 +59,88 @@ class _ViewNotesScreenState extends State<ViewNotesScreen> {
     }
   }
 
+  Widget _buildNotesView(List<String> notes) {
+    switch (_selectedView) {
+      case 'Grid View':
+        return SizedBox(
+          height: 300, // Provide a fixed height
+          child: GridView.builder(
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 8.0,
+              mainAxisSpacing: 8.0,
+            ),
+            itemCount: notes.length,
+            itemBuilder: (context, index) {
+              return _AnimatedNoteCard(note: notes[index]);
+            },
+          ),
+        );
+      case 'Carousel View':
+        return SizedBox(
+          height: 300, // Provide a fixed height
+          child: PageView.builder(
+            itemCount: notes.length,
+            itemBuilder: (context, index) {
+              return Center(
+                child: _AnimatedNoteCard(note: notes[index]),
+              );
+            },
+          ),
+        );
+      case 'Horizontal List View':
+        return SizedBox(
+          height: 150, // Provide a fixed height
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: notes.length,
+            itemBuilder: (context, index) {
+              return Container(
+                width: 200,
+                margin: EdgeInsets.symmetric(horizontal: 8.0),
+                child: _AnimatedNoteCard(note: notes[index]),
+              );
+            },
+          ),
+        );
+      case 'Staggered Grid View':
+        return SizedBox(
+          height: 300, // Provide a fixed height
+          child: GridView.builder(
+            gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+              maxCrossAxisExtent: 200,
+              mainAxisSpacing: 8.0,
+              crossAxisSpacing: 8.0,
+            ),
+            itemCount: notes.length,
+            itemBuilder: (context, index) {
+              return _AnimatedNoteCard(note: notes[index]);
+            },
+          ),
+        );
+      case 'List View':
+      default:
+        return SizedBox(
+          height: 300, // Provide a fixed height
+          child: ListView.builder(
+            itemCount: notes.length,
+            itemBuilder: (context, index) {
+              return _AnimatedNoteCard(note: notes[index]);
+            },
+          ),
+        );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final String emotionFelt = widget.emotion['emotion_felt'] ?? 'Unknown';
+    final int intensity = widget.emotion['emotion_intensity'] ?? 0;
+    final String timestamp = widget.emotion['timestamp'] ?? 'Unknown';
+
     return Scaffold(
       appBar: AppBar(
-        title: Text('View Notes'),
+        title: Text('Emotion Details'),
         actions: [
           DropdownButton<String>(
             value: _selectedView,
@@ -89,9 +166,40 @@ class _ViewNotesScreenState extends State<ViewNotesScreen> {
           ),
         ],
       ),
-      body: _decryptedNotes.isEmpty
-          ? Center(child: Text('No notes available.'))
-          : _buildNotesView(_decryptedNotes),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Emotion Felt: $emotionFelt',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              SizedBox(height: 8),
+              Text(
+                'Intensity: $intensity',
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
+              SizedBox(height: 8),
+              Text(
+                'Timestamp: $timestamp',
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
+              SizedBox(height: 16),
+              if (_decryptedNotes.isNotEmpty) ...[
+                Text(
+                  'Notes:',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                SizedBox(height: 8),
+                _buildNotesView(_decryptedNotes),
+              ] else
+                Center(child: Text('No notes available.')),
+            ],
+          ),
+        ),
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
           final prefs = await SharedPreferences.getInstance();
@@ -139,7 +247,7 @@ class _ViewNotesScreenState extends State<ViewNotesScreen> {
             }
 
             setState(() {
-              _decryptedNotes.add(noteToAdd);
+              _decryptedNotes.add(newNote);
               widget.emotion['notes'] = _decryptedNotes;
             });
 
@@ -155,64 +263,6 @@ class _ViewNotesScreenState extends State<ViewNotesScreen> {
         child: Icon(Icons.add),
       ),
     );
-  }
-
-  Widget _buildNotesView(List<String> notes) {
-    switch (_selectedView) {
-      case 'Grid View':
-        return GridView.builder(
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            crossAxisSpacing: 8.0,
-            mainAxisSpacing: 8.0,
-          ),
-          itemCount: notes.length,
-          itemBuilder: (context, index) {
-            return _AnimatedNoteCard(note: notes[index]);
-          },
-        );
-      case 'Carousel View':
-        return PageView.builder(
-          itemCount: notes.length,
-          itemBuilder: (context, index) {
-            return Center(
-              child: _AnimatedNoteCard(note: notes[index]),
-            );
-          },
-        );
-      case 'Horizontal List View':
-        return ListView.builder(
-          scrollDirection: Axis.horizontal,
-          itemCount: notes.length,
-          itemBuilder: (context, index) {
-            return Container(
-              width: 200,
-              margin: EdgeInsets.symmetric(horizontal: 8.0),
-              child: _AnimatedNoteCard(note: notes[index]),
-            );
-          },
-        );
-      case 'Staggered Grid View':
-        return GridView.builder(
-          gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-            maxCrossAxisExtent: 200,
-            mainAxisSpacing: 8.0,
-            crossAxisSpacing: 8.0,
-          ),
-          itemCount: notes.length,
-          itemBuilder: (context, index) {
-            return _AnimatedNoteCard(note: notes[index]);
-          },
-        );
-      case 'List View':
-      default:
-        return ListView.builder(
-          itemCount: notes.length,
-          itemBuilder: (context, index) {
-            return _AnimatedNoteCard(note: notes[index]);
-          },
-        );
-    }
   }
 
   Future<String> _encryptNote(String note, String key) async {
