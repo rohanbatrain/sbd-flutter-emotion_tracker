@@ -17,7 +17,7 @@ class _OfflineLogEmotionScreenState extends State<OfflineLogEmotionScreen> {
   double _intensity = 5.0;
 
   // Encrypt note using AES with random IV
-  Future<Map<String, String>> _encryptNote(String note, String encryptionKey) async {
+  Future<String> _encryptNote(String note, String encryptionKey) async {
     final key = encrypt.Key.fromUtf8(encryptionKey.padRight(32, ' ')); // AES key needs to be 32 bytes
     final iv = encrypt.IV.fromLength(16); // Random 16-byte IV for AES
     final encrypter = encrypt.Encrypter(encrypt.AES(key));
@@ -25,18 +25,11 @@ class _OfflineLogEmotionScreenState extends State<OfflineLogEmotionScreen> {
     // Encrypt the note value
     final encrypted = encrypter.encrypt(note, iv: iv);
 
-    // Encode IV and encrypted note as base64
-    final ivBase64 = base64.encode(iv.bytes); // base64 encode the IV
-    final encryptedNoteBase64 = encrypted.base64; // base64 encode the encrypted note
-
-    // Return both IV and encrypted note as a map
-    return {
-      'encryptedNote': encryptedNoteBase64,
-      'iv': ivBase64,
-    };
+    // Combine the encrypted note and IV into a single string
+    return '${encrypted.base64}:${iv.base64}';
   }
 
-  // Log emotion and store encrypted note with random IV
+  // Log emotion and store notes as an array
   Future<void> _logEmotion() async {
     final String emotionFelt = _emotionController.text;
     final int emotionIntensity = _intensity.toInt();
@@ -55,21 +48,17 @@ class _OfflineLogEmotionScreenState extends State<OfflineLogEmotionScreen> {
     final String? encryptionKey = prefs.getString('encryption_key');
 
     String encryptedNote = note;
-    String? iv;
 
     if (isEncryptionEnabled && encryptionKey != null) {
       // Encrypt the note with AES (random IV)
-      final encryptedData = await _encryptNote(note, encryptionKey);
-      encryptedNote = encryptedData['encryptedNote']!;
-      iv = encryptedData['iv'];
+      encryptedNote = await _encryptNote(note, encryptionKey);
     }
 
     // Create the emotion data
     final newEmotion = {
       'emotion_felt': emotionFelt,
       'emotion_intensity': emotionIntensity,
-      'note': encryptedNote, // Store encrypted or plain note
-      if (iv != null) 'iv': iv, // Include IV only if encryption is used
+      'notes': [encryptedNote], // Store notes as an array
       'timestamp': DateTime.now().toIso8601String(),
     };
 
@@ -91,18 +80,24 @@ class _OfflineLogEmotionScreenState extends State<OfflineLogEmotionScreen> {
   }
 
   // Decrypt the note value using stored IV
-  Future<String> _decryptNote(String encryptedNote, String ivBase64, String encryptionKey) async {
+  Future<String> _decryptNote(String encryptedNote, String encryptionKey) async {
     final key = encrypt.Key.fromUtf8(encryptionKey.padRight(32, ' ')); // AES key needs to be 32 bytes
-    final iv = encrypt.IV.fromBase64(ivBase64); // Decode the base64 IV
 
-    // Decode the encrypted note from base64
-    final encryptedData = encrypt.Encrypted.fromBase64(encryptedNote); // Decode the encrypted note
+    try {
+      // Split the encrypted note and IV
+      final parts = encryptedNote.split(':');
+      if (parts.length != 2) throw Exception('Invalid encrypted note format');
 
-    // Decrypt the note using AES
-    final encrypter = encrypt.Encrypter(encrypt.AES(key));
-    final decrypted = encrypter.decrypt(encryptedData, iv: iv);
+      final encryptedData = encrypt.Encrypted.fromBase64(parts[0]); // Decode the encrypted note
+      final iv = encrypt.IV.fromBase64(parts[1]); // Decode the base64 IV
 
-    return decrypted;
+      // Decrypt the note using AES
+      final encrypter = encrypt.Encrypter(encrypt.AES(key));
+      return encrypter.decrypt(encryptedData, iv: iv);
+    } catch (e) {
+      print('Error decrypting note: $e');
+      return 'Invalid note format'; // Fallback for invalid formats
+    }
   }
 
   @override
