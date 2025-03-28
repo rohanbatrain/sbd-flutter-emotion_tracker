@@ -50,19 +50,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
         await prefs.remove('encryption_key'); // Remove the key from SharedPreferences
       }
     } else {
-      // If the encryption is being enabled, just toggle it
+      // If the encryption is being enabled, generate and load a key
       setState(() {
         _isEncryptionEnabled = value;
+        _encryptionKeyController.text = _generateRandomKey(); // Generate and set a random key
       });
-      // Save the encryption status to SharedPreferences
+      // Save the encryption status and key to SharedPreferences
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('is_encryption_enabled', value);
-
-      // If encryption is enabled, make sure the key is saved
-      if (_isEncryptionEnabled) {
-        _saveEncryptionKey();
-      }
+      await _saveEncryptionKey(); // Save the generated key
     }
+    // Directly save settings
+    await _saveSettings();
   }
 
   Future<bool?> _showEncryptionWarningDialog() {
@@ -122,6 +121,40 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  // Show confirmation dialog before regenerating the key
+  Future<bool?> _showRegenerateKeyConfirmationDialog() {
+    return showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text(
+            'Regenerate Key',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          content: const Text(
+            'Are you sure you want to regenerate the encryption key? '
+            'This will overwrite the existing key and may result in loss of access to previously encrypted data.',
+            style: TextStyle(fontSize: 16),
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(false); // User cancels the action
+              },
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(true); // User confirms the action
+              },
+              child: const Text('Proceed'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   // Clear encryption key when encryption is disabled
   void _clearEncryptionKey() {
     _encryptionKeyController.clear();
@@ -131,6 +164,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _saveEncryptionKey() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('encryption_key', _encryptionKeyController.text);
+    // Directly save settings
+    await _saveSettings();
   }
 
   // Generate a random 32-character key
@@ -149,6 +184,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('is_debug_enabled', value);
+    // Directly save settings
+    await _saveSettings();
+  }
+
+  // Save all settings to SharedPreferences
+  Future<void> _saveSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('is_encryption_enabled', _isEncryptionEnabled);
+    if (_isEncryptionEnabled) {
+      await prefs.setString('encryption_key', _encryptionKeyController.text);
+    } else {
+      await prefs.remove('encryption_key');
+    }
+    await prefs.setBool('is_debug_enabled', _isDebugEnabled);
   }
 
   @override
@@ -227,17 +276,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   const SizedBox(height: 10),
 
-                  // Random key generator button
+                  // Regenerate key button with confirmation dialog
                   Align(
                     alignment: Alignment.centerRight,
                     child: ElevatedButton.icon(
-                      onPressed: () {
-                        String randomKey = _generateRandomKey();
-                        _encryptionKeyController.text = randomKey;
-                        _saveEncryptionKey();
+                      onPressed: () async {
+                        bool? shouldRegenerate = await _showRegenerateKeyConfirmationDialog();
+                        if (shouldRegenerate == true) {
+                          String randomKey = _generateRandomKey();
+                          setState(() {
+                            _encryptionKeyController.text = randomKey;
+                          });
+                          _saveEncryptionKey();
+                        }
                       },
                       icon: const Icon(Icons.shuffle),
-                      label: const Text('Generate Key'),
+                      label: const Text('Regenerate Key'),
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -388,32 +442,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const SnackBar(content: Text('Donation feature coming soon!')),
                 );
               },
-            ),
-            const SizedBox(height: 20),
-
-            // Save Button
-            Center(
-              child: ElevatedButton(
-                onPressed: () async {
-                  final prefs = await SharedPreferences.getInstance();
-                  await prefs.setBool('is_encryption_enabled', _isEncryptionEnabled);
-                  if (_isEncryptionEnabled) {
-                    await prefs.setString('encryption_key', _encryptionKeyController.text);
-                  } else {
-                    await prefs.remove('encryption_key');
-                  }
-                  await prefs.setBool('is_debug_enabled', _isDebugEnabled);
-
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Settings saved successfully!')),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 40),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-                child: const Text('Save Settings'),
-              ),
             ),
           ],
         ),
