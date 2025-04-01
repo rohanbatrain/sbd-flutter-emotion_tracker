@@ -57,10 +57,12 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev pkg-config
-        # Cache system dependencies for Linux
+
+      # Cache system dependencies for Linux
+      - name: Cache GTK+ 3.0 dependencies
         uses: actions/cache@v3
         with:
-          path: /usr/lib/x86_64-linux-gnu/libgtk-3.so
+          path: /usr/lib/x86_64-linux-gnu
           key: ${{ runner.os }}-gtk-${{ hashFiles('**/pubspec.yaml') }}
           restore-keys: |
             ${{ runner.os }}-gtk-
