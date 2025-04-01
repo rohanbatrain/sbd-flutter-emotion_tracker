@@ -40,7 +40,6 @@ jobs:
         run: |
           VERSION=$(echo ${GITHUB_REF} | sed 's/refs\/heads\///')
           echo "VERSION=${VERSION}" >> $GITHUB_ENV
-
       - name: Generate Keystore (Android)
         run: |
           keytool -genkey -v -keystore $HOME/keystore.jks -storetype JKS -keyalg RSA -keysize 2048 -validity 10000 -alias "$ANDROID_KEY_ALIAS" -dname "CN=Rohan Batra, OU=Open Source, O=Second Brain Database, L=Bidholi, ST=UK, C=IN" -storepass $ANDROID_KEYSTORE_PASSWORD -keypass $ANDROID_KEY_PASSWORD
@@ -49,10 +48,11 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
 
+
       # --- Run builds in parallel ---
       - name: Build Android (APK & AAB)
         run: |
-          flutter build apk --release
+          flutter build apk --release --no-shrink
           flutter build appbundle --release
         env:
           ANDROID_KEYSTORE: $HOME/keystore.jks
@@ -60,6 +60,11 @@ jobs:
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         working-directory: .
+
+      - name: Install GTK+ 3.0 dependencies (Linux)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev pkg-config
 
       # Cache system dependencies for Linux
       - name: Cache GTK+ 3.0 dependencies
@@ -69,12 +74,6 @@ jobs:
           key: ${{ runner.os }}-gtk-${{ hashFiles('**/pubspec.yaml') }}
           restore-keys: |
             ${{ runner.os }}-gtk-
-
-
-      - name: Install GTK+ 3.0 dependencies (Linux)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev pkg-config
 
       - name: Build Linux version (Linux)
         run: flutter build linux --release
@@ -148,26 +147,6 @@ jobs:
             exit 1
           fi
 
-      # --- Rename release files for industry naming ---
-      - name: Rename release files for industry naming
-        run: |
-          # Define the new naming scheme, e.g., v1.2.3 -> project_name-v1.2.3
-          NEW_NAME="Emotion_Tracker-${{ env.VERSION }}"
-          
-          # Rename APK
-          mv build/app/outputs/flutter-apk/app-release.apk "release/${NEW_NAME}-apk-release.apk"
-          
-          # Rename AAB
-          mv build/app/outputs/bundle/release/app-release.aab "release/${NEW_NAME}-aab-release.aab"
-          
-          # Rename AppImage
-          mv appimage/Emotion_Tracker.Appimage "release/${NEW_NAME}-linux.AppImage"
-          
-          # Rename Tar.gz
-          mv release/emotion_tracker-${{ env.VERSION }}.tar.gz "release/${NEW_NAME}-linux.tar.gz"
-          
-          echo "Renaming completed: ${NEW_NAME}"
-
       - name: Create or Update GitHub Release
         run: |
           echo "Checking if release exists..."
@@ -183,10 +162,10 @@ jobs:
           # Create the new release and upload the assets
           echo "Creating a new release and uploading assets..."
           gh release create $VERSION \
-            release/${NEW_NAME}-apk-release.apk \
-            release/${NEW_NAME}-aab-release.aab \
-            release/${NEW_NAME}-linux.AppImage \
-            release/${NEW_NAME}-linux.tar.gz \
+            build/app/outputs/bundle/release/app-release.aab \
+            build/app/outputs/flutter-apk/app-release.apk \
+            appimage/Emotion_Tracker.Appimage \
+            release/emotion_tracker-${{ env.VERSION }}.tar.gz \
             --title "Release $VERSION" \
             --notes "Release $VERSION for branch $GITHUB_REF" \
             --repo $GITHUB_REPOSITORY
