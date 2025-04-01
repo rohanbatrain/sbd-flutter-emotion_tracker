@@ -52,7 +52,7 @@ jobs:
       # --- Run builds in parallel ---
       - name: Build Android (APK & AAB)
         run: |
-          flutter build apk --release --parallel-code
+          flutter build apk --release
           flutter build appbundle --release
         env:
           ANDROID_KEYSTORE: $HOME/keystore.jks
