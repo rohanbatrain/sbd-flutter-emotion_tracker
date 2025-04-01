@@ -25,17 +25,20 @@ jobs:
           VERSION=$(echo ${GITHUB_REF} | sed 's/refs\/heads\///')
           echo "VERSION=${VERSION}" >> $GITHUB_ENV
 
-      # --- Android Release ---
-      - name: Generate Keystore (Android)
+      # --- Decrypt Keystore ---
+      - name: Decrypt Keystore (Android)
         run: |
-          keytool -genkey -v -keystore $HOME/keystore.jks -storetype JKS -keyalg RSA -keysize 2048 -validity 10000 -alias "$ANDROID_KEY_ALIAS" -dname "CN=Rohan Batra, OU=Open Source, O=Second Brain Database, L=Bidholi, ST=UK, C=IN" -storepass $ANDROID_KEYSTORE_PASSWORD -keypass $ANDROID_KEY_PASSWORD
+          gpg --quiet --batch --yes --decrypt --passphrase="$GPG_PASSPHRASE" --output $HOME/emotion_tracker_keystore.jks emotion_tracker_keystore.jks.gpg
         env:
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
 
       - name: Build APK for release (Android)
         run: flutter build apk --release --no-shrink
+        env:
+          ANDROID_KEYSTORE: $HOME/emotion_tracker_keystore.jks
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
 
       - name: Build AAB for release (Android)
         run: flutter build appbundle --release
@@ -142,7 +145,7 @@ jobs:
       - name: Cleanup Temporary Files
         run: |
           echo "Cleaning up temporary files..."
-          rm -rf $HOME/keystore.jks  # Remove sensitive files
+          rm -rf $HOME/emotion_tracker_keystore.jks  # Remove sensitive files
           rm -rf build/              # Remove build artifacts
           rm -rf release/            # Remove release artifacts
           unset ANDROID_KEY_ALIAS
