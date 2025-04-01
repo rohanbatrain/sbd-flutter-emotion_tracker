@@ -151,7 +151,7 @@ jobs:
       - name: Rename release files for industry naming
         run: |
           # Define the new naming scheme, e.g., v1.2.3 -> project_name-v1.2.3
-          NEW_NAME="project_name-${{ env.VERSION }}"
+          NEW_NAME="Emotion_Tracker-${{ env.VERSION }}"
           
           # Rename APK
           mv build/app/outputs/flutter-apk/app-release.apk "release/${NEW_NAME}-apk-release.apk"
