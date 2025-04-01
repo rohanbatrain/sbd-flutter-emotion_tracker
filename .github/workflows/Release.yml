@@ -8,12 +8,16 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    concurrency:
+      group: release
+      cancel-in-progress: true
+
     steps:
       # Checkout the code from the repository
       - name: Checkout code
         uses: actions/checkout@v2
 
-      # Cache Flutter dependencies to speed up subsequent runs
+      # Cache Flutter dependencies
       - name: Cache Flutter dependencies
         uses: actions/cache@v3
         with:
@@ -37,90 +41,77 @@ jobs:
           VERSION=$(echo ${GITHUB_REF} | sed 's/refs\/heads\///')
           echo "VERSION=${VERSION}" >> $GITHUB_ENV
 
-      # Cache system dependencies (Linux specific)
-      - name: Cache Linux dependencies
+      # --- Run builds in parallel ---
+      - name: Build Android (APK & AAB)
+        run: |
+          flutter build apk --release --no-shrink
+          flutter build appbundle --release
+        env:
+          ANDROID_KEYSTORE: $HOME/keystore.jks
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        working-directory: .
+
+      - name: Install GTK+ 3.0 dependencies (Linux)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev pkg-config
+
+      # Cache system dependencies for Linux
+      - name: Cache GTK+ 3.0 dependencies
         uses: actions/cache@v3
         with:
           path: /usr/lib/x86_64-linux-gnu
-          key: ${{ runner.os }}-linux-${{ hashFiles('**/pubspec.yaml') }}
+          key: ${{ runner.os }}-gtk-${{ hashFiles('**/pubspec.yaml') }}
           restore-keys: |
-            ${{ runner.os }}-linux-
+            ${{ runner.os }}-gtk-
 
-  build:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        platform: [android, linux, web]
+      - name: Build Linux version (Linux)
+        run: flutter build linux --release
 
-    steps:
-      # Checkout the code from the repository
-      - name: Checkout code
-        uses: actions/checkout@v2
-
-      # Cache Flutter dependencies to speed up subsequent runs
-      - name: Cache Flutter dependencies
+      - name: Cache AppImage tool
         uses: actions/cache@v3
         with:
-          path: ~/.pub-cache
-          key: ${{ runner.os }}-flutter-${{ hashFiles('**/pubspec.yaml') }}
+          path: appimage/appimagetool-x86_64.AppImage
+          key: ${{ runner.os }}-appimagetool-${{ hashFiles('**/pubspec.yaml') }}
           restore-keys: |
-            ${{ runner.os }}-flutter-
+            ${{ runner.os }}-appimagetool-
 
-      # Set up Flutter
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
+      - name: Copy Linux binary to AppDir
+        run: cp build/linux/x64/release/bundle/emotion_tracker appimage/Emotion-Tracker.AppDir/
 
-      # Install dependencies
-      - name: Install dependencies
-        run: flutter pub get
+      - name: Copy build to AppDir
+        run: cp -r build/linux/x64/release/bundle/* appimage/Emotion-Tracker.AppDir/
 
-      # Platform-specific steps for Android, Linux, and Web
-      - name: Build and Deploy for ${{ matrix.platform }}
+      - name: Run appimagetool
+        run: ./appimage/appimagetool-x86_64.AppImage ./appimage/Emotion-Tracker.AppDir ./appimage/Emotion_Tracker.Appimage
+
+      - name: Create tar.gz archive for Linux executable
         run: |
-          if [ "${{ matrix.platform }}" == "android" ]; then
-            # Generate Keystore (Android)
-            keytool -genkey -v -keystore $HOME/keystore.jks -storetype JKS -keyalg RSA -keysize 2048 -validity 10000 -alias "$ANDROID_KEY_ALIAS" -dname "CN=Rohan Batra, OU=Open Source, O=Second Brain Database, L=Bidholi, ST=UK, C=IN" -storepass $ANDROID_KEYSTORE_PASSWORD -keypass $ANDROID_KEY_PASSWORD
-            
-            # Build APK for release (Android)
-            flutter build apk --release --no-shrink
+          mkdir -p release
+          tar -czvf "release/emotion_tracker-${{ env.VERSION }}.tar.gz" -C build/linux/x64/release bundle
+          ls -la release
 
-            # Build AAB for release (Android)
-            flutter build appbundle --release
-
-          elif [ "${{ matrix.platform }}" == "linux" ]; then
-            # Install GTK+ 3.0 dependencies (Linux)
-            sudo apt-get update
-            sudo apt-get install -y libgtk-3-dev pkg-config
-
-            # Build Linux version (Linux)
-            flutter build linux --release
-
-            # Copy Linux binary to AppDir
-            cp build/linux/x64/release/bundle/emotion_tracker appimage/Emotion-Tracker.AppDir/
-
-            # Run appimagetool
-            ./appimage/appimagetool-x86_64.AppImage ./appimage/Emotion-Tracker.AppDir ./appimage/Emotion_Tracker.Appimage
-
-          elif [ "${{ matrix.platform }}" == "web" ]; then
-            # Enable Web for Flutter (Web)
+      - name: Enable Web for Flutter (Web)
+        run: |
+          if ! flutter config --list | grep -q "web"; then
             flutter config --enable-web
+          fi
 
-            # Build Flutter web app (Web)
-            flutter build web --release
+      - name: Build Flutter web app (Web)
+        run: flutter build web --release
 
-            # Deploy to GitHub Pages (Web)
-            uses: crazy-max/ghaction-github-pages@v4.1.0
-            with:
-              build_dir: build/web
-              repo: ${{ github.repository }}
-              target_branch: gh-pages
-            env:
-              GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: GitHub Pages (Web)
+        uses: crazy-max/ghaction-github-pages@v4.1.0
+        with:
+          build_dir: build/web
+          repo: ${{ github.repository }}
+          target_branch: gh-pages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # Create or Update GitHub Release
-  release:
-    runs-on: ubuntu-latest
-    steps:
+      # --- Create or Update GitHub Release ---
       - name: Check if Release Exists
         id: check_release
         run: |
@@ -131,16 +122,17 @@ jobs:
           else
             echo "Release exists, updating the existing release"
             echo "create=false" >> $GITHUB_ENV
+          fi
         env:
-            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Verify Files Exist
         id: verify_files
         run: |
           if [ -f "build/app/outputs/bundle/release/app-release.aab" ] && \
-            [ -f "build/app/outputs/flutter-apk/app-release.apk" ] && \
-            [ -f "appimage/Emotion_Tracker.Appimage" ] && \
-            [ -f "release/emotion_tracker-${{ env.VERSION }}.tar.gz" ]; then
+             [ -f "build/app/outputs/flutter-apk/app-release.apk" ] && \
+             [ -f "appimage/Emotion_Tracker.Appimage" ] && \
+             [ -f "release/emotion_tracker-${{ env.VERSION }}.tar.gz" ]; then
             echo "All files exist"
           else
             echo "One or more files do not exist"
