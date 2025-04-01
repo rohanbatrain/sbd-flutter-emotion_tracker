@@ -118,6 +118,9 @@ jobs:
               GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # Create or Update GitHub Release
+  release:
+    runs-on: ubuntu-latest
+    steps:
       - name: Check if Release Exists
         id: check_release
         run: |
