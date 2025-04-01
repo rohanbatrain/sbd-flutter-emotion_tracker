@@ -61,11 +61,6 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         working-directory: .
 
-      - name: Install GTK+ 3.0 dependencies (Linux)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev pkg-config
-
       # Cache system dependencies for Linux
       - name: Cache GTK+ 3.0 dependencies
         uses: actions/cache@v3
@@ -74,6 +69,12 @@ jobs:
           key: ${{ runner.os }}-gtk-${{ hashFiles('**/pubspec.yaml') }}
           restore-keys: |
             ${{ runner.os }}-gtk-
+
+
+      - name: Install GTK+ 3.0 dependencies (Linux)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev pkg-config
 
       - name: Build Linux version (Linux)
         run: flutter build linux --release
