@@ -32,7 +32,7 @@ android {
 
     signingConfigs {
         release {
-            storeFile file(System.getenv('HOME') + '/emotion_tracker_keystore.jks')  // Reference to the keystore file
+            storeFile file(System.getenv('HOME') + '/keystore.jks')  // Reference to the keystore file
             storePassword System.getenv('ANDROID_KEYSTORE_PASSWORD')  // Password from the secret
             keyAlias System.getenv('ANDROID_KEY_ALIAS')  // Key alias from the secret
             keyPassword System.getenv('ANDROID_KEY_PASSWORD')  // Key password from the secret
