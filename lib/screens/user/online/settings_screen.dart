@@ -2,6 +2,7 @@ import 'package:emotion_tracker/main.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:math';
+import 'package:emotion_tracker/widgets/buy_me_coffee_button.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -568,19 +569,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             const SizedBox(height: 10),
 
-            // Donate (Coming Soon)
-            ListTile(
-              leading: const Icon(Icons.favorite, color: Colors.red),
-              title: const Text(
-                'Donate (Coming Soon)',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
-              ),
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Donation feature coming soon!')),
-                );
-              },
+            // Add a section header for support options
+            const Text(
+              'Support',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
+            const Divider(thickness: 1, height: 20),
+
+            // Buy Me Coffee Button
+            const BuyMeCoffeeButton(),
+            const SizedBox(height: 10),
           ],
         ),
       ),

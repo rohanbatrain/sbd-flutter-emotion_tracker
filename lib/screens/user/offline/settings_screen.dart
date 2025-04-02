@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:math';
 import 'package:emotion_tracker/main.dart'; // Import MyApp to access the ValueNotifier
+import 'package:emotion_tracker/widgets/buy_me_coffee_button.dart';
 
 class OfflineSettingsScreen extends StatefulWidget {
   const OfflineSettingsScreen({super.key});
@@ -200,6 +201,33 @@ class _OfflineSettingsScreenState extends State<OfflineSettingsScreen> {
         padding: const EdgeInsets.all(16.0),
         child: ListView(
           children: [
+            // Appearance Settings
+            const Text(
+              'Appearance',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const Divider(thickness: 1, height: 20),
+
+            // Dark Mode
+            SwitchListTile(
+              title: const Text(
+                'Enable Dark Mode',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+              ),
+              value: _isDarkMode,
+              onChanged: (bool value) {
+                _toggleDarkMode(value);
+              },
+            ),
+            const SizedBox(height: 24),
+
+            // Application Settings
+            const Text(
+              'Application',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const Divider(thickness: 1, height: 20),
+
             // Debug Mode
             SwitchListTile(
               title: const Text(
@@ -226,7 +254,7 @@ class _OfflineSettingsScreenState extends State<OfflineSettingsScreen> {
                   ),
                 ),
               ),
-            const SizedBox(height: 24), // Adjusted spacing for uniformity
+            const SizedBox(height: 24),
 
             // Toggle Encryption
             Row(
@@ -256,7 +284,6 @@ class _OfflineSettingsScreenState extends State<OfflineSettingsScreen> {
                             'Turning off encryption after enabling it may cause abnormal behavior. '
                             'We recommend not disabling encryption once it is enabled, as edge cases are not yet fully tested.'
                             'If you need to disable it, please clear all data first.'
-                            
                           ),
                           actions: <Widget>[
                             TextButton(
@@ -273,7 +300,6 @@ class _OfflineSettingsScreenState extends State<OfflineSettingsScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 24), // Adjusted spacing for uniformity
 
             // Encryption key input field
             if (_isEncryptionEnabled)
@@ -324,20 +350,7 @@ class _OfflineSettingsScreenState extends State<OfflineSettingsScreen> {
                   ),
                 ],
               ),
-            const SizedBox(height: 24), // Adjusted spacing for uniformity
-
-            // Dark Mode
-            SwitchListTile(
-              title: const Text(
-                'Enable Dark Mode',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
-              ),
-              value: _isDarkMode,
-              onChanged: (bool value) {
-                _toggleDarkMode(value);
-              },
-            ),
-            const SizedBox(height: 24), // Adjusted spacing for uniformity
+            const SizedBox(height: 24),
 
             // Load Online Version
             ListTile(
@@ -357,7 +370,7 @@ class _OfflineSettingsScreenState extends State<OfflineSettingsScreen> {
                 );
               },
             ),
-            const SizedBox(height: 24), // Adjusted spacing for uniformity
+            const SizedBox(height: 24),
 
             // Clear All Data
             ListTile(
@@ -366,6 +379,17 @@ class _OfflineSettingsScreenState extends State<OfflineSettingsScreen> {
               trailing: const Icon(Icons.delete),
               onTap: _showClearDataConfirmationDialog,
             ),
+            
+            const SizedBox(height: 24),
+            
+            // Add a section header for support options
+            const Text(
+              'Support',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const Divider(thickness: 1, height: 20),
+            
+            const BuyMeCoffeeButton(),
           ],
         ),
       ),
