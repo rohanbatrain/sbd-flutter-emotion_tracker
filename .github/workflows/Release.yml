@@ -57,7 +57,7 @@ jobs:
       # --- Run Android, Linux, and Web Builds in Parallel ---
       - name: Build Android and Linux in Parallel
         run: |
-          flutter build apk --release --no-shrink & 
+          flutter build apk --release & 
           flutter build appbundle --release & 
           flutter build linux --release &
           wait
