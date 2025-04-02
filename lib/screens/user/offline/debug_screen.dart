@@ -41,83 +41,117 @@ class _DebugScreenState extends State<DebugScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Debug Screen'),
         actions: [
-          DropdownButton<String>(
-            value: _selectedView,
-            icon: const Icon(Icons.more_vert),
-            elevation: 16,
-            style: const TextStyle(color: Colors.black),
-            underline: Container(
-              height: 2,
-              color: Colors.grey,
+          Container(
+            margin: const EdgeInsets.only(right: 16),
+            child: DropdownButton<String>(
+              value: _selectedView,
+              icon: Icon(Icons.more_vert, color: theme.colorScheme.onSurface),
+              elevation: 16,
+              style: TextStyle(color: theme.colorScheme.onSurface),
+              dropdownColor: theme.colorScheme.surface,
+              underline: Container(
+                height: 2,
+                color: theme.colorScheme.primary,
+              ),
+              onChanged: _isDebugEnabled
+                  ? (String? newValue) {
+                      setState(() {
+                        _selectedView = newValue!;
+                        if (_selectedView == 'Shared Preference') {
+                          _loadSharedPreferencesData();
+                        }
+                      });
+                    }
+                  : null,
+              items: <String>[
+                'Select View',
+                'Shared Preference',
+              ].map<DropdownMenuItem<String>>((String value) {
+                return DropdownMenuItem<String>(
+                  value: value,
+                  child: Text(value),
+                );
+              }).toList(),
             ),
-            onChanged: _isDebugEnabled
-                ? (String? newValue) {
-                    setState(() {
-                      _selectedView = newValue!;
-                      if (_selectedView == 'Shared Preference') {
-                        _loadSharedPreferencesData();
-                      }
-                    });
-                  }
-                : null,
-            items: <String>[
-              'Select View',
-              'Shared Preference', // Removed Offline Emotion from the dropdown
-            ].map<DropdownMenuItem<String>>((String value) {
-              return DropdownMenuItem<String>(
-                value: value,
-                child: Text(value),
-              );
-            }).toList(),
           ),
         ],
       ),
       body: _isDebugEnabled
-          ? Center(
-              child: _selectedView == 'Select View'
-                  ? const Text(
-                      'Select an option from the dropdown to view debug info.',
-                      style:
-                          TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+          ? _selectedView == 'Select View'
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.bug_report,
+                        size: 64,
+                        color: theme.colorScheme.primary,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Debug Mode Active',
+                        style: theme.textTheme.headlineSmall,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Select an option from the dropdown to view debug info.',
+                        style: theme.textTheme.bodyLarge,
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                )
+              : _selectedView == 'Shared Preference'
+                  ? _buildSharedPreferencesView()
+                  : Center(
+                      child: Text(
+                        'Other debug views coming soon...',
+                        style: theme.textTheme.bodyLarge,
+                      ),
                     )
-                  : _selectedView == 'Shared Preference'
-                      ? _buildSharedPreferencesView()
-                      : const Text(
-                          'Other debug views coming soon...',
-                          style:
-                              TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
-                        ),
-            )
           : Center(
               child: Padding(
-                padding: const EdgeInsets.all(16.0),
+                padding: const EdgeInsets.all(24.0),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Text(
-                      'Debug mode is disabled. Please enable debug mode in the settings.',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.red,
+                    Icon(
+                      Icons.warning_rounded,
+                      size: 64,
+                      color: theme.colorScheme.error,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Debug Mode Disabled',
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        color: theme.colorScheme.error,
                       ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Please enable debug mode in the settings to access debugging tools.',
+                      style: theme.textTheme.bodyLarge,
                       textAlign: TextAlign.center,
                     ),
-                    const SizedBox(height: 20),
-                    ElevatedButton(
+                    const SizedBox(height: 24),
+                    ElevatedButton.icon(
                       onPressed: () {
-                        // Navigate to the settings screen where the user can enable debug mode
-                        Navigator.push(context,
-  MaterialPageRoute(builder: (context) => const OfflineSettingsScreen()),
-);
-
-                        
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const OfflineSettingsScreen(),
+                          ),
+                        );
                       },
-                      child: const Text('Go to Settings'),
+                      icon: const Icon(Icons.settings),
+                      label: const Text('Go to Settings'),
                     ),
                   ],
                 ),
@@ -126,10 +160,11 @@ class _DebugScreenState extends State<DebugScreen> {
     );
   }
 
-  // Build Shared Preferences View
   Widget _buildSharedPreferencesView() {
+    final theme = Theme.of(context);
+
     if (_sharedPreferencesData.isEmpty) {
-      return const CircularProgressIndicator();
+      return const Center(child: CircularProgressIndicator());
     }
 
     return Padding(
@@ -137,75 +172,78 @@ class _DebugScreenState extends State<DebugScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Shared Preferences Data:',
-            style: TextStyle(
-                fontSize: 22, fontWeight: FontWeight.bold, color: Colors.blue),
-          ),
-          const SizedBox(height: 20),
-          Expanded(
-            child: ListView(
-              children: _sharedPreferencesData.entries.map((entry) {
-                return entry.key == 'offline_emotion'
-                    ? _buildOfflineEmotion(entry.value)
-                    : Card(
-                        margin: const EdgeInsets.symmetric(vertical: 8),
-                        child: ListTile(
-                          title: SelectableText(entry.key), // Making the key text copyable
-                          subtitle: SelectableText(entry.value.toString()), // Making the value copyable
-                          trailing: IconButton(
-                            icon: const Icon(Icons.copy),
-                            onPressed: () {
-                              final dataToCopy = '${entry.key}: ${entry.value}';
-                              Clipboard.setData(ClipboardData(text: dataToCopy));
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Copied: $dataToCopy')),
-                              );
-                            },
-                          ),
-                        ),
-                      );
-              }).toList(),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primary.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.data_object,
+                  color: theme.colorScheme.primary,
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'Shared Preferences Data',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+              ],
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  // Build Offline Emotion directly inside Shared Preferences View
-  Widget _buildOfflineEmotion(dynamic value) {
-    final offlineEmotionData = value as List?;
-    if (offlineEmotionData == null || offlineEmotionData.isEmpty) {
-      return const ListTile(
-        title: Text('Offline Emotion'),
-        subtitle: Text('No offline emotion data available'),
-      );
-    }
-
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Offline Emotions:',
-            style: TextStyle(
-                fontSize: 20, fontWeight: FontWeight.bold, color: Colors.blue),
-          ),
-          const SizedBox(height: 10),
-          ListView.builder(
-            shrinkWrap: true,
-            itemCount: offlineEmotionData.length,
-            itemBuilder: (context, index) {
-              return Card(
-                margin: const EdgeInsets.symmetric(vertical: 8),
-                child: ListTile(
-                  title: SelectableText('Emotion ${index + 1}'), // Making the emotion number copyable
-                  subtitle: SelectableText(offlineEmotionData[index].toString()), // Making the emotion value copyable
-                ),
-              );
-            },
+          const SizedBox(height: 16),
+          Expanded(
+            child: ListView.builder(
+              itemCount: _sharedPreferencesData.length,
+              itemBuilder: (context, index) {
+                final entry = _sharedPreferencesData.entries.elementAt(index);
+                return Card(
+                  margin: const EdgeInsets.symmetric(vertical: 4),
+                  child: ExpansionTile(
+                    title: Text(
+                      entry.key,
+                      style: theme.textTheme.titleMedium,
+                    ),
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SelectableText(
+                              entry.value.toString(),
+                              style: theme.textTheme.bodyMedium,
+                            ),
+                            const SizedBox(height: 8),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton.icon(
+                                onPressed: () {
+                                  Clipboard.setData(ClipboardData(
+                                    text: '${entry.key}: ${entry.value}',
+                                  ));
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: const Text('Copied to clipboard'),
+                                      behavior: SnackBarBehavior.floating,
+                                    ),
+                                  );
+                                },
+                                icon: const Icon(Icons.copy),
+                                label: const Text('Copy'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
           ),
         ],
       ),
