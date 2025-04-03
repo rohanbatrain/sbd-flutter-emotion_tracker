@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:math';
 import 'package:emotion_tracker/main.dart'; // Import MyApp to access the ValueNotifier
 import 'package:emotion_tracker/widgets/buy_me_coffee_button.dart';
+import 'package:emotion_tracker/widgets/author_socials.dart';
 
 class OfflineSettingsScreen extends StatefulWidget {
   const OfflineSettingsScreen({super.key});
@@ -282,8 +283,11 @@ class _OfflineSettingsScreenState extends State<OfflineSettingsScreen> {
                           title: const Text('Encryption Info'),
                           content: const Text(
                             'Turning off encryption after enabling it may cause abnormal behavior. '
-                            'We recommend not disabling encryption once it is enabled, as edge cases are not yet fully tested.'
-                            'If you need to disable it, please clear all data first.'
+                            'We recommend not disabling encryption once it is enabled, as edge cases are not yet fully tested. '
+                            'If you need to disable it, please clear all data first.\n\n'
+                            'IMPORTANT: This encryption key should be the same across all second brain database applications. '
+                            'Using different keys in different micro-frontends will create incompatibility issues and make '
+                            'data synchronization impossible.'
                           ),
                           actions: <Widget>[
                             TextButton(
@@ -390,6 +394,17 @@ class _OfflineSettingsScreenState extends State<OfflineSettingsScreen> {
             const Divider(thickness: 1, height: 20),
             
             const BuyMeCoffeeButton(),
+            
+            const SizedBox(height: 24),
+            
+            // Add About the Author section
+            const Text(
+              'About the Author',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const Divider(thickness: 1, height: 20),
+            
+            const AuthorSocials(),
           ],
         ),
       ),

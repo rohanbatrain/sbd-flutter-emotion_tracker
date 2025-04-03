@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:math';
 import 'package:emotion_tracker/widgets/buy_me_coffee_button.dart';
+import 'package:emotion_tracker/widgets/author_socials.dart';
+import 'package:flutter/services.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -320,11 +322,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             return AlertDialog(
                               title: const Text('Encryption Warning'),
                               content: const Text(
-                            'Turning off encryption after enabling it may cause abnormal behavior. '
-                            'We recommend not disabling encryption once it is enabled, as edge cases are not yet fully tested.'
-                            'If you need to disable it, please clear all data first.'
-                            
-                          ),
+                                'Turning off encryption after enabling it may cause abnormal behavior. '
+                                'We recommend not disabling encryption once it is enabled, as edge cases are not yet fully tested. '
+                                'If you need to disable it, please clear all data first.\n\n'
+                                'IMPORTANT: This encryption key should be the same across all second brain database applications. '
+                                'Using different keys in different micro-frontends will create incompatibility issues and make '
+                                'data synchronization impossible.',
+                              ),
                               actions: <Widget>[
                                 TextButton(
                                   onPressed: () {
@@ -537,22 +541,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
               ),
               onTap: () {
-                showDialog(
-                  context: context,
-                  builder: (BuildContext context) {
-                    return AlertDialog(
-                      title: const Text('GitHub Repository'),
-                      content: const Text('https://github.com/rohanbatrain/emotion_tracker'),
-                      actions: <Widget>[
-                        TextButton(
-                          onPressed: () {
-                            Navigator.of(context).pop();
-                          },
-                          child: const Text('Close'),
-                        ),
-                      ],
-                    );
-                  },
+                const githubUrl = 'https://github.com/rohanbatrain/emotion_tracker';
+                Clipboard.setData(const ClipboardData(text: githubUrl));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('GitHub repository link copied to clipboard!')),
                 );
               },
             ),
@@ -576,8 +568,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             const Divider(thickness: 1, height: 20),
 
-            // Buy Me Coffee Button
             const BuyMeCoffeeButton(),
+            const SizedBox(height: 24),
+
+            // Add About the Author section
+            const Text(
+              'About the Author',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const Divider(thickness: 1, height: 20),
+
+            const AuthorSocials(),
             const SizedBox(height: 10),
           ],
         ),

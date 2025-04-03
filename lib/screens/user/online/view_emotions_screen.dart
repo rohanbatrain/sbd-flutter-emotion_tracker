@@ -585,23 +585,32 @@ class _AnimatedNoteCardState extends State<_AnimatedNoteCard> {
   }
 
   Future<String> _decryptNote(String noteJsonString, String encryptionKey) async {
-    final key = encrypt.Key.fromUtf8(encryptionKey.padRight(32, ' ')); // AES key needs to be 32 bytes
     try {
       final Map<String, dynamic> noteJson = jsonDecode(noteJsonString);
       final String encryptedContent = noteJson['content'] ?? '';
 
       if (encryptedContent.isEmpty) {
-        throw Exception('No encrypted content found');
+        return 'No content found';
       }
 
       final parts = encryptedContent.split(':');
-      if (parts.length != 2) throw Exception('Invalid encrypted content format');
-      final encryptedData = encrypt.Encrypted.fromBase64(parts[0]);
-      final iv = encrypt.IV.fromBase64(parts[1]);
-      final encrypter = encrypt.Encrypter(encrypt.AES(key));
-      return encrypter.decrypt(encryptedData, iv: iv);
+      if (parts.length != 2) {
+        return 'Invalid note format';
+      }
+
+      try {
+        final key = encrypt.Key.fromUtf8(encryptionKey.padRight(32, ' '));
+        final encryptedData = encrypt.Encrypted.fromBase64(parts[0]);
+        final iv = encrypt.IV.fromBase64(parts[1]);
+        final encrypter = encrypt.Encrypter(encrypt.AES(key));
+        return encrypter.decrypt(encryptedData, iv: iv);
+      } on ArgumentError catch (e) {
+        return 'Decryption failed: corrupted data';
+      } catch (e) {
+        return 'Decryption failed';
+      }
     } catch (e) {
-      return 'Invalid note format or decryption failed';
+      return 'Invalid note format';
     }
   }
 

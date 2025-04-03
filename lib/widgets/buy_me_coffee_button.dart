@@ -33,7 +33,9 @@ class BuyMeCoffeeButton extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.grey[200],
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.grey[900]
+                        : Colors.grey[100],
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Row(
