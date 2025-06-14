@@ -1,31 +1,16 @@
-
-
 # emotion_tracker
-
-[![Netlify Status](https://api.netlify.com/api/v1/badges/f90782bd-d91d-4f17-8636-9b9307a7fbc2/deploy-status)](https://app.netlify.com/sites/emotion-tracker/deploys)
-
 
 A new Flutter project.
 
 ## Getting Started
 
-Coming Soon 
+This project is a starting point for a Flutter application.
 
+A few resources to get you started if this is your first Flutter project:
 
-dmg generation dir
+- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
+- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
 
-```
-build/macos/Build/Products/Release
-```
-
-
-```
-
-
-hdiutil create -volname Emtoion-Tracker -srcfolder Emotion_Tracker -ov -format UDZO Emotion-Tracker.dmg 
-```
-
-
-# Trying package build
-
-```pkgbuild --identifier in.rohanbatra.emotion-tracker --version 1.0 --install-location /Applications --root ./Emotion\ Tracker.app  Emotion_Tracker.pkg```
+For help getting started with Flutter development, view the
+[online documentation](https://docs.flutter.dev/), which offers tutorials,
+samples, guidance on mobile development, and a full API reference.
