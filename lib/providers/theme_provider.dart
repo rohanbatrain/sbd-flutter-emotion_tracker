@@ -9,6 +9,10 @@ import 'package:emotion_tracker/themes/blush_rose_theme.dart';
 import 'package:emotion_tracker/themes/cloud_gray_theme.dart';
 import 'package:emotion_tracker/themes/sunset_peach_theme.dart';
 import 'package:emotion_tracker/themes/midnight_lavender_theme.dart';
+import 'package:emotion_tracker/themes/crimson_red_theme.dart';
+import 'package:emotion_tracker/themes/forest_green_theme.dart';
+import 'package:emotion_tracker/themes/golden_yellow_theme.dart';
+import 'package:emotion_tracker/themes/deep_purple_theme.dart';
 
 class AppThemes {
   static final Map<String, ThemeData> allThemes = {
@@ -20,17 +24,25 @@ class AppThemes {
     'cloudGray': CloudGrayTheme.theme,
     'sunsetPeach': SunsetPeachTheme.theme,
     'midnightLavender': MidnightLavenderTheme.theme,
+    'crimsonRed': CrimsonRedTheme.theme,
+    'forestGreen': ForestGreenTheme.theme,
+    'goldenYellow': GoldenYellowTheme.theme,
+    'deepPurple': DeepPurpleTheme.theme,
   };
 
   static final Map<String, String> themeNames = {
-    'lightTheme': 'Light Blue',
-    'darkTheme': 'Dark Blue',
+    'lightTheme': 'Light Theme',
+    'darkTheme': 'Dark Theme',
     'serenityGreen': 'Serenity Green',
     'pacificBlue': 'Pacific Blue',
     'blushRose': 'Blush Rose',
     'cloudGray': 'Cloud Gray',
     'sunsetPeach': 'Sunset Peach',
     'midnightLavender': 'Midnight Lavender',
+    'crimsonRed': 'Crimson Red',
+    'forestGreen': 'Forest Green',
+    'goldenYellow': 'Golden Yellow',
+    'deepPurple': 'Deep Purple',
   };
 }
 

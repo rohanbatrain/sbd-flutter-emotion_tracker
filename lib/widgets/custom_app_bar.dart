@@ -87,6 +87,25 @@ class ThemeSelector extends ConsumerWidget {
                 final themeData = AppThemes.allThemes[themeKey]!;
                 final isSelected = themeKey == currentTheme;
                 
+                // Special handling for light and dark themes
+                Color tileColor;
+                Color textColor;
+                Color iconColor;
+                
+                if (themeKey == 'lightTheme') {
+                  tileColor = Colors.white;
+                  textColor = Colors.black87;
+                  iconColor = Colors.black87;
+                } else if (themeKey == 'darkTheme') {
+                  tileColor = Colors.grey[900]!;
+                  textColor = Colors.white;
+                  iconColor = Colors.white;
+                } else {
+                  tileColor = themeData.primaryColor;
+                  textColor = Colors.white;
+                  iconColor = Colors.white;
+                }
+                
                 return GestureDetector(
                   onTap: () {
                     ref.read(themeProvider.notifier).setTheme(themeKey);
@@ -94,14 +113,16 @@ class ThemeSelector extends ConsumerWidget {
                   },
                   child: Container(
                     decoration: BoxDecoration(
-                      color: themeData.primaryColor,
+                      color: tileColor,
                       borderRadius: BorderRadius.circular(12),
                       border: isSelected
                           ? Border.all(color: theme.primaryColor, width: 3)
-                          : Border.all(color: Colors.transparent, width: 3),
+                          : Border.all(color: Colors.grey.withOpacity(0.3), width: 1),
                       boxShadow: [
                         BoxShadow(
-                          color: themeData.primaryColor.withOpacity(0.3),
+                          color: tileColor == Colors.white 
+                              ? Colors.grey.withOpacity(0.3)
+                              : tileColor.withOpacity(0.3),
                           blurRadius: 8,
                           offset: const Offset(0, 2),
                         ),
@@ -112,8 +133,8 @@ class ThemeSelector extends ConsumerWidget {
                         Center(
                           child: Text(
                             themeName,
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: textColor,
                               fontWeight: FontWeight.w600,
                               fontSize: 14,
                             ),
@@ -121,12 +142,12 @@ class ThemeSelector extends ConsumerWidget {
                           ),
                         ),
                         if (isSelected)
-                          const Positioned(
+                          Positioned(
                             top: 8,
                             right: 8,
                             child: Icon(
                               Icons.check_circle,
-                              color: Colors.white,
+                              color: iconColor,
                               size: 20,
                             ),
                           ),
