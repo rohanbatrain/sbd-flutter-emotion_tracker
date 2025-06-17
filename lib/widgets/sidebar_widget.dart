@@ -1,22 +1,53 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:emotion_tracker/providers/theme_provider.dart';
 import 'package:emotion_tracker/providers/app_providers.dart';
+import 'package:emotion_tracker/providers/ad_provider.dart';
 
-class SidebarWidget extends ConsumerWidget {
+class SidebarWidget extends ConsumerStatefulWidget {
   final String selectedItem;
   final Function(String) onItemSelected;
 
   const SidebarWidget({
-    Key? key,
+    super.key,
     required this.selectedItem,
     required this.onItemSelected,
-  }) : super(key: key);
+  });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SidebarWidget> createState() => _SidebarWidgetState();
+}
+
+class _SidebarWidgetState extends ConsumerState<SidebarWidget> {
+  static const String sidebarBannerAdId = 'sidebar_banner';
+  AdNotifier? _adNotifier;
+
+  @override
+  void initState() {
+    super.initState();
+    // Load banner ad using the ad provider
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _adNotifier = ref.read(adProvider.notifier);
+        _adNotifier?.loadBannerAd(sidebarBannerAdId);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    // Dispose the banner ad using stored reference
+    _adNotifier?.disposeBannerAd(sidebarBannerAdId);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final theme = ref.watch(currentThemeProvider);
-    
+    final bannerAd = ref.watch(bannerAdProvider(sidebarBannerAdId));
+    final isBannerAdReady = ref.watch(adProvider.notifier).isBannerAdReady(sidebarBannerAdId);
+
     return Container(
       width: 280,
       decoration: BoxDecoration(
@@ -69,7 +100,7 @@ class SidebarWidget extends ConsumerWidget {
                     icon: Icons.dashboard_rounded,
                     title: 'Dashboard',
                     value: 'dashboard',
-                    isSelected: selectedItem == 'dashboard',
+                    isSelected: widget.selectedItem == 'dashboard',
                   ),
                   SizedBox(height: 8),
                   _buildMenuItem(
@@ -77,7 +108,7 @@ class SidebarWidget extends ConsumerWidget {
                     icon: Icons.settings_rounded,
                     title: 'Settings',
                     value: 'settings',
-                    isSelected: selectedItem == 'settings',
+                    isSelected: widget.selectedItem == 'settings',
                   ),
                   SizedBox(height: 8),
                   _buildMenuItem(
@@ -85,7 +116,7 @@ class SidebarWidget extends ConsumerWidget {
                     icon: Icons.shopping_bag_rounded,
                     title: 'Shop',
                     value: 'shop',
-                    isSelected: selectedItem == 'shop',
+                    isSelected: widget.selectedItem == 'shop',
                   ),
                 ],
               ),
@@ -97,6 +128,21 @@ class SidebarWidget extends ConsumerWidget {
             padding: EdgeInsets.all(16),
             child: Column(
               children: [
+                // Banner Ad
+                if (isBannerAdReady && bannerAd != null)
+                  Container(
+                    margin: EdgeInsets.only(bottom: 16),
+                    width: 248, // Sidebar width (280) - padding (32)
+                    height: bannerAd.size.height.toDouble(),
+                    child: FittedBox(
+                      fit: BoxFit.contain,
+                      child: SizedBox(
+                        width: bannerAd.size.width.toDouble(),
+                        height: bannerAd.size.height.toDouble(),
+                        child: AdWidget(ad: bannerAd),
+                      ),
+                    ),
+                  ),
                 // Logout Button
                 Container(
                   width: double.infinity,
@@ -170,7 +216,7 @@ class SidebarWidget extends ConsumerWidget {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
-          onTap: () => onItemSelected(value),
+          onTap: () => widget.onItemSelected(value),
           child: Padding(
             padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Row(

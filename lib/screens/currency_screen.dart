@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:emotion_tracker/providers/theme_provider.dart';
 import 'package:emotion_tracker/providers/currency_provider.dart';
+import 'package:emotion_tracker/providers/ad_provider.dart';
+import 'dart:async';
 
 class CurrencyScreen extends ConsumerStatefulWidget {
   const CurrencyScreen({Key? key}) : super(key: key);
@@ -16,6 +19,9 @@ class _CurrencyScreenState extends ConsumerState<CurrencyScreen>
   late AnimationController _coinBounceController;
   late Animation<double> _coinBounceAnimation;
   bool _showRewardSuccess = false;
+  AdNotifier? _adNotifier;
+  Timer? _cooldownTimer;
+  Duration _cooldownRemaining = Duration.zero;
 
   @override
   void initState() {
@@ -35,12 +41,43 @@ class _CurrencyScreenState extends ConsumerState<CurrencyScreen>
       parent: _coinBounceController,
       curve: Curves.elasticOut,
     ));
+
+    // Initialize ad provider and load rewarded ad
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _adNotifier = ref.read(adProvider.notifier);
+      _adNotifier?.loadRewardedAd();
+      _startCooldownTimerIfNeeded();
+    });
+  }
+
+  void _startCooldownTimerIfNeeded() {
+    final currencyData = ref.read(currencyProvider);
+    final now = DateTime.now();
+    final lastAdWatched = currencyData.lastAdWatched;
+    final cooldown = lastAdWatched != null ? now.difference(lastAdWatched) : Duration(minutes: 5);
+    if (cooldown.inMinutes < 5) {
+      _cooldownRemaining = Duration(minutes: 5) - cooldown;
+      _cooldownTimer?.cancel();
+      _cooldownTimer = Timer.periodic(Duration(seconds: 1), (timer) {
+        setState(() {
+          _cooldownRemaining = _cooldownRemaining - Duration(seconds: 1);
+          if (_cooldownRemaining.isNegative || _cooldownRemaining == Duration.zero) {
+            _cooldownTimer?.cancel();
+            _cooldownRemaining = Duration.zero;
+          }
+        });
+      });
+    } else {
+      _cooldownRemaining = Duration.zero;
+      _cooldownTimer?.cancel();
+    }
   }
 
   @override
   void dispose() {
     _confettiController.dispose();
     _coinBounceController.dispose();
+    _cooldownTimer?.cancel();
     super.dispose();
   }
 
@@ -52,15 +89,35 @@ class _CurrencyScreenState extends ConsumerState<CurrencyScreen>
       return;
     }
 
+    // Check if rewarded ad is ready
+    if (_adNotifier?.isRewardedAdReady != true) {
+      _showAdNotReadyDialog();
+      return;
+    }
+
+    // Show rewarded ad
+    await _adNotifier?.showRewardedAd(
+      onUserEarnedReward: (reward) {
+        // User earned reward, add coins
+        _handleAdReward();
+      },
+      onAdClosed: () {
+        // Ad was closed, preload next ad
+        _adNotifier?.loadRewardedAd();
+      },
+    );
+  }
+
+  void _handleAdReward() async {
+    final currencyNotifier = ref.read(currencyProvider.notifier);
     setState(() {
       _showRewardSuccess = true;
     });
-    
     await currencyNotifier.addCoins(50);
-    
+    currencyNotifier.updateLastAdWatched();
+    _startCooldownTimerIfNeeded();
     _confettiController.forward();
     _coinBounceController.forward();
-    
     Future.delayed(Duration(seconds: 4), () {
       if (mounted) {
         setState(() {
@@ -70,6 +127,31 @@ class _CurrencyScreenState extends ConsumerState<CurrencyScreen>
         _coinBounceController.reset();
       }
     });
+  }
+
+  void _showAdNotReadyDialog() {
+    final theme = ref.read(currentThemeProvider);
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: theme.cardColor,
+        title: Text('Ad Not Ready', style: theme.textTheme.titleLarge),
+        content: Text(
+          'The ad is still loading. Please try again in a moment.',
+          style: theme.textTheme.bodyMedium,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              // Try to load the ad again
+              _adNotifier?.loadRewardedAd();
+            },
+            child: Text('OK', style: TextStyle(color: theme.primaryColor)),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showDailyLimitDialog() {
@@ -97,6 +179,11 @@ class _CurrencyScreenState extends ConsumerState<CurrencyScreen>
   Widget build(BuildContext context) {
     final theme = ref.watch(currentThemeProvider);
     final currencyData = ref.watch(currencyProvider);
+    final now = DateTime.now();
+    final lastAdWatched = currencyData.lastAdWatched;
+    final cooldown = lastAdWatched != null ? now.difference(lastAdWatched) : Duration(minutes: 5);
+    final isCooldownActive = cooldown.inMinutes < 5 || _cooldownRemaining > Duration.zero;
+    final displayCooldown = _cooldownRemaining > Duration.zero ? _cooldownRemaining : (Duration(minutes: 5) - cooldown);
     
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -206,7 +293,7 @@ class _CurrencyScreenState extends ConsumerState<CurrencyScreen>
                       Container(
                         width: double.infinity,
                         child: ElevatedButton(
-                          onPressed: _watchAd,
+                          onPressed: isCooldownActive ? null : _watchAd,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: theme.primaryColor,
                             foregroundColor: theme.colorScheme.onPrimary,
@@ -215,13 +302,21 @@ class _CurrencyScreenState extends ConsumerState<CurrencyScreen>
                               borderRadius: BorderRadius.circular(12),
                             ),
                           ),
-                          child: Text(
-                            'Watch Ad to Earn +50 SBD',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
+                          child: isCooldownActive
+                              ? Text(
+                                  'Wait ${displayCooldown.inMinutes}:${(displayCooldown.inSeconds % 60).toString().padLeft(2, '0')} to watch again',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                )
+                              : Text(
+                                  'Watch Ad to Earn +50 SBD',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                         ),
                       ),
                       SizedBox(height: 24),
@@ -278,13 +373,13 @@ class _CurrencyScreenState extends ConsumerState<CurrencyScreen>
                               Icons.trending_up,
                             ),
                           ),
-                          SizedBox(width: 16),
+                          SizedBox(width: 12),
                           Expanded(
                             child: _buildStatCard(
                               theme,
-                              'Next Goal',
-                              currencyData.formattedNextGoalWithSymbol,
-                              Icons.flag,
+                              'Avg. Daily Earnings',
+                              '${currencyData.averageDailyEarnings.toStringAsFixed(1)} SBD',
+                              Icons.show_chart,
                             ),
                           ),
                         ],
@@ -304,6 +399,76 @@ class _CurrencyScreenState extends ConsumerState<CurrencyScreen>
                           ),
                         ),
                       ),
+                      
+                      // Debug/Testing Reset Counter (only in debug mode)
+                      /*
+                      if (kDebugMode) ...[
+                        SizedBox(height: 16),
+                        Container(
+                          width: double.infinity,
+                          padding: EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Colors.orange.withOpacity(0.3),
+                              width: 1,
+                            ),
+                          ),
+                          child: Column(
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.bug_report,
+                                    color: Colors.orange,
+                                    size: 20,
+                                  ),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'Debug Mode - Testing Tools',
+                                    style: theme.textTheme.bodyMedium?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.orange,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: OutlinedButton(
+                                      onPressed: _resetDailyCounter,
+                                      style: OutlinedButton.styleFrom(
+                                        side: BorderSide(color: Colors.orange),
+                                      ),
+                                      child: Text(
+                                        'Reset Daily Counter',
+                                        style: TextStyle(color: Colors.orange),
+                                      ),
+                                    ),
+                                  ),
+                                  SizedBox(width: 12),
+                                  Expanded(
+                                    child: OutlinedButton(
+                                      onPressed: _reloadAds,
+                                      style: OutlinedButton.styleFrom(
+                                        side: BorderSide(color: Colors.orange),
+                                      ),
+                                      child: Text(
+                                        'Reload Ads',
+                                        style: TextStyle(color: Colors.orange),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                      */
                     ],
                   ),
                 ),
@@ -319,6 +484,11 @@ class _CurrencyScreenState extends ConsumerState<CurrencyScreen>
   }
 
   Widget _buildRewardOverlay(ThemeData theme, CurrencyData currencyData) {
+    final now = DateTime.now();
+    final lastAdWatched = currencyData.lastAdWatched;
+    final cooldown = lastAdWatched != null ? now.difference(lastAdWatched) : Duration(minutes: 5);
+    final isCooldownActive = cooldown.inMinutes < 5 || _cooldownRemaining > Duration.zero;
+    final displayCooldown = _cooldownRemaining > Duration.zero ? _cooldownRemaining : (Duration(minutes: 5) - cooldown);
     return Container(
       color: Colors.black.withOpacity(0.5),
       child: Center(
@@ -373,46 +543,24 @@ class _CurrencyScreenState extends ConsumerState<CurrencyScreen>
               ),
               SizedBox(height: 20),
 
-              // Progress to next goal
-              Container(
-                padding: EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: theme.primaryColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Column(
-                  children: [
-                    Text(
-                      'You\'re ${currencyData.nextGoal - currencyData.currentBalance} SBD away from unlocking the \'Premium Theme\'!',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w500,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    SizedBox(height: 12),
-                    LinearProgressIndicator(
-                      value: currencyData.goalProgress,
-                      backgroundColor: theme.primaryColor.withOpacity(0.2),
-                      valueColor: AlwaysStoppedAnimation<Color>(theme.primaryColor),
-                    ),
-                  ],
-                ),
-              ),
-              SizedBox(height: 20),
-
               // Action buttons
               Row(
                 children: [
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: _watchAd,
+                      onPressed: isCooldownActive ? null : _watchAd,
                       style: OutlinedButton.styleFrom(
                         side: BorderSide(color: theme.primaryColor),
                       ),
-                      child: Text(
-                        'Watch Another',
-                        style: TextStyle(color: theme.primaryColor),
-                      ),
+                      child: isCooldownActive
+                          ? Text(
+                              'Wait ${displayCooldown.inMinutes}:${(displayCooldown.inSeconds % 60).toString().padLeft(2, '0')} to watch again',
+                              style: TextStyle(color: theme.primaryColor),
+                            )
+                          : Text(
+                              'Watch Another',
+                              style: TextStyle(color: theme.primaryColor),
+                            ),
                     ),
                   ),
                   SizedBox(width: 12),
@@ -495,5 +643,35 @@ class _CurrencyScreenState extends ConsumerState<CurrencyScreen>
         ],
       ),
     );
+  }
+
+  // Debug helper methods (only available in debug mode)
+  void _resetDailyCounter() async {
+    final currencyNotifier = ref.read(currencyProvider.notifier);
+    await currencyNotifier.resetDailyEarnings();
+    
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Daily counter reset! You can now earn ads again.'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  void _reloadAds() {
+    _adNotifier?.loadRewardedAd();
+    
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Ads reloaded! Rewarded ad should be ready soon.'),
+          backgroundColor: Colors.blue,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
   }
 }

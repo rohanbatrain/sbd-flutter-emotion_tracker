@@ -15,6 +15,7 @@ class CurrencyData {
   final String lastUpdateDate;
   final String userId; // For future backend sync
   final String dataHash; // For tamper detection
+  final DateTime? lastAdWatched; // Add this field
 
   const CurrencyData({
     required this.currentBalance,
@@ -25,6 +26,7 @@ class CurrencyData {
     required this.lastUpdateDate,
     required this.userId,
     required this.dataHash,
+    this.lastAdWatched,
   });
 
   // Generate hash for tamper detection
@@ -46,6 +48,7 @@ class CurrencyData {
       'lastUpdateDate': lastUpdateDate,
       'userId': userId,
       'dataHash': dataHash,
+      'lastAdWatched': lastAdWatched?.toIso8601String(),
     };
   }
 
@@ -59,6 +62,7 @@ class CurrencyData {
       lastUpdateDate: json['lastUpdateDate'] ?? DateTime.now().toIso8601String().split('T')[0],
       userId: json['userId'] ?? 'default_user',
       dataHash: json['dataHash'] ?? '',
+      lastAdWatched: json['lastAdWatched'] != null ? DateTime.parse(json['lastAdWatched']) : null,
     );
   }
 
@@ -70,6 +74,7 @@ class CurrencyData {
     int? nextGoal,
     String? lastUpdateDate,
     String? userId,
+    DateTime? lastAdWatched,
   }) {
     final newData = CurrencyData(
       currentBalance: currentBalance ?? this.currentBalance,
@@ -79,6 +84,7 @@ class CurrencyData {
       nextGoal: nextGoal ?? this.nextGoal,
       lastUpdateDate: lastUpdateDate ?? this.lastUpdateDate,
       userId: userId ?? this.userId,
+      lastAdWatched: lastAdWatched ?? this.lastAdWatched,
       dataHash: '', // Will be generated
     );
     
@@ -90,6 +96,7 @@ class CurrencyData {
       nextGoal: newData.nextGoal,
       lastUpdateDate: newData.lastUpdateDate,
       userId: newData.userId,
+      lastAdWatched: newData.lastAdWatched,
       dataHash: newData._generateHash(),
     );
   }
@@ -148,6 +155,34 @@ class CurrencyData {
 
   // Progress toward next goal (0.0 to 1.0)
   double get goalProgress => nextGoal > 0 ? (currentBalance / nextGoal).clamp(0.0, 1.0) : 0.0;
+
+  // --- COOLDOWN HELPERS FOR UI ---
+  // Returns true if cooldown is active (less than 5 minutes since last ad watched)
+  bool get isCooldownActive {
+    if (lastAdWatched == null) return false;
+    final now = DateTime.now();
+    final cooldown = now.difference(lastAdWatched!);
+    return cooldown.inMinutes < 5;
+  }
+
+  // Returns the remaining cooldown duration (Duration.zero if not active)
+  Duration get displayCooldown {
+    if (lastAdWatched == null) return Duration.zero;
+    final now = DateTime.now();
+    final cooldown = now.difference(lastAdWatched!);
+    final remaining = Duration(minutes: 5) - cooldown;
+    return remaining.isNegative ? Duration.zero : remaining;
+  }
+
+  // --- AVERAGE DAILY EARNINGS ---
+  double get averageDailyEarnings {
+    // Estimate days active based on lifetimeEarned and dailyLimit
+    // (or you can store a daysActive field for more accuracy)
+    if (lifetimeEarned == 0) return 0;
+    int days = (lifetimeEarned / dailyLimit).ceil();
+    if (days == 0) days = 1;
+    return lifetimeEarned / days;
+  }
 }
 
 // Currency state notifier
@@ -166,6 +201,7 @@ class CurrencyNotifier extends StateNotifier<CurrencyData> {
       lastUpdateDate: '',
       userId: 'default_user',
       dataHash: '',
+      lastAdWatched: null,
     )
   ) {
     _loadCurrencyData();
@@ -244,6 +280,7 @@ class CurrencyNotifier extends StateNotifier<CurrencyData> {
         lastUpdateDate: today,
         userId: 'default_user',
         dataHash: '',
+        lastAdWatched: null,
       ).copyWith(); // This will generate the hash
       
       state = defaultData;
@@ -304,6 +341,21 @@ class CurrencyNotifier extends StateNotifier<CurrencyData> {
     await _saveCurrencyData(updatedData);
   }
 
+  // Reset daily earnings
+  Future<void> resetDailyEarnings() async {
+    state = CurrencyData(
+      currentBalance: state.currentBalance,
+      lifetimeEarned: state.lifetimeEarned,
+      todayEarned: 0,
+      dailyLimit: state.dailyLimit,
+      nextGoal: state.nextGoal,
+      lastUpdateDate: DateTime.now().toIso8601String(),
+      userId: state.userId,
+      dataHash: state.dataHash,
+      lastAdWatched: state.lastAdWatched,
+    );
+  }
+
   // Check if user can earn more coins today
   bool get canEarnMore => state.todayEarned < state.dailyLimit;
   
@@ -329,6 +381,11 @@ class CurrencyNotifier extends StateNotifier<CurrencyData> {
     } catch (e) {
       debugPrint('Error importing from backend: $e');
     }
+  }
+
+  // Update last ad watched timestamp
+  void updateLastAdWatched() {
+    state = state.copyWith(lastAdWatched: DateTime.now());
   }
 }
 
