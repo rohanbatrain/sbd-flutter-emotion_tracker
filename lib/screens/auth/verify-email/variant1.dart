@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:emotion_tracker/providers/theme_provider.dart';
+import 'package:emotion_tracker/providers/secure_storage_provider.dart';
+import 'package:emotion_tracker/providers/shared_prefs_provider.dart';
 import 'package:lottie/lottie.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class VerifyEmailScreenV1 extends ConsumerWidget {
   final VoidCallback? onResend;
@@ -13,6 +17,48 @@ class VerifyEmailScreenV1 extends ConsumerWidget {
     this.onResend,
     this.onRefresh,
   }) : super(key: key);
+
+  Future<void> _checkVerification(BuildContext context, WidgetRef ref) async {
+    final storage = ref.read(secureStorageProvider);
+    final prefs = await ref.read(sharedPrefsProvider.future);
+    final token = await storage.read(key: 'access_token');
+    final protocol = prefs.getString('server_protocol') ?? 'https';
+    final domain = prefs.getString('server_domain') ?? 'default.server.com';
+    final url = Uri.parse('$protocol://$domain/auth/is-verified');
+    if (token == null || token.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No access token found. Please login again.')),
+      );
+      return;
+    }
+    try {
+      final response = await http.get(
+        url,
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['is_verified'] == true) {
+          await prefs.setBool('is_verified', true);
+          if (context.mounted) {
+            Navigator.of(context).pushReplacementNamed('/home/v1');
+          }
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Email not verified yet. Please check your inbox.')),
+          );
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to check verification: ${response.body}')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -96,7 +142,7 @@ class VerifyEmailScreenV1 extends ConsumerWidget {
                     ),
                     const SizedBox(height: 16),
                     TextButton.icon(
-                      onPressed: onRefresh,
+                      onPressed: () => _checkVerification(context, ref),
                       icon: Icon(Icons.check_circle_outline, color: theme.primaryColor),
                       label: Text(
                         'I Have Verified',

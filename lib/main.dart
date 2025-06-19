@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:emotion_tracker/providers/theme_provider.dart';
 import 'package:emotion_tracker/providers/app_providers.dart';
 import 'package:emotion_tracker/screens/splash/variant1.dart';
@@ -11,11 +10,10 @@ import 'package:emotion_tracker/screens/auth/verify-email/variant1.dart';
 import 'package:emotion_tracker/screens/auth/client-side-encryption/variant1.dart';
 import 'package:emotion_tracker/screens/auth/forgot-password/variant1.dart';
 
+const String registrationAppId = 'emotion_tracker';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
-  // Initialize Google Mobile Ads
-  await MobileAds.instance.initialize();
   
   runApp(const ProviderScope(child: MyApp()));
 }

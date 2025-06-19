@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:emotion_tracker/providers/shared_prefs_provider.dart';
+import 'package:emotion_tracker/main.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 // Navigation service provider
 class NavigationService {
@@ -92,3 +95,71 @@ final healthCheckEndpointProvider = Provider<String>((ref) {
   final baseUrl = ref.watch(apiBaseUrlProvider);
   return '$baseUrl/health';
 });
+
+/// Function to perform login POST request
+Future<Map<String, dynamic>> loginWithApi(WidgetRef ref, String email, String password) async {
+  final baseUrl = ref.read(apiBaseUrlProvider);
+  final url = Uri.parse('$baseUrl/auth/login');
+  try {
+    final response = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'email': email, 'password': password}),
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } else {
+      throw Exception('Login failed: ${response.statusCode} ${response.body}');
+    }
+  } catch (e) {
+    throw Exception('Could not connect to the server. Please check your domain/IP and try again.');
+  }
+}
+
+/// Function to validate password strength
+bool isPasswordStrong(String password) {
+  final lengthCheck = password.length >= 8;
+  final upperCheck = password.contains(RegExp(r'[A-Z]'));
+  final lowerCheck = password.contains(RegExp(r'[a-z]'));
+  final digitCheck = password.contains(RegExp(r'\d'));
+  final specialCheck = password.contains(RegExp(r'[!@#\$&*~%^()_\-+=\[\]{}|;:,.<>?/]'));
+  return lengthCheck && upperCheck && lowerCheck && digitCheck && specialCheck;
+}
+
+/// Function to perform registration POST request
+Future<Map<String, dynamic>> registerWithApi(
+  WidgetRef ref,
+  String username,
+  String email,
+  String password,
+  {String? clientSideEncryption}
+) async {
+  if (!isPasswordStrong(password)) {
+    throw Exception('Password must be at least 8 characters long and contain uppercase, lowercase, digit, and special character.');
+  }
+  final baseUrl = ref.read(apiBaseUrlProvider);
+  final url = Uri.parse('$baseUrl/auth/register');
+  try {
+    final body = {
+      'username': username,
+      'email': email,
+      'password': password,
+      'registration_app_id': registrationAppId, // from main.dart
+    };
+    if (clientSideEncryption != null && clientSideEncryption.isNotEmpty) {
+      body['client_side_encryption'] = clientSideEncryption;
+    }
+    final response = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(body),
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } else {
+      throw Exception('Registration failed: ${response.statusCode} ${response.body}');
+    }
+  } catch (e) {
+    throw Exception('Could not connect to the server. Please check your domain/IP and try again.');
+  }
+}

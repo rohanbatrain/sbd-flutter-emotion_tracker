@@ -71,6 +71,17 @@ class _ForgotPasswordScreenV1State extends ConsumerState<ForgotPasswordScreenV1>
     final theme = ref.watch(currentThemeProvider);
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
+      appBar: AppBar(
+        backgroundColor: theme.primaryColor,
+        foregroundColor: theme.colorScheme.onPrimary,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: const Text('Forgot Password?', style: TextStyle(fontWeight: FontWeight.bold)),
+        centerTitle: true,
+        elevation: 0,
+      ),
       body: SafeArea(
         child: Center(
           child: Padding(
@@ -169,17 +180,6 @@ class _ForgotPasswordScreenV1State extends ConsumerState<ForgotPasswordScreenV1>
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-            ),
-          ),
-          const SizedBox(height: 18),
-          TextButton(
-            onPressed: isLoading ? null : () => Navigator.of(context).pop(),
-            child: Text(
-              'Back to Login',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.primaryColor,
-                fontWeight: FontWeight.w500,
-              ),
             ),
           ),
         ],

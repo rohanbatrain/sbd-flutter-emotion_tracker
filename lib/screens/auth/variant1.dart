@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:emotion_tracker/providers/theme_provider.dart';
 import 'package:emotion_tracker/providers/app_providers.dart';
 import 'package:emotion_tracker/screens/auth/server-settings/variant1.dart';
+import 'package:emotion_tracker/providers/secure_storage_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthScreenV1 extends ConsumerStatefulWidget {
   const AuthScreenV1({Key? key}) : super(key: key);
@@ -621,31 +623,71 @@ class _AuthScreenV1State extends ConsumerState<AuthScreenV1> with TickerProvider
 
     try {
       final authNotifier = ref.read(authProvider.notifier);
+      Map<String, dynamic> result;
       if (isLogin) {
-        await authNotifier.login(email, password);
+        result = await loginWithApi(ref, email, password);
+        await authNotifier.login(email, password); // Optionally update state
       } else {
-        await authNotifier.signup(username, email, password);
+        result = await registerWithApi(
+          ref,
+          username,
+          email,
+          password,
+          clientSideEncryption: encryptionEnabled ? encryptionKeyController.text : null,
+        );
+        await authNotifier.signup(username, email, password); // Optionally update state
       }
 
+      // Store sensitive info in secure storage
+      final secureStorage = ref.read(secureStorageProvider);
+      await secureStorage.write(key: 'access_token', value: result['access_token'] ?? '');
+      await secureStorage.write(key: 'token_type', value: result['token_type'] ?? '');
+      await secureStorage.write(key: 'client_side_encryption_enabled', value: encryptionEnabled ? 'true' : 'false');
+      if (encryptionEnabled) {
+        await secureStorage.write(key: 'client_side_encryption', value: encryptionKeyController.text);
+      } else {
+        await secureStorage.delete(key: 'client_side_encryption');
+      }
+
+      // Store other info in shared preferences
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('issued_at', result['issued_at']?.toString() ?? '');
+      await prefs.setString('expires_at', result['expires_at']?.toString() ?? '');
+      await prefs.setString('login_app_id', result['login_app_id']?.toString() ?? '');
+      await prefs.setBool('is_verified', result['is_verified'] ?? false);
+
       if (mounted) {
+        if (result['is_verified'] == false) {
+          if (encryptionEnabled) {
+            // Go to client-side-encryption screen first
+            await Navigator.of(context).pushNamed('/client-side-encryption/v1');
+          }
+          // Then lock to verify email as usual
+          Navigator.of(context).pushReplacementNamed('/verify-email/v1');
+          return;
+        }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(isLogin ? 'Login successful!' : 'Account created successfully!'),
             backgroundColor: Theme.of(context).colorScheme.secondary,
           ),
         );
-
         // Navigate to home screen after successful auth
         Navigator.of(context).pushReplacementNamed('/home/v1');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Authentication failed: ${e.toString()}'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
+        final errorMsg = e.toString();
+        if (errorMsg.contains('domain/IP')) {
+          _showServerChangeDialog();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Authentication failed: $errorMsg'),
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+          );
+        }
       }
     }
   }
