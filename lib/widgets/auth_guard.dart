@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:emotion_tracker/providers/app_providers.dart';
-import 'package:emotion_tracker/screens/auth_screen.dart';
+import 'package:emotion_tracker/screens/auth/variant1.dart';
 
 class AuthGuard extends ConsumerWidget {
   final Widget child;
@@ -18,7 +18,7 @@ class AuthGuard extends ConsumerWidget {
     if (authState.isLoggedIn) {
       return child;
     } else {
-      return const AuthScreen();
+      return const AuthScreenV1();
     }
   }
 }

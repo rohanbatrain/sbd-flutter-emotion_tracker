@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:emotion_tracker/providers/theme_provider.dart';
 import 'package:emotion_tracker/providers/currency_provider.dart';
-import 'package:emotion_tracker/screens/currency_screen.dart';
+import 'package:emotion_tracker/screens/currency/variant1.dart';
 
 class CustomAppBar extends ConsumerWidget implements PreferredSizeWidget {
   final String title;
@@ -39,7 +39,7 @@ class CustomAppBar extends ConsumerWidget implements PreferredSizeWidget {
           onTap: () {
             Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (context) => CurrencyScreen(),
+                builder: (context) => CurrencyScreenV1(),
               ),
             );
           },

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:emotion_tracker/providers/shared_prefs_provider.dart';
 
 // Navigation service provider
 class NavigationService {
@@ -62,7 +63,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = state.copyWith(isLoggedIn: true, userEmail: email);
   }
 
-  Future<void> signup(String email, String password) async {
+  Future<void> signup(String username, String email, String password) async {
     // Simulate signup process
     await Future.delayed(const Duration(milliseconds: 500));
     
@@ -77,4 +78,17 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
   return AuthNotifier();
+});
+
+/// Provides the full API base URL (e.g., https://example.com)
+final apiBaseUrlProvider = Provider<String>((ref) {
+  final protocol = ref.watch(serverProtocolProvider);
+  final domain = ref.watch(serverDomainProvider);
+  return '$protocol://$domain';
+});
+
+/// Provides the health check endpoint (e.g., https://example.com/health)
+final healthCheckEndpointProvider = Provider<String>((ref) {
+  final baseUrl = ref.watch(apiBaseUrlProvider);
+  return '$baseUrl/health';
 });

@@ -6,14 +6,14 @@ import 'package:emotion_tracker/providers/currency_provider.dart';
 import 'package:emotion_tracker/providers/ad_provider.dart';
 import 'dart:async';
 
-class CurrencyScreen extends ConsumerStatefulWidget {
-  const CurrencyScreen({Key? key}) : super(key: key);
+class CurrencyScreenV1 extends ConsumerStatefulWidget {
+  const CurrencyScreenV1({Key? key}) : super(key: key);
 
   @override
-  ConsumerState<CurrencyScreen> createState() => _CurrencyScreenState();
+  ConsumerState<CurrencyScreenV1> createState() => _CurrencyScreenV1State();
 }
 
-class _CurrencyScreenState extends ConsumerState<CurrencyScreen>
+class _CurrencyScreenV1State extends ConsumerState<CurrencyScreenV1>
     with TickerProviderStateMixin {
   late AnimationController _confettiController;
   late AnimationController _coinBounceController;
@@ -448,7 +448,6 @@ class _CurrencyScreenState extends ConsumerState<CurrencyScreen>
                                         style: TextStyle(color: Colors.orange),
                                       ),
                                     ),
-                                  ),
                                   SizedBox(width: 12),
                                   Expanded(
                                     child: OutlinedButton(

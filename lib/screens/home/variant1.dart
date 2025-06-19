@@ -3,16 +3,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:emotion_tracker/providers/theme_provider.dart';
 import 'package:emotion_tracker/widgets/custom_app_bar.dart';
 import 'package:emotion_tracker/widgets/sidebar_widget.dart';
-import 'package:emotion_tracker/screens/settings_screen.dart';
+import 'package:emotion_tracker/screens/settings/variant1.dart';
 
-class HomeScreen extends ConsumerStatefulWidget {
-  const HomeScreen({Key? key}) : super(key: key);
+class HomeScreenV1 extends ConsumerStatefulWidget {
+  const HomeScreenV1({Key? key}) : super(key: key);
 
   @override
-  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+  ConsumerState<HomeScreenV1> createState() => _HomeScreenV1State();
 }
 
-class _HomeScreenState extends ConsumerState<HomeScreen> {
+class _HomeScreenV1State extends ConsumerState<HomeScreenV1> {
   String selectedItem = 'dashboard';
 
   void _onItemSelected(String item) {
@@ -39,7 +39,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget _buildBody(ThemeData theme) {
     switch (selectedItem) {
       case 'settings':
-        return const SettingsScreen();
+        return const SettingsScreenV1();
       case 'shop':
         return Center(
           child: Column(

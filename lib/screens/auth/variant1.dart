@@ -2,21 +2,27 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:emotion_tracker/providers/theme_provider.dart';
 import 'package:emotion_tracker/providers/app_providers.dart';
+import 'package:emotion_tracker/screens/auth/server-settings/variant1.dart';
 
-class AuthScreen extends ConsumerStatefulWidget {
-  const AuthScreen({Key? key}) : super(key: key);
+class AuthScreenV1 extends ConsumerStatefulWidget {
+  const AuthScreenV1({Key? key}) : super(key: key);
 
   @override
-  ConsumerState<AuthScreen> createState() => _AuthScreenState();
+  ConsumerState<AuthScreenV1> createState() => _AuthScreenV1State();
 }
 
-class _AuthScreenState extends ConsumerState<AuthScreen> with TickerProviderStateMixin {
+class _AuthScreenV1State extends ConsumerState<AuthScreenV1> with TickerProviderStateMixin {
   bool isLogin = true;
   bool isPasswordVisible = false;
   bool isConfirmPasswordVisible = false;
+  bool encryptionEnabled = false;
+  bool isEncryptionKeyVisible = false;
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
   final TextEditingController confirmPasswordController = TextEditingController();
+  final TextEditingController encryptionKeyController = TextEditingController();
+  final TextEditingController usernameController = TextEditingController();
+  final FocusNode passwordFocusNode = FocusNode();
   AnimationController? _animationController;
   Animation<double>? _fadeAnimation;
   Animation<Offset>? _slideAnimation;
@@ -43,6 +49,12 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with TickerProviderStat
       curve: Curves.easeOutBack,
     ));
     _animationController!.forward();
+    passwordFocusNode.addListener(() {
+      if (!passwordFocusNode.hasFocus && passwordController.text.isEmpty) {
+        confirmPasswordController.clear();
+        setState(() {}); // Triggers rebuild to hide confirm password
+      }
+    });
   }
 
   @override
@@ -51,6 +63,9 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with TickerProviderStat
     emailController.dispose();
     passwordController.dispose();
     confirmPasswordController.dispose();
+    encryptionKeyController.dispose();
+    usernameController.dispose();
+    passwordFocusNode.dispose();
     super.dispose();
   }
 
@@ -90,7 +105,32 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with TickerProviderStat
                         fontSize: 28,
                       ),
                     ),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 12),
+
+                    // Subtle info message for login/register
+                    if (isLogin)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 12.0),
+                        child: Text(
+                          'Please login with your Second Brain Database account.',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.textTheme.bodySmall?.color?.withOpacity(0.7),
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    if (!isLogin)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 12.0),
+                        child: Text(
+                          'You are creating a Second Brain Database account. This account will be used across all our apps.',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.textTheme.bodySmall?.color?.withOpacity(0.7),
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    const SizedBox(height: 20),
 
                     // Enhanced Toggle Section
                     Container(
@@ -183,12 +223,28 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with TickerProviderStat
 
                     const SizedBox(height: 24),
 
+                    // Username Field (signup only)
+                    if (!isLogin) ...[
+                      _buildTextField(
+                        controller: usernameController,
+                        hintText: 'Username',
+                        prefixIcon: Icons.person_outline,
+                        keyboardType: TextInputType.text,
+                        autofillHints: [AutofillHints.username],
+                        theme: theme,
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+
                     // Enhanced Email Field
                     _buildTextField(
                       controller: emailController,
                       hintText: 'Email Address',
                       prefixIcon: Icons.email_outlined,
                       keyboardType: TextInputType.emailAddress,
+                      autofillHints: isLogin
+                          ? [AutofillHints.username, AutofillHints.email]
+                          : [AutofillHints.newUsername, AutofillHints.email],
                       theme: theme,
                     ),
 
@@ -202,7 +258,18 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with TickerProviderStat
                       isPassword: true,
                       isPasswordVisible: isPasswordVisible,
                       onPasswordToggle: () => setState(() => isPasswordVisible = !isPasswordVisible),
+                      autofillHints: isLogin
+                          ? [AutofillHints.password]
+                          : [AutofillHints.newPassword],
                       theme: theme,
+                      keyboardType: TextInputType.text,
+                      focusNode: passwordFocusNode,
+                      onChanged: (val) {
+                        if (val.isEmpty) {
+                          confirmPasswordController.clear();
+                        }
+                        setState(() {});
+                      },
                     ),
 
                     // Spacing between password fields
@@ -211,8 +278,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with TickerProviderStat
                     // Confirm Password Field (animated)
                     AnimatedContainer(
                       duration: const Duration(milliseconds: 300),
-                      height: !isLogin ? 56 : 0,
-                      child: !isLogin
+                      height: (!isLogin && passwordController.text.isNotEmpty && passwordFocusNode.hasFocus || (!isLogin && passwordController.text.isNotEmpty && !passwordFocusNode.hasFocus && passwordController.text.isNotEmpty)) ? 56 : 0,
+                      child: (!isLogin && passwordController.text.isNotEmpty && passwordFocusNode.hasFocus || (!isLogin && passwordController.text.isNotEmpty && !passwordFocusNode.hasFocus && passwordController.text.isNotEmpty))
                           ? _buildTextField(
                               controller: confirmPasswordController,
                               hintText: 'Confirm Password',
@@ -220,10 +287,108 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with TickerProviderStat
                               isPassword: true,
                               isPasswordVisible: isConfirmPasswordVisible,
                               onPasswordToggle: () => setState(() => isConfirmPasswordVisible = !isConfirmPasswordVisible),
+                              autofillHints: [AutofillHints.newPassword],
                               theme: theme,
                             )
                           : const SizedBox.shrink(),
                     ),
+
+                    // Add spacing between Confirm Password and Encryption Key
+                    if (!isLogin && encryptionEnabled) SizedBox(height: 16),
+
+                    // Encryption Key Field (signup only, above checkbox)
+                    if (!isLogin && encryptionEnabled) ...[
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
+                        height: 56,
+                        child: _buildTextField(
+                          controller: encryptionKeyController,
+                          hintText: 'Enter encryption key (min 16 chars)',
+                          prefixIcon: Icons.vpn_key,
+                          isPassword: true,
+                          isPasswordVisible: isEncryptionKeyVisible,
+                          onPasswordToggle: () => setState(() => isEncryptionKeyVisible = !isEncryptionKeyVisible),
+                          theme: theme,
+                        ),
+                      ),
+                      SizedBox(height: 16),
+                    ],
+
+                    // Encryption Checkbox (signup only, below key field)
+                    if (!isLogin) ...[
+                      Row(
+                        children: [
+                          Checkbox(
+                            value: encryptionEnabled,
+                            onChanged: (val) {
+                              if (val == true && !encryptionEnabled) {
+                                showDialog(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                    backgroundColor: theme.cardTheme.color,
+                                    title: Row(
+                                      children: [
+                                        Icon(Icons.warning_amber_rounded, color: Colors.red, size: 22),
+                                        SizedBox(width: 8),
+                                        Text('Important Notice', style: theme.textTheme.titleMedium),
+                                      ],
+                                    ),
+                                    content: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'If you enable encryption, your data will be protected with this key. If you forget it, there is absolutely no way to recover your data. This applies to all apps using this unified login.',
+                                          style: theme.textTheme.bodySmall?.copyWith(color: Colors.red),
+                                        ),
+                                        SizedBox(height: 16),
+                                        Text(
+                                          'Choose a strong encryption key (at least 16 characters, 32+ recommended, using a mix of upper and lower case letters, numbers, and symbols). More than 32 is overkill for most users.',
+                                          style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold),
+                                        ),
+                                        SizedBox(height: 12),
+                                        Text(
+                                          'Note: Enabling encryption will significantly increase our storage costs, as your data will be stored at a size proportional to your key length. Please consider supporting us to help keep this zero-trust ecosystem running.',
+                                          style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold),
+                                        ),
+                                      ],
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.of(context).pop(),
+                                        child: Text('Cancel', style: TextStyle(color: theme.primaryColor)),
+                                      ),
+                                      ElevatedButton(
+                                        onPressed: () {
+                                          setState(() => encryptionEnabled = true);
+                                          Navigator.of(context).pop();
+                                        },
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: theme.primaryColor,
+                                          foregroundColor: theme.colorScheme.onPrimary,
+                                        ),
+                                        child: Text('I Understand'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              } else {
+                                setState(() {
+                                  encryptionEnabled = val ?? false;
+                                  if (!encryptionEnabled) encryptionKeyController.clear();
+                                });
+                              }
+                            },
+                          ),
+                          Expanded(
+                            child: Text(
+                              'Enable encryption for my account data',
+                              style: theme.textTheme.bodyMedium,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
 
                     const SizedBox(height: 24),
 
@@ -284,13 +449,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with TickerProviderStat
                     if (isLogin)
                       TextButton(
                         onPressed: () {
-                          // Handle forgot password
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: const Text('Password reset link sent!'),
-                              backgroundColor: theme.colorScheme.secondary,
-                            ),
-                          );
+                          Navigator.of(context).pushNamed('/forgot-password/v1');
                         },
                         child: Text(
                           'Forgot Password?',
@@ -340,12 +499,18 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with TickerProviderStat
     bool isPassword = false,
     bool isPasswordVisible = false,
     VoidCallback? onPasswordToggle,
+    List<String>? autofillHints,
+    FocusNode? focusNode,
+    ValueChanged<String>? onChanged,
   }) {
     return TextField(
       controller: controller,
       keyboardType: keyboardType,
       obscureText: isPassword && !isPasswordVisible,
       style: theme.textTheme.bodyLarge,
+      autofillHints: autofillHints,
+      focusNode: focusNode,
+      onChanged: onChanged,
       decoration: InputDecoration(
         hintText: hintText,
         hintStyle: theme.textTheme.bodyMedium?.copyWith(
@@ -395,17 +560,46 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with TickerProviderStat
   }
 
   void _handleSubmit() async {
-    if (emailController.text.isEmpty || passwordController.text.isEmpty) {
+    final username = usernameController.text.trim().toLowerCase();
+    final email = emailController.text.trim().toLowerCase();
+    final password = passwordController.text;
+
+    // Username validation (for registration)
+    final usernameRegExp = RegExp(r'^[a-z0-9_-]{3,50}$');
+    if (!isLogin && !usernameRegExp.hasMatch(username)) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Please fill in all fields'),
+          content: const Text('Username must be 3-50 characters, only letters, numbers, dash (-), and underscore (_). No spaces or special characters.'),
           backgroundColor: Theme.of(context).colorScheme.error,
         ),
       );
       return;
     }
 
-    if (!isLogin && passwordController.text != confirmPasswordController.text) {
+    // Email validation
+    final emailRegExp = RegExp(r'^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$');
+    if (!emailRegExp.hasMatch(email)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Please enter a valid email address.'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+      return;
+    }
+
+    // Password validation (eased)
+    if (password.isEmpty || password.length < 8) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Password must be at least 8 characters.'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+      return;
+    }
+
+    if (!isLogin && password != confirmPasswordController.text) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('Passwords do not match'),
@@ -415,13 +609,22 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with TickerProviderStat
       return;
     }
 
+    if (!isLogin && encryptionEnabled && encryptionKeyController.text.length < 16) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Encryption key must be at least 16 characters.'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+      return;
+    }
+
     try {
       final authNotifier = ref.read(authProvider.notifier);
-      
       if (isLogin) {
-        await authNotifier.login(emailController.text, passwordController.text);
+        await authNotifier.login(email, password);
       } else {
-        await authNotifier.signup(emailController.text, passwordController.text);
+        await authNotifier.signup(username, email, password);
       }
 
       if (mounted) {
@@ -433,7 +636,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with TickerProviderStat
         );
 
         // Navigate to home screen after successful auth
-        Navigator.of(context).pushReplacementNamed('/home');
+        Navigator.of(context).pushReplacementNamed('/home/v1');
       }
     } catch (e) {
       if (mounted) {
@@ -450,66 +653,12 @@ class _AuthScreenState extends ConsumerState<AuthScreen> with TickerProviderStat
   void _showServerChangeDialog() {
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (BuildContext context) {
-        final theme = Theme.of(context);
-        return AlertDialog(
-          backgroundColor: theme.cardTheme.color,
-          title: Text(
-            'Change Server',
-            style: theme.textTheme.titleMedium,
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                decoration: InputDecoration(
-                  hintText: 'Enter server URL',
-                  hintStyle: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6),
-                  ),
-                  filled: true,
-                  fillColor: theme.scaffoldBackgroundColor,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide.none,
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(
-                      color: theme.primaryColor,
-                      width: 2,
-                    ),
-                  ),
-                ),
-                style: theme.textTheme.bodyLarge,
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text(
-                'Cancel',
-                style: TextStyle(color: theme.textTheme.bodyMedium?.color),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: const Text('Server updated successfully'),
-                    backgroundColor: theme.colorScheme.secondary,
-                  ),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: theme.primaryColor,
-                foregroundColor: theme.floatingActionButtonTheme.foregroundColor,
-              ),
-              child: const Text('Update'),
-            ),
-          ],
+        return ServerSettingsDialog(
+          onSaved: () {
+            if (mounted) setState(() {});
+          },
         );
       },
     );

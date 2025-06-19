@@ -4,14 +4,14 @@ import 'package:lottie/lottie.dart';
 import 'dart:async';
 import 'package:emotion_tracker/providers/theme_provider.dart';
 
-class SplashScreen extends ConsumerStatefulWidget {
-  const SplashScreen({Key? key}) : super(key: key);
+class SplashScreenV1 extends ConsumerStatefulWidget {
+  const SplashScreenV1({Key? key}) : super(key: key);
 
   @override
-  ConsumerState<SplashScreen> createState() => _SplashScreenState();
+  ConsumerState<SplashScreenV1> createState() => _SplashScreenV1State();
 }
 
-class _SplashScreenState extends ConsumerState<SplashScreen> {
+class _SplashScreenV1State extends ConsumerState<SplashScreenV1> {
   @override
   void initState() {
     super.initState();
@@ -21,7 +21,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   _navigateToAuth() async {
     await Future.delayed(const Duration(seconds: 3));
     if (mounted) {
-      Navigator.pushReplacementNamed(context, '/auth');
+      Navigator.pushReplacementNamed(context, '/auth/v1');
     }
   }
 

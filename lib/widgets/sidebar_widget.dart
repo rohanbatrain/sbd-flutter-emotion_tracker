@@ -286,7 +286,7 @@ class _SidebarWidgetState extends ConsumerState<SidebarWidget> {
       // Navigate to auth screen
       if (context.mounted) {
         Navigator.of(context).pushNamedAndRemoveUntil(
-          '/auth',
+          '/auth/v1',
           (route) => false,
         );
       }
