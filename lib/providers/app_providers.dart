@@ -132,7 +132,7 @@ Future<Map<String, dynamic>> registerWithApi(
   String username,
   String email,
   String password,
-  {String? clientSideEncryption}
+  {bool? clientSideEncryption}
 ) async {
   if (!isPasswordStrong(password)) {
     throw Exception('Password must be at least 8 characters long and contain uppercase, lowercase, digit, and special character.');
@@ -140,13 +140,13 @@ Future<Map<String, dynamic>> registerWithApi(
   final baseUrl = ref.read(apiBaseUrlProvider);
   final url = Uri.parse('$baseUrl/auth/register');
   try {
-    final body = {
+    final body = <String, dynamic>{
       'username': username,
       'email': email,
       'password': password,
       'registration_app_id': registrationAppId, // from main.dart
     };
-    if (clientSideEncryption != null && clientSideEncryption.isNotEmpty) {
+    if (clientSideEncryption != null) {
       body['client_side_encryption'] = clientSideEncryption;
     }
     final response = await http.post(
@@ -161,5 +161,22 @@ Future<Map<String, dynamic>> registerWithApi(
     }
   } catch (e) {
     throw Exception('Could not connect to the server. Please check your domain/IP and try again.');
+  }
+}
+
+/// Function to check username availability
+Future<bool> checkUsernameAvailability(WidgetRef ref, String username) async {
+  final baseUrl = ref.read(apiBaseUrlProvider);
+  final url = Uri.parse('$baseUrl/auth/check-username?username=$username');
+  try {
+    final response = await http.get(url);
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      return data['available'] == true;
+    } else {
+      throw Exception('Failed to check username: \\${response.statusCode}');
+    }
+  } catch (e) {
+    throw Exception('Could not check username. Please check your connection.');
   }
 }

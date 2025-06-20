@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:emotion_tracker/providers/theme_provider.dart';
+import 'package:emotion_tracker/providers/secure_storage_provider.dart';
 import 'package:lottie/lottie.dart';
 
 class ClientSideEncryptionScreenV1 extends ConsumerStatefulWidget {
@@ -117,7 +118,7 @@ class _ClientSideEncryptionScreenV1State extends ConsumerState<ClientSideEncrypt
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: () {
+                    onPressed: () async {
                       final key = encryptionKeyController.text.trim();
                       if (key.length < 16) {
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -128,14 +129,17 @@ class _ClientSideEncryptionScreenV1State extends ConsumerState<ClientSideEncrypt
                         );
                         return;
                       }
-                      // TODO: Save key securely and proceed
+                      // Save key securely
+                      final secureStorage = ref.read(secureStorageProvider);
+                      await secureStorage.write(key: 'client_side_encryption_key', value: key);
+                      // Show success and redirect
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: const Text('Encryption key accepted!'),
                           backgroundColor: theme.colorScheme.secondary,
                         ),
                       );
-                      // Example: Navigator.of(context).pushReplacementNamed('/home/v1');
+                      Navigator.of(context).pushReplacementNamed('/verify-email/v1');
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: theme.primaryColor,
