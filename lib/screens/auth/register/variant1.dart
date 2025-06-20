@@ -23,6 +23,9 @@ class _RegisterScreenV1State extends ConsumerState<RegisterScreenV1> with Ticker
   String? usernameError;
   String? passwordError;
   final TextEditingController emailController = TextEditingController();
+  bool? isEmailAvailable;
+  bool isCheckingEmail = false;
+  String? emailError;
   final TextEditingController passwordController = TextEditingController();
   final TextEditingController confirmPasswordController = TextEditingController();
   final TextEditingController usernameController = TextEditingController();
@@ -61,6 +64,7 @@ class _RegisterScreenV1State extends ConsumerState<RegisterScreenV1> with Ticker
       }
     });
     usernameController.addListener(_onUsernameChanged);
+    emailController.addListener(_onEmailChanged);
   }
 
   void _onUsernameChanged() {
@@ -117,6 +121,41 @@ class _RegisterScreenV1State extends ConsumerState<RegisterScreenV1> with Ticker
     });
   }
 
+  void _onEmailChanged() {
+    final email = emailController.text.trim().toLowerCase();
+    final emailRegExp = RegExp(r'^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$');
+    if (!emailRegExp.hasMatch(email)) {
+      setState(() {
+        isEmailAvailable = null;
+        emailError = 'Enter a valid email address.';
+        isCheckingEmail = false;
+      });
+      return;
+    }
+    setState(() {
+      isEmailAvailable = null;
+      emailError = null;
+      isCheckingEmail = true;
+    });
+    Timer(const Duration(milliseconds: 600), () async {
+      try {
+        final available = await checkEmailAvailability(ref, email);
+        setState(() {
+          isEmailAvailable = available;
+          emailError = available ? null : 'Email is already registered.';
+        });
+      } catch (e) {
+        setState(() {
+          emailError = 'Could not check email.';
+        });
+      } finally {
+        setState(() {
+          isCheckingEmail = false;
+        });
+      }
+    });
+  }
+
   void _onPasswordChanged(String val) {
     // Password strength: min 8, upper, lower, digit, special
     if (val.isEmpty) {
@@ -164,6 +203,7 @@ class _RegisterScreenV1State extends ConsumerState<RegisterScreenV1> with Ticker
   void dispose() {
     _usernameDebounce?.cancel();
     _animationController?.dispose();
+    emailController.removeListener(_onEmailChanged);
     emailController.dispose();
     passwordController.dispose();
     confirmPasswordController.dispose();
@@ -252,6 +292,23 @@ class _RegisterScreenV1State extends ConsumerState<RegisterScreenV1> with Ticker
                       keyboardType: TextInputType.emailAddress,
                       autofillHints: [AutofillHints.newUsername, AutofillHints.email],
                       theme: theme,
+                      errorText: emailError,
+                      suffix: isCheckingEmail
+                          ? Padding(
+                              padding: const EdgeInsets.only(right: 2),
+                              child: Icon(Icons.more_horiz, color: theme.dividerColor, size: 14),
+                            )
+                          : isEmailAvailable == true
+                              ? Padding(
+                                  padding: const EdgeInsets.only(right: 2),
+                                  child: Icon(Icons.check_circle, color: Colors.green, size: 12),
+                                )
+                              : isEmailAvailable == false
+                                  ? Padding(
+                                      padding: const EdgeInsets.only(right: 2),
+                                      child: Icon(Icons.error, color: Colors.red, size: 12),
+                                    )
+                                  : null,
                     ),
                     const SizedBox(height: 16),
                     _buildTextField(
@@ -542,6 +599,17 @@ class _RegisterScreenV1State extends ConsumerState<RegisterScreenV1> with Ticker
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('Please enter a valid email address.'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+      return;
+    }
+
+    // Email availability check
+    if (isEmailAvailable == false) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Email is already registered.'),
           backgroundColor: Theme.of(context).colorScheme.error,
         ),
       );

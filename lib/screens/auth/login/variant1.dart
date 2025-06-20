@@ -15,6 +15,7 @@ class LoginScreenV1 extends ConsumerStatefulWidget {
 
 class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProviderStateMixin {
   bool isPasswordVisible = false;
+  final TextEditingController usernameOrEmailController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
   final FocusNode passwordFocusNode = FocusNode();
@@ -49,6 +50,7 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
   @override
   void dispose() {
     _animationController?.dispose();
+    usernameOrEmailController.dispose();
     emailController.dispose();
     passwordController.dispose();
     passwordFocusNode.dispose();
@@ -92,7 +94,7 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
                     Padding(
                       padding: const EdgeInsets.only(bottom: 12.0),
                       child: Text(
-                        'Please login with your Second Brain Database account.',
+                        'Please login with your username or email.',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.textTheme.bodySmall?.color?.withOpacity(0.7),
                         ),
@@ -100,12 +102,12 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
                       ),
                     ),
                     const SizedBox(height: 20),
-                    // Email Field
+                    // Username or Email Field
                     _buildTextField(
-                      controller: emailController,
-                      hintText: 'Email Address',
-                      prefixIcon: Icons.email_outlined,
-                      keyboardType: TextInputType.emailAddress,
+                      controller: usernameOrEmailController,
+                      hintText: 'Username or Email',
+                      prefixIcon: Icons.person_outline,
+                      keyboardType: TextInputType.text,
                       autofillHints: [AutofillHints.username, AutofillHints.email],
                       theme: theme,
                     ),
@@ -283,15 +285,17 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
   }
 
   void _handleSubmit() async {
-    final email = emailController.text.trim().toLowerCase();
+    final userInput = usernameOrEmailController.text.trim();
     final password = passwordController.text;
 
-    // Email validation
-    final emailRegExp = RegExp(r'^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,} $');
-    if (!emailRegExp.hasMatch(email)) {
+    // Regex for email and username
+    final emailRegExp = RegExp(r'^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$');
+    final usernameRegExp = RegExp(r'^[a-z0-9_-]{3,50}$');
+
+    if (!emailRegExp.hasMatch(userInput) && !usernameRegExp.hasMatch(userInput)) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Please enter a valid email address.'),
+          content: const Text('Please enter a valid username or email.'),
           backgroundColor: Theme.of(context).colorScheme.error,
         ),
       );
@@ -311,13 +315,13 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
 
     try {
       final authNotifier = ref.read(authProvider.notifier);
-      final result = await loginWithApi(ref, email, password);
-      await authNotifier.login(email, password);
+      final result = await loginWithApi(ref, userInput, password);
+      await authNotifier.login(userInput, password);
 
       final secureStorage = ref.read(secureStorageProvider);
       await secureStorage.write(key: 'access_token', value: result['access_token'] ?? '');
       await secureStorage.write(key: 'token_type', value: result['token_type'] ?? '');
-      await secureStorage.write(key: 'client_side_encryption', value: 'false');
+      await secureStorage.write(key: 'client_side_encryption', value: result['client_side_encryption']?.toString() ?? 'false');
 
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('issued_at', result['issued_at']?.toString() ?? '');
@@ -326,6 +330,10 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
       await prefs.setBool('is_verified', result['is_verified'] ?? false);
 
       if (mounted) {
+        if (result['client_side_encryption'] == true) {
+          Navigator.of(context).pushReplacementNamed('/client-side-encryption/v1');
+          return;
+        }
         if (result['is_verified'] == false) {
           Navigator.of(context).pushReplacementNamed('/verify-email/v1');
           return;

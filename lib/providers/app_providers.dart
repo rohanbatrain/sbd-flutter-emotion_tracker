@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:emotion_tracker/providers/shared_prefs_provider.dart';
-import 'package:emotion_tracker/main.dart';
+// import 'package:emotion_tracker/main.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:emotion_tracker/providers/user_agent_util.dart';
 
 // Navigation service provider
 class NavigationService {
@@ -97,14 +98,25 @@ final healthCheckEndpointProvider = Provider<String>((ref) {
 });
 
 /// Function to perform login POST request
-Future<Map<String, dynamic>> loginWithApi(WidgetRef ref, String email, String password) async {
+Future<Map<String, dynamic>> loginWithApi(WidgetRef ref, String usernameOrEmail, String password) async {
   final baseUrl = ref.read(apiBaseUrlProvider);
   final url = Uri.parse('$baseUrl/auth/login');
   try {
+    final userAgent = await getUserAgent();
+    // Determine if input is email or username
+    final emailRegExp = RegExp(r'^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}?$');
+    final isEmail = emailRegExp.hasMatch(usernameOrEmail);
+    final body = isEmail
+        ? {'email': usernameOrEmail, 'password': password}
+        : {'username': usernameOrEmail, 'password': password};
     final response = await http.post(
       url,
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'email': email, 'password': password}),
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': userAgent,
+        'X-User-Agent': userAgent,
+      },
+      body: jsonEncode(body),
     );
     if (response.statusCode == 200) {
       return jsonDecode(response.body) as Map<String, dynamic>;
@@ -140,18 +152,23 @@ Future<Map<String, dynamic>> registerWithApi(
   final baseUrl = ref.read(apiBaseUrlProvider);
   final url = Uri.parse('$baseUrl/auth/register');
   try {
+    final userAgent = await getUserAgent();
     final body = <String, dynamic>{
       'username': username,
       'email': email,
       'password': password,
-      'registration_app_id': registrationAppId, // from main.dart
+      'user_agent': userAgent, // custom user agent
     };
     if (clientSideEncryption != null) {
       body['client_side_encryption'] = clientSideEncryption;
     }
     final response = await http.post(
       url,
-      headers: {'Content-Type': 'application/json'},
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': userAgent,
+        'X-User-Agent': userAgent,
+      },
       body: jsonEncode(body),
     );
     if (response.statusCode == 200) {
@@ -169,14 +186,45 @@ Future<bool> checkUsernameAvailability(WidgetRef ref, String username) async {
   final baseUrl = ref.read(apiBaseUrlProvider);
   final url = Uri.parse('$baseUrl/auth/check-username?username=$username');
   try {
-    final response = await http.get(url);
+    final userAgent = await getUserAgent();
+    final response = await http.get(
+      url,
+      headers: {
+        'User-Agent': userAgent,
+        'X-User-Agent': userAgent,
+      },
+    );
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       return data['available'] == true;
     } else {
-      throw Exception('Failed to check username: \\${response.statusCode}');
+      throw Exception('Failed to check username: ${response.statusCode}');
     }
   } catch (e) {
     throw Exception('Could not check username. Please check your connection.');
+  }
+}
+
+/// Function to check email availability
+Future<bool> checkEmailAvailability(WidgetRef ref, String email) async {
+  final baseUrl = ref.read(apiBaseUrlProvider);
+  final url = Uri.parse('$baseUrl/auth/check-email?email=$email');
+  try {
+    final userAgent = await getUserAgent();
+    final response = await http.get(
+      url,
+      headers: {
+        'User-Agent': userAgent,
+        'X-User-Agent': userAgent,
+      },
+    );
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      return data['available'] == true;
+    } else {
+      throw Exception('Failed to check email: ${response.statusCode}');
+    }
+  } catch (e) {
+    throw Exception('Could not check email. Please check your connection.');
   }
 }
