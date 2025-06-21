@@ -323,12 +323,21 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
       await secureStorage.write(key: 'token_type', value: result['token_type'] ?? '');
       await secureStorage.write(key: 'client_side_encryption', value: result['client_side_encryption']?.toString() ?? 'false');
       await secureStorage.write(key: 'user_role', value: result['role'] ?? 'user');
-      // Store email if present
-      if (emailRegExp.hasMatch(userInput)) {
-        await secureStorage.write(key: 'user_email', value: userInput);
-      } else {
-        // Store username for verification purposes
-        await secureStorage.write(key: 'user_username', value: userInput);
+      
+      // Store username and email from server response
+      if (result['username'] != null && result['username'].isNotEmpty) {
+        await secureStorage.write(key: 'user_username', value: result['username']);
+      }
+      if (result['email'] != null && result['email'].isNotEmpty) {
+        await secureStorage.write(key: 'user_email', value: result['email']);
+      }
+      
+      // Store first name and last name from server response
+      if (result['first_name'] != null && result['first_name'].isNotEmpty) {
+        await secureStorage.write(key: 'user_first_name', value: result['first_name']);
+      }
+      if (result['last_name'] != null && result['last_name'].isNotEmpty) {
+        await secureStorage.write(key: 'user_last_name', value: result['last_name']);
       }
 
       final prefs = await SharedPreferences.getInstance();
