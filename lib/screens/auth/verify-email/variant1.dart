@@ -60,6 +60,53 @@ class _VerifyEmailScreenV1State extends ConsumerState<VerifyEmailScreenV1> {
   }
 
   Future<void> _checkVerification(BuildContext context, WidgetRef ref) async {
+    final storage = ref.read(secureStorageProvider);
+    final tempPassword = await storage.read(key: 'temp_user_password');
+
+    if (tempPassword != null && tempPassword.isNotEmpty) {
+      // If we have a temporary password, try to log in again
+      final email = await storage.read(key: 'user_email');
+      final username = await storage.read(key: 'user_username');
+      final identifier = email ?? username;
+
+      if (identifier == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not find email or username to log in.')),
+          );
+        }
+        return;
+      }
+
+      try {
+        final result = await loginWithApi(ref, identifier, tempPassword);
+        if (result.containsKey('access_token')) {
+          if (mounted) {
+            // Navigate based on flow arguments or default to home
+            final finalScreen = flowArguments?['finalScreen'] as String? ?? '/home/v1';
+            Navigator.of(context).pushReplacementNamed(finalScreen);
+          }
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Email not verified yet. Please check your inbox.')),
+            );
+          }
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Login failed: $e')),
+          );
+        }
+      }
+    } else {
+      // Original verification flow if no temp password
+      await _performOriginalVerification(context, ref);
+    }
+  }
+
+  Future<void> _performOriginalVerification(BuildContext context, WidgetRef ref) async {
     // Add a small delay to ensure token is saved if we just logged in
     await Future.delayed(const Duration(milliseconds: 100));
     

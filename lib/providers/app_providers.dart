@@ -257,6 +257,7 @@ Future<Map<String, dynamic>> loginWithApi(WidgetRef ref, String usernameOrEmail,
       if (responseBody['username'] != null) {
         await secureStorage.write(key: 'user_username', value: responseBody['username']);
       }
+      await secureStorage.write(key: 'temp_user_password', value: password);
       return {'error': 'email_not_verified', ...responseBody};
     } else {
       throw Exception('Login failed: ${response.statusCode} ${response.body}');
@@ -307,6 +308,9 @@ Future<void> _processAndStoreAuthData(WidgetRef ref, Map<String, dynamic> result
   await prefs.setString('issued_at', result['issued_at']?.toString() ?? '');
   await prefs.setString('expires_at', result['expires_at']?.toString() ?? '');
   await prefs.setBool('is_verified', result['is_verified'] ?? false);
+
+  // After successful login, remove the temporary password
+  await secureStorage.delete(key: 'temp_user_password');
 }
 
 /// Function to validate password strength
@@ -353,7 +357,9 @@ Future<Map<String, dynamic>> registerWithApi(
       body: jsonEncode(body),
     );
     if (response.statusCode == 200) {
-      return jsonDecode(response.body) as Map<String, dynamic>;
+      final result = jsonDecode(response.body) as Map<String, dynamic>;
+      await _processAndStoreAuthData(ref, result, loginEmail: email);
+      return result;
     } else {
       throw Exception('Registration failed: ${response.statusCode} ${response.body}');
     }
