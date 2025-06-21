@@ -22,26 +22,6 @@ class VerifyEmailScreenV1 extends ConsumerStatefulWidget {
 
 class _VerifyEmailScreenV1State extends ConsumerState<VerifyEmailScreenV1> {
   Map<String, dynamic>? flowArguments;
-  String? _email;
-  String? _username;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadUserData();
-  }
-
-  Future<void> _loadUserData() async {
-    final storage = ref.read(secureStorageProvider);
-    final email = await storage.read(key: 'user_email');
-    final username = await storage.read(key: 'user_username');
-    if (mounted) {
-      setState(() {
-        _email = email;
-        _username = username;
-      });
-    }
-  }
 
   @override
   void didChangeDependencies() {
@@ -53,6 +33,68 @@ class _VerifyEmailScreenV1State extends ConsumerState<VerifyEmailScreenV1> {
   @override
   void dispose() {
     super.dispose();
+  }
+
+  Future<void> _resendVerificationEmail() async {
+    final storage = ref.read(secureStorageProvider);
+    final email = await storage.read(key: 'user_email');
+    final username = await storage.read(key: 'user_username');
+
+    if ((email == null || email.isEmpty) && (username == null || username.isEmpty)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not find your email or username to resend verification.')),
+        );
+      }
+      return;
+    }
+
+    final prefs = await ref.read(sharedPrefsProvider.future);
+    final protocol = prefs.getString('server_protocol') ?? 'https';
+    final domain = prefs.getString('server_domain') ?? 'dev-app-sbd.rohanbatra.in';
+    final url = Uri.parse('$protocol://$domain/auth/resend-verification-email');
+
+    final body = <String, String>{};
+    if (email != null && email.isNotEmpty) {
+      body['email'] = email;
+    } else if (username != null && username.isNotEmpty) {
+      body['username'] = username;
+    }
+
+    try {
+      final response = await HttpUtil.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(body),
+      );
+
+      if (mounted) {
+        if (response.statusCode == 200) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Verification email sent successfully.'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to resend verification email: ${response.body}'),
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('An error occurred: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _checkVerification(BuildContext context, WidgetRef ref) async {
@@ -183,23 +225,6 @@ class _VerifyEmailScreenV1State extends ConsumerState<VerifyEmailScreenV1> {
                   ),
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 16),
-                if (_email != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 4.0),
-                    child: Text(
-                      "Email: $_email",
-                      style: theme.textTheme.bodyMedium,
-                    ),
-                  ),
-                if (_username != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 4.0),
-                    child: Text(
-                      "Username: $_username",
-                      style: theme.textTheme.bodyMedium,
-                    ),
-                  ),
                 const SizedBox(height: 32),
                 // Buttons
                 Column(
@@ -218,6 +243,18 @@ class _VerifyEmailScreenV1State extends ConsumerState<VerifyEmailScreenV1> {
                       style: TextButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 18),
                         foregroundColor: theme.primaryColor,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextButton.icon(
+                      onPressed: _resendVerificationEmail,
+                      icon: Icon(Icons.send_outlined, color: theme.hintColor),
+                      label: Text(
+                        'Resend Verification Link',
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          color: theme.hintColor,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ),
                   ],
