@@ -3,12 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:emotion_tracker/providers/theme_provider.dart';
 import 'package:emotion_tracker/providers/secure_storage_provider.dart';
 import 'package:emotion_tracker/providers/shared_prefs_provider.dart';
+import 'package:emotion_tracker/providers/app_providers.dart';
 import 'package:lottie/lottie.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:http/http.dart' as http;
+import 'package:emotion_tracker/utils/http_util.dart';
 import 'dart:convert';
 
-class VerifyEmailScreenV1 extends ConsumerWidget {
+class VerifyEmailScreenV1 extends ConsumerStatefulWidget {
   final VoidCallback? onResend;
   final VoidCallback? onRefresh;
 
@@ -18,13 +19,41 @@ class VerifyEmailScreenV1 extends ConsumerWidget {
     this.onRefresh,
   }) : super(key: key);
 
+  @override
+  ConsumerState<VerifyEmailScreenV1> createState() => _VerifyEmailScreenV1State();
+}
+
+class _VerifyEmailScreenV1State extends ConsumerState<VerifyEmailScreenV1> {
+  final TextEditingController emailController = TextEditingController();
+  String? emailError;
+  bool showEmailInput = false;
+  bool isLoading = false;
+  Map<String, dynamic>? flowArguments;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Get navigation arguments
+    flowArguments = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+  }
+
+  @override
+  void dispose() {
+    emailController.dispose();
+    super.dispose();
+  }
+
   Future<void> _checkVerification(BuildContext context, WidgetRef ref) async {
+    // Add a small delay to ensure token is saved if we just logged in
+    await Future.delayed(const Duration(milliseconds: 100));
+    
     final storage = ref.read(secureStorageProvider);
     final prefs = await ref.read(sharedPrefsProvider.future);
     final token = await storage.read(key: 'access_token');
     final protocol = prefs.getString('server_protocol') ?? 'https';
-    final domain = prefs.getString('server_domain') ?? 'default.server.com';
+    final domain = prefs.getString('server_domain') ?? 'dev-app-sbd.rohanbatra.in';
     final url = Uri.parse('$protocol://$domain/auth/is-verified');
+    
     if (token == null || token.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No access token found. Please login again.')),
@@ -32,7 +61,7 @@ class VerifyEmailScreenV1 extends ConsumerWidget {
       return;
     }
     try {
-      final response = await http.get(
+      final response = await HttpUtil.get(
         url,
         headers: {'Authorization': 'Bearer $token'},
       );
@@ -41,7 +70,9 @@ class VerifyEmailScreenV1 extends ConsumerWidget {
         if (data['is_verified'] == true) {
           await prefs.setBool('is_verified', true);
           if (context.mounted) {
-            Navigator.of(context).pushReplacementNamed('/home/v1');
+            // Navigate based on flow arguments or default to home
+            final finalScreen = flowArguments?['finalScreen'] as String? ?? '/home/v1';
+            Navigator.of(context).pushReplacementNamed(finalScreen);
           }
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -54,18 +85,116 @@ class VerifyEmailScreenV1 extends ConsumerWidget {
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
+      if (e is CloudflareTunnelException) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Cloudflare tunnel is down. Please try again later.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      } else if (e is NetworkException) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Network error. Please check your connection.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _resendVerificationEmail(BuildContext context, WidgetRef ref) async {
+    setState(() {
+      isLoading = true;
+    });
+    
+    // Add a small delay to ensure token is saved if we just logged in
+    await Future.delayed(const Duration(milliseconds: 100));
+    
+    String? email = emailController.text.trim();
+    if (showEmailInput && (email.isEmpty || !RegExp(r'^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$').hasMatch(email))) {
+      setState(() {
+        emailError = 'Enter a valid email address.';
+        isLoading = false;
+      });
+      return;
+    }
+    
+    try {
+      // Get stored username if available
+      final storage = ref.read(secureStorageProvider);
+      final storedUsername = await storage.read(key: 'user_username');
+      
+      await resendVerificationEmail(
+        ref, 
+        email: showEmailInput ? email : null,
+        username: storedUsername,
       );
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Verification email resent! Please check your inbox.')),
+      );
+    } catch (e) {
+      // Handle custom error messages from resendVerificationEmail
+      final msg = e.toString();
+      if (msg.contains('NO_EMAIL_FOUND')) {
+        setState(() {
+          showEmailInput = true;
+        });
+      } else if (msg.contains('CLOUDFLARE_TUNNEL_DOWN')) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Cloudflare tunnel is down. Please try again later.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      } else if (msg.contains('NETWORK_ERROR')) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Network error. Please check your connection.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      } else if (msg.contains('TOO_MANY_REQUESTS')) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('You have requested too many verification emails. Please wait and try again later.'), backgroundColor: Colors.orange),
+        );
+      } else if (msg.contains('IP_BLACKLISTED')) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Your IP has been temporarily blacklisted due to excessive requests. Please try again later.'), backgroundColor: Colors.red),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to resend email: $e')),
+        );
+      }
+    } finally {
+      setState(() {
+        isLoading = false;
+      });
     }
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final theme = ref.watch(currentThemeProvider);
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
+      appBar: flowArguments != null ? AppBar(
+        backgroundColor: theme.scaffoldBackgroundColor,
+        elevation: 0,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: theme.primaryColor),
+          onPressed: () {
+            // Check if we came from encryption screen
+            Navigator.of(context).pushReplacementNamed('/auth/v1');
+          },
+        ),
+      ) : null,
       body: SafeArea(
         child: Center(
           child: Padding(
@@ -113,6 +242,18 @@ class VerifyEmailScreenV1 extends ConsumerWidget {
                   ),
                   textAlign: TextAlign.center,
                 ),
+                if (showEmailInput) ...[
+                  const SizedBox(height: 18),
+                  TextField(
+                    controller: emailController,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: InputDecoration(
+                      labelText: 'Enter your email',
+                      errorText: emailError,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 32),
                 // Buttons
                 Column(
@@ -120,8 +261,17 @@ class VerifyEmailScreenV1 extends ConsumerWidget {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
-                        onPressed: onResend,
-                        icon: Icon(Icons.refresh, color: theme.colorScheme.onPrimary),
+                        onPressed: isLoading ? null : () => _resendVerificationEmail(context, ref),
+                        icon: isLoading
+                            ? SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: theme.colorScheme.onPrimary,
+                                ),
+                              )
+                            : Icon(Icons.refresh, color: theme.colorScheme.onPrimary),
                         label: Text(
                           'Resend Email',
                           style: theme.textTheme.labelLarge?.copyWith(
@@ -190,7 +340,6 @@ class VerifyEmailScreenV1 extends ConsumerWidget {
                             url: 'ms-outlook://',
                             fallbackUrl: 'https://outlook.live.com',
                           ),
-          
                           const SizedBox(width: 10),
                           _EmailClientButton(
                             icon: Icons.mail_lock_outlined,

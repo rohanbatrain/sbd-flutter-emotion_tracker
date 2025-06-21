@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:emotion_tracker/providers/theme_provider.dart';
 import 'package:emotion_tracker/providers/shared_prefs_provider.dart';
 import 'package:emotion_tracker/providers/app_providers.dart';
-import 'package:http/http.dart' as http;
+import 'package:emotion_tracker/utils/http_util.dart';
 
 class ServerSettingsDialog extends ConsumerStatefulWidget {
   final void Function()? onSaved;
@@ -33,7 +33,7 @@ class _ServerSettingsDialogState extends ConsumerState<ServerSettingsDialog> {
     final domain = ref.watch(serverDomainProvider);
     final healthCheckUrl = ref.watch(healthCheckEndpointProvider);
     domainController ??= TextEditingController(text: domain);
-    preview = '$protocol://${domainController!.text.trim().isEmpty ? 'api.example.com' : domainController!.text.trim()}';
+    preview = '$protocol://${domainController!.text.trim().isEmpty ? 'dev-app-sbd.rohanbatra.in' : domainController!.text.trim()}';
     return AlertDialog(
       backgroundColor: theme.cardTheme.color,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
@@ -84,7 +84,7 @@ class _ServerSettingsDialogState extends ConsumerState<ServerSettingsDialog> {
               maxLines: 1,
               style: theme.textTheme.bodyMedium,
               decoration: InputDecoration(
-                hintText: 'api.example.com',
+                hintText: 'dev-app-sbd.rohanbatra.in',
                 filled: true,
                 fillColor: theme.cardColor,
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
@@ -93,7 +93,7 @@ class _ServerSettingsDialogState extends ConsumerState<ServerSettingsDialog> {
               ),
               onChanged: (val) {
                 setState(() {
-                  preview = '$protocol://${val.trim().isEmpty ? 'api.example.com' : val.trim()}';
+                  preview = '$protocol://${val.trim().isEmpty ? 'dev-app-sbd.rohanbatra.in' : val.trim()}';
                   errorText = null;
                   testSuccess = false;
                 });
@@ -121,9 +121,9 @@ class _ServerSettingsDialogState extends ConsumerState<ServerSettingsDialog> {
                               });
                               return;
                             }
-                            final url = healthCheckUrl.replaceFirst(domain, inputDomain.isEmpty ? 'api.example.com' : inputDomain);
+                            final url = healthCheckUrl.replaceFirst(domain, inputDomain.isEmpty ? 'dev-app-sbd.rohanbatra.in' : inputDomain);
                             try {
-                              final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 3));
+                              final response = await HttpUtil.get(Uri.parse(url)).timeout(const Duration(seconds: 3));
                               if (response.statusCode == 200) {
                                 setState(() {
                                   testSuccess = true;
@@ -137,10 +137,17 @@ class _ServerSettingsDialogState extends ConsumerState<ServerSettingsDialog> {
                                   testing = false;
                                 });
                               }
-                            } catch (_) {
+                            } catch (e) {
                               setState(() {
                                 testSuccess = false;
-                                errorText = 'Could not connect. Please check your network or server address.';
+                                // Check for Cloudflare tunnel errors
+                                if (e is CloudflareTunnelException) {
+                                  errorText = 'Cloudflare tunnel is down: ${e.message}';
+                                } else if (e is NetworkException) {
+                                  errorText = 'Network error: ${e.message}';
+                                } else {
+                                  errorText = 'Could not connect. Please check your network or server address.';
+                                }
                                 testing = false;
                               });
                             }

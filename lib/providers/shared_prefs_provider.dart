@@ -25,7 +25,7 @@ class ServerDomainNotifier extends StateNotifier<String> {
   final SharedPreferences? prefs;
   static const String _key = 'server_domain';
 
-  ServerDomainNotifier(this.prefs) : super('default.server.com') {
+  ServerDomainNotifier(this.prefs) : super('dev-app-sbd.rohanbatra.in') {
     _load();
   }
 

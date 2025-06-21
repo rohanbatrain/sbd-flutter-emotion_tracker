@@ -322,6 +322,14 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
       await secureStorage.write(key: 'access_token', value: result['access_token'] ?? '');
       await secureStorage.write(key: 'token_type', value: result['token_type'] ?? '');
       await secureStorage.write(key: 'client_side_encryption', value: result['client_side_encryption']?.toString() ?? 'false');
+      await secureStorage.write(key: 'user_role', value: result['role'] ?? 'user');
+      // Store email if present
+      if (emailRegExp.hasMatch(userInput)) {
+        await secureStorage.write(key: 'user_email', value: userInput);
+      } else {
+        // Store username for verification purposes
+        await secureStorage.write(key: 'user_username', value: userInput);
+      }
 
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('issued_at', result['issued_at']?.toString() ?? '');
@@ -329,15 +337,87 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
       await prefs.setString('login_app_id', result['login_app_id']?.toString() ?? '');
       await prefs.setBool('is_verified', result['is_verified'] ?? false);
 
+      // Ensure all storage operations are complete before continuing
+      await Future.delayed(const Duration(milliseconds: 50));
+
       if (mounted) {
-        if (result['client_side_encryption'] == true) {
-          Navigator.of(context).pushReplacementNamed('/client-side-encryption/v1');
+        // Check for special email not verified error (login failed due to unverified email)
+        if (result['error'] == 'email_not_verified') {
+          // Even with email not verified, check if encryption is also required
+          final needsEncryption = result['client_side_encryption'] == true || result['client_side_encryption'] == 'true';
+          
+          if (needsEncryption) {
+            // Check if we already have an encryption key
+            final existingKey = await secureStorage.read(key: 'client_side_encryption_key');
+            if (existingKey != null && existingKey.isNotEmpty) {
+              // Key exists, go directly to verification
+              Navigator.of(context).pushReplacementNamed(
+                '/verify-email/v1',
+                arguments: {'finalScreen': '/home/v1'},
+              );
+            } else {
+              // No key, need to set up encryption first, then verification
+              Navigator.of(context).pushReplacementNamed(
+                '/client-side-encryption/v1',
+                arguments: {'nextScreen': '/verify-email/v1', 'finalScreen': '/home/v1'},
+              );
+            }
+          } else {
+            // Only verification required
+            Navigator.of(context).pushReplacementNamed(
+              '/verify-email/v1',
+              arguments: {'finalScreen': '/home/v1'},
+            );
+          }
           return;
         }
-        if (result['is_verified'] == false) {
-          Navigator.of(context).pushReplacementNamed('/verify-email/v1');
+        
+        // Login was successful, now check what additional steps are needed
+        final needsEncryption = result['client_side_encryption'] == true || result['client_side_encryption'] == 'true';
+        final isVerified = result['is_verified'] == true || result['is_verified'] == 'true';
+        
+        if (needsEncryption && !isVerified) {
+          // Check if we already have an encryption key
+          final existingKey = await secureStorage.read(key: 'client_side_encryption_key');
+          if (existingKey != null && existingKey.isNotEmpty) {
+            // Key exists, go directly to verification
+            Navigator.of(context).pushReplacementNamed(
+              '/verify-email/v1',
+              arguments: {'finalScreen': '/home/v1'},
+            );
+          } else {
+            // No key, need to set up encryption first, then verification
+            Navigator.of(context).pushReplacementNamed(
+              '/client-side-encryption/v1',
+              arguments: {'nextScreen': '/verify-email/v1', 'finalScreen': '/home/v1'},
+            );
+          }
+          return;
+        } else if (needsEncryption && isVerified) {
+          // Check if we already have an encryption key
+          final existingKey = await secureStorage.read(key: 'client_side_encryption_key');
+          if (existingKey != null && existingKey.isNotEmpty) {
+            // Key exists and verified, go directly to home
+            Navigator.of(context).pushReplacementNamed('/home/v1');
+          } else {
+            // No key, need to set up encryption
+            Navigator.of(context).pushReplacementNamed(
+              '/client-side-encryption/v1',
+              arguments: {'finalScreen': '/home/v1'},
+            );
+          }
+          return;
+        } else if (!isVerified) {
+          // Only verification required (no encryption needed)
+          // This should only happen if login succeeded but server indicates email not verified
+          Navigator.of(context).pushReplacementNamed(
+            '/verify-email/v1',
+            arguments: {'finalScreen': '/home/v1'},
+          );
           return;
         }
+        
+        // Neither required, go directly to home
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Login successful!'),
@@ -349,16 +429,46 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
     } catch (e) {
       if (mounted) {
         final errorMsg = e.toString();
-        if (errorMsg.contains('domain/IP')) {
+        
+        // Handle different types of errors with user-friendly messages
+        String displayMessage = 'Authentication failed';
+        Color? backgroundColor = Theme.of(context).colorScheme.error;
+        
+        if (errorMsg.contains('CLOUDFLARE_TUNNEL_DOWN:')) {
+          displayMessage = 'Cloudflare tunnel is down. Please try again later or contact support.';
+          backgroundColor = Colors.orange;
           _showServerChangeDialog();
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Authentication failed: $errorMsg'),
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
+          return;
+        } else if (errorMsg.contains('NETWORK_ERROR:')) {
+          displayMessage = 'Network error. Please check your internet connection.';
+          backgroundColor = Colors.red;
+        } else if (errorMsg.contains('domain/IP')) {
+          _showServerChangeDialog();
+          return;
+        } else if (errorMsg.contains('Login failed: 401')) {
+          displayMessage = 'Invalid username/email or password. Please check your credentials and try again.';
+        } else if (errorMsg.contains('Login failed: 403') && errorMsg.contains('Email not verified')) {
+          // Only trigger email verification for 403 errors that specifically mention "Email not verified"
+          Navigator.of(context).pushReplacementNamed(
+            '/verify-email/v1',
+            arguments: {'finalScreen': '/home/v1'},
           );
+          return;
+        } else if (errorMsg.contains('Login failed: 403')) {
+          displayMessage = 'Access denied. Please check your credentials.';
+        } else if (errorMsg.contains('Login failed: 429')) {
+          displayMessage = 'Too many login attempts. Please wait and try again later.';
+        } else if (errorMsg.contains('Could not connect')) {
+          displayMessage = 'Could not connect to server. Please check your internet connection.';
         }
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(displayMessage),
+            backgroundColor: backgroundColor,
+            duration: const Duration(seconds: 4),
+          ),
+        );
       }
     }
   }

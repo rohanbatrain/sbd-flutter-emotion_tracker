@@ -652,6 +652,7 @@ class _RegisterScreenV1State extends ConsumerState<RegisterScreenV1> with Ticker
       await secureStorage.write(key: 'access_token', value: result['access_token'] ?? '');
       await secureStorage.write(key: 'token_type', value: result['token_type'] ?? '');
       await secureStorage.write(key: 'client_side_encryption', value: encryptionEnabled ? 'true' : 'false');
+      await secureStorage.write(key: 'user_email', value: email);
 
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('issued_at', result['issued_at']?.toString() ?? '');
@@ -660,13 +661,32 @@ class _RegisterScreenV1State extends ConsumerState<RegisterScreenV1> with Ticker
       await prefs.setBool('is_verified', result['is_verified'] ?? false);
 
       if (mounted) {
-        if (result['is_verified'] == false) {
-          if (encryptionEnabled) {
-            await Navigator.of(context).pushNamed('/client-side-encryption/v1');
-          }
-          Navigator.of(context).pushReplacementNamed('/verify-email/v1');
+        final needsVerification = result['is_verified'] == false;
+        
+        if (encryptionEnabled && needsVerification) {
+          // Both required: start with encryption, then verification
+          Navigator.of(context).pushReplacementNamed(
+            '/client-side-encryption/v1',
+            arguments: {'nextScreen': '/verify-email/v1', 'finalScreen': '/home/v1'},
+          );
+          return;
+        } else if (encryptionEnabled) {
+          // Only encryption required
+          Navigator.of(context).pushReplacementNamed(
+            '/client-side-encryption/v1',
+            arguments: {'finalScreen': '/home/v1'},
+          );
+          return;
+        } else if (needsVerification) {
+          // Only verification required
+          Navigator.of(context).pushReplacementNamed(
+            '/verify-email/v1',
+            arguments: {'finalScreen': '/home/v1'},
+          );
           return;
         }
+        
+        // Neither required, go directly to home
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Account created successfully!'),

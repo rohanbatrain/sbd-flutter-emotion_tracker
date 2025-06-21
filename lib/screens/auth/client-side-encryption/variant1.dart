@@ -15,11 +15,19 @@ class _ClientSideEncryptionScreenV1State extends ConsumerState<ClientSideEncrypt
   final TextEditingController encryptionKeyController = TextEditingController();
   bool isKeyVisible = false;
   bool isUserTyping = false;
+  Map<String, dynamic>? flowArguments;
 
   @override
   void initState() {
     super.initState();
     encryptionKeyController.addListener(_handleTyping);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Get navigation arguments
+    flowArguments = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
   }
 
   void _handleTyping() {
@@ -42,14 +50,31 @@ class _ClientSideEncryptionScreenV1State extends ConsumerState<ClientSideEncrypt
     final theme = ref.watch(currentThemeProvider);
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
+      appBar: flowArguments != null ? AppBar(
+        backgroundColor: theme.scaffoldBackgroundColor,
+        elevation: 0,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: theme.primaryColor),
+          onPressed: () {
+            // Go back to auth screen
+            Navigator.of(context).pushReplacementNamed('/auth/v1');
+          },
+        ),
+      ) : null,
       body: SafeArea(
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 32.0),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 16.0),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: MediaQuery.of(context).size.height - 
+                        MediaQuery.of(context).viewInsets.bottom - 
+                        MediaQuery.of(context).padding.top - 
+                        MediaQuery.of(context).padding.bottom - 
+                        (flowArguments != null ? kToolbarHeight : 0) - 32,
+            ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
               children: [
                 AnimatedSwitcher(
                   duration: const Duration(milliseconds: 400),
@@ -132,14 +157,37 @@ class _ClientSideEncryptionScreenV1State extends ConsumerState<ClientSideEncrypt
                       // Save key securely
                       final secureStorage = ref.read(secureStorageProvider);
                       await secureStorage.write(key: 'client_side_encryption_key', value: key);
-                      // Show success and redirect
+                      
+                      // Show success
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: const Text('Encryption key accepted!'),
                           backgroundColor: theme.colorScheme.secondary,
                         ),
                       );
-                      Navigator.of(context).pushReplacementNamed('/verify-email/v1');
+                      
+                      // Navigate based on flow arguments
+                      if (flowArguments != null) {
+                        final nextScreen = flowArguments!['nextScreen'] as String?;
+                        final finalScreen = flowArguments!['finalScreen'] as String?;
+                        
+                        if (nextScreen != null) {
+                          // More screens to show, pass along the final destination
+                          Navigator.of(context).pushReplacementNamed(
+                            nextScreen,
+                            arguments: {'finalScreen': finalScreen},
+                          );
+                        } else if (finalScreen != null) {
+                          // Go directly to final screen
+                          Navigator.of(context).pushReplacementNamed(finalScreen);
+                        } else {
+                          // Fallback to home
+                          Navigator.of(context).pushReplacementNamed('/home/v1');
+                        }
+                      } else {
+                        // Legacy behavior - go to verify email
+                        Navigator.of(context).pushReplacementNamed('/verify-email/v1');
+                      }
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: theme.primaryColor,

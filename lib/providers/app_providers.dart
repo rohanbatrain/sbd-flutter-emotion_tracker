@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:emotion_tracker/providers/shared_prefs_provider.dart';
-// import 'package:emotion_tracker/main.dart';
-import 'package:http/http.dart' as http;
+import 'package:emotion_tracker/providers/secure_storage_provider.dart';
 import 'dart:convert';
 import 'package:emotion_tracker/providers/user_agent_util.dart';
+import 'package:emotion_tracker/utils/http_util.dart';
 
 // Navigation service provider
 class NavigationService {
@@ -84,14 +84,14 @@ final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
   return AuthNotifier();
 });
 
-/// Provides the full API base URL (e.g., https://example.com)
+/// Provides the full API base URL (e.g., https://dev-app-sbd.rohanbatra.in)
 final apiBaseUrlProvider = Provider<String>((ref) {
   final protocol = ref.watch(serverProtocolProvider);
   final domain = ref.watch(serverDomainProvider);
   return '$protocol://$domain';
 });
 
-/// Provides the health check endpoint (e.g., https://example.com/health)
+/// Provides the health check endpoint (e.g., https://dev-app-sbd.rohanbatra.in/health)
 final healthCheckEndpointProvider = Provider<String>((ref) {
   final baseUrl = ref.watch(apiBaseUrlProvider);
   return '$baseUrl/health';
@@ -109,7 +109,7 @@ Future<Map<String, dynamic>> loginWithApi(WidgetRef ref, String usernameOrEmail,
     final body = isEmail
         ? {'email': usernameOrEmail, 'password': password}
         : {'username': usernameOrEmail, 'password': password};
-    final response = await http.post(
+    final response = await HttpUtil.post(
       url,
       headers: {
         'Content-Type': 'application/json',
@@ -119,11 +119,33 @@ Future<Map<String, dynamic>> loginWithApi(WidgetRef ref, String usernameOrEmail,
       body: jsonEncode(body),
     );
     if (response.statusCode == 200) {
-      return jsonDecode(response.body) as Map<String, dynamic>;
+      final result = jsonDecode(response.body) as Map<String, dynamic>;
+      // Store user_email in secure storage
+      final secureStorage = ref.read(secureStorageProvider);
+      if (isEmail) {
+        await secureStorage.write(key: 'user_email', value: usernameOrEmail);
+      } else if (result['email'] != null) {
+        await secureStorage.write(key: 'user_email', value: result['email']);
+      }
+      return result;
+    } else if (response.statusCode == 403 && response.body.contains('Email not verified')) {
+      // Special case: email not verified
+      // Server should respond with: raise HTTPException(status_code=403, detail="Email not verified")
+      // This ensures we only trigger email verification for actual unverified emails, not wrong passwords
+      return {'error': 'email_not_verified', ...jsonDecode(response.body)};
     } else {
       throw Exception('Login failed: ${response.statusCode} ${response.body}');
     }
   } catch (e) {
+    // Only catch network and Cloudflare errors here, let authentication errors pass through
+    if (e is CloudflareTunnelException) {
+      throw Exception('CLOUDFLARE_TUNNEL_DOWN: ${e.message}');
+    } else if (e is NetworkException) {
+      throw Exception('NETWORK_ERROR: ${e.message}');
+    } else if (e.toString().contains('Login failed:')) {
+      // Re-throw login/authentication errors as-is (don't wrap them)
+      rethrow;
+    }
     throw Exception('Could not connect to the server. Please check your domain/IP and try again.');
   }
 }
@@ -162,7 +184,7 @@ Future<Map<String, dynamic>> registerWithApi(
     if (clientSideEncryption != null) {
       body['client_side_encryption'] = clientSideEncryption;
     }
-    final response = await http.post(
+    final response = await HttpUtil.post(
       url,
       headers: {
         'Content-Type': 'application/json',
@@ -177,6 +199,11 @@ Future<Map<String, dynamic>> registerWithApi(
       throw Exception('Registration failed: ${response.statusCode} ${response.body}');
     }
   } catch (e) {
+    if (e is CloudflareTunnelException) {
+      throw Exception('CLOUDFLARE_TUNNEL_DOWN: ${e.message}');
+    } else if (e is NetworkException) {
+      throw Exception('NETWORK_ERROR: ${e.message}');
+    }
     throw Exception('Could not connect to the server. Please check your domain/IP and try again.');
   }
 }
@@ -187,7 +214,7 @@ Future<bool> checkUsernameAvailability(WidgetRef ref, String username) async {
   final url = Uri.parse('$baseUrl/auth/check-username?username=$username');
   try {
     final userAgent = await getUserAgent();
-    final response = await http.get(
+    final response = await HttpUtil.get(
       url,
       headers: {
         'User-Agent': userAgent,
@@ -201,6 +228,11 @@ Future<bool> checkUsernameAvailability(WidgetRef ref, String username) async {
       throw Exception('Failed to check username: ${response.statusCode}');
     }
   } catch (e) {
+    if (e is CloudflareTunnelException) {
+      throw Exception('CLOUDFLARE_TUNNEL_DOWN: ${e.message}');
+    } else if (e is NetworkException) {
+      throw Exception('NETWORK_ERROR: ${e.message}');
+    }
     throw Exception('Could not check username. Please check your connection.');
   }
 }
@@ -211,7 +243,7 @@ Future<bool> checkEmailAvailability(WidgetRef ref, String email) async {
   final url = Uri.parse('$baseUrl/auth/check-email?email=$email');
   try {
     final userAgent = await getUserAgent();
-    final response = await http.get(
+    final response = await HttpUtil.get(
       url,
       headers: {
         'User-Agent': userAgent,
@@ -225,6 +257,81 @@ Future<bool> checkEmailAvailability(WidgetRef ref, String email) async {
       throw Exception('Failed to check email: ${response.statusCode}');
     }
   } catch (e) {
+    if (e is CloudflareTunnelException) {
+      throw Exception('CLOUDFLARE_TUNNEL_DOWN: ${e.message}');
+    } else if (e is NetworkException) {
+      throw Exception('NETWORK_ERROR: ${e.message}');
+    }
     throw Exception('Could not check email. Please check your connection.');
+  }
+}
+
+/// Function to resend verification email
+Future<void> resendVerificationEmail(WidgetRef ref, {String? email, String? username}) async {
+  final baseUrl = ref.read(apiBaseUrlProvider);
+  final url = Uri.parse('$baseUrl/auth/resend-verification-email');
+  
+  try {
+    final userAgent = await getUserAgent();
+    final storage = ref.read(secureStorageProvider);
+    
+    // Determine what identifier to use
+    String? userEmail = email;
+    String? userUsername = username;
+    
+    // If no email provided, try to get it from storage
+    if (userEmail == null || userEmail.isEmpty) {
+      userEmail = await storage.read(key: 'user_email');
+    }
+    
+    // If still no identifier, throw error
+    if ((userEmail == null || userEmail.isEmpty) && (userUsername == null || userUsername.isEmpty)) {
+      throw Exception('NO_EMAIL_FOUND: No email or username found. Please enter your email or username.');
+    }
+    
+    // Prepare request body
+    Map<String, dynamic> body = {};
+    if (userEmail != null && userEmail.isNotEmpty) {
+      body['email'] = userEmail;
+    } else if (userUsername != null && userUsername.isNotEmpty) {
+      body['username'] = userUsername;
+    }
+    
+    final response = await HttpUtil.post(
+      url,
+      headers: {
+        'User-Agent': userAgent,
+        'X-User-Agent': userAgent,
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode(body),
+    );
+    
+    if (response.statusCode != 200) {
+      // Gracefully handle too many requests error
+      if (response.statusCode == 429 || response.body.contains('Too many requests')) {
+        throw Exception('TOO_MANY_REQUESTS: Too many requests. Please try again later.');
+      }
+      // Handle IP blacklisted error
+      if (response.body.contains('blacklisted') || response.body.contains('excessive abuse')) {
+        throw Exception('IP_BLACKLISTED: Your IP has been temporarily blacklisted due to excessive abuse. Please try again later.');
+      }
+      throw Exception('Failed to resend verification email: ${response.body}');
+    }
+  } catch (e) {
+    // Re-throw special exceptions without wrapping them
+    if (e.toString().contains('NO_EMAIL_FOUND:') || 
+        e.toString().contains('TOO_MANY_REQUESTS:') || 
+        e.toString().contains('IP_BLACKLISTED:')) {
+      rethrow;
+    }
+    
+    if (e is CloudflareTunnelException) {
+      throw Exception('CLOUDFLARE_TUNNEL_DOWN: ${e.message}');
+    } else if (e is NetworkException) {
+      throw Exception('NETWORK_ERROR: ${e.message}');
+    }
+    
+    throw Exception('Could not resend verification email. $e');
   }
 }

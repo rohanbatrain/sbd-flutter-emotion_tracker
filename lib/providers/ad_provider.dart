@@ -71,9 +71,8 @@ class AdNotifier extends StateNotifier<AdState> {
     try {
       await MobileAds.instance.initialize();
       state = state.copyWith(isAdMobInitialized: true);
-      debugPrint('AdMob initialized successfully');
     } catch (e) {
-      debugPrint('Failed to initialize AdMob: $e');
+      // AdMob initialization failed
     }
   }
 
@@ -112,7 +111,6 @@ class AdNotifier extends StateNotifier<AdState> {
             bannerAds: newBannerAds,
             bannerAdStates: newBannerAdStates,
           );
-          debugPrint('Banner ad loaded successfully for ID: $adId');
         },
         onAdFailedToLoad: (ad, error) {
           final newBannerAdStates = Map<String, AdLoadingState>.from(state.bannerAdStates);
@@ -120,7 +118,6 @@ class AdNotifier extends StateNotifier<AdState> {
           
           state = state.copyWith(bannerAdStates: newBannerAdStates);
           ad.dispose();
-          debugPrint('Banner ad failed to load for ID $adId: $error');
         },
       ),
     );
@@ -145,13 +142,11 @@ class AdNotifier extends StateNotifier<AdState> {
             interstitialAd: ad,
             interstitialAdState: AdLoadingState.loaded,
           );
-          debugPrint('Interstitial ad loaded successfully');
 
           ad.setImmersiveMode(true);
         },
         onAdFailedToLoad: (error) {
           state = state.copyWith(interstitialAdState: AdLoadingState.failed);
-          debugPrint('Interstitial ad failed to load: $error');
         },
       ),
     );
@@ -160,13 +155,12 @@ class AdNotifier extends StateNotifier<AdState> {
   // Show interstitial ad
   Future<void> showInterstitialAd({VoidCallback? onAdClosed}) async {
     if (state.interstitialAd == null) {
-      debugPrint('Interstitial ad not ready');
       return;
     }
 
     state.interstitialAd!.fullScreenContentCallback = FullScreenContentCallback(
       onAdShowedFullScreenContent: (ad) {
-        debugPrint('Interstitial ad showed full screen content');
+        // Ad showed full screen content
       },
       onAdDismissedFullScreenContent: (ad) {
         ad.dispose();
@@ -176,7 +170,6 @@ class AdNotifier extends StateNotifier<AdState> {
         );
         onAdClosed?.call();
         loadInterstitialAd(); // Preload next ad
-        debugPrint('Interstitial ad dismissed');
       },
       onAdFailedToShowFullScreenContent: (ad, error) {
         ad.dispose();
@@ -184,7 +177,6 @@ class AdNotifier extends StateNotifier<AdState> {
           interstitialAd: null,
           interstitialAdState: AdLoadingState.failed,
         );
-        debugPrint('Interstitial ad failed to show: $error');
       },
     );
 
@@ -208,13 +200,11 @@ class AdNotifier extends StateNotifier<AdState> {
             rewardedAd: ad,
             rewardedAdState: AdLoadingState.loaded,
           );
-          debugPrint('Rewarded ad loaded successfully');
 
           ad.setImmersiveMode(true);
         },
         onAdFailedToLoad: (error) {
           state = state.copyWith(rewardedAdState: AdLoadingState.failed);
-          debugPrint('Rewarded ad failed to load: $error');
         },
       ),
     );
@@ -226,13 +216,11 @@ class AdNotifier extends StateNotifier<AdState> {
     VoidCallback? onAdClosed,
   }) async {
     if (state.rewardedAd == null) {
-      debugPrint('Rewarded ad not ready');
       return;
     }
 
     state.rewardedAd!.fullScreenContentCallback = FullScreenContentCallback(
       onAdShowedFullScreenContent: (ad) {
-        debugPrint('Rewarded ad showed full screen content');
       },
       onAdDismissedFullScreenContent: (ad) {
         ad.dispose();
@@ -242,7 +230,6 @@ class AdNotifier extends StateNotifier<AdState> {
         );
         onAdClosed?.call();
         loadRewardedAd(); // Preload next ad
-        debugPrint('Rewarded ad dismissed');
       },
       onAdFailedToShowFullScreenContent: (ad, error) {
         ad.dispose();
@@ -250,7 +237,6 @@ class AdNotifier extends StateNotifier<AdState> {
           rewardedAd: null,
           rewardedAdState: AdLoadingState.failed,
         );
-        debugPrint('Rewarded ad failed to show: $error');
       },
     );
 

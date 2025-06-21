@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:emotion_tracker/providers/theme_provider.dart';
@@ -215,7 +214,6 @@ class CurrencyNotifier extends StateNotifier<CurrencyData> {
         
         // Verify data integrity
         if (!data.isValid) {
-          debugPrint('Currency data corrupted, attempting to restore from backup');
           await _restoreFromBackup();
           return;
         }
@@ -240,7 +238,6 @@ class CurrencyNotifier extends StateNotifier<CurrencyData> {
         await _saveCurrencyData(initialData);
       }
     } catch (e) {
-      debugPrint('Error loading currency data: $e');
       await _restoreFromBackup();
     }
   }
@@ -253,7 +250,7 @@ class CurrencyNotifier extends StateNotifier<CurrencyData> {
       // Create backup
       await _storage.write(key: _backupKey, value: json.encode(data.toJson()));
     } catch (e) {
-      debugPrint('Error saving currency data: $e');
+      // Error saving currency data
     }
   }
 
@@ -286,7 +283,7 @@ class CurrencyNotifier extends StateNotifier<CurrencyData> {
       state = defaultData;
       await _saveCurrencyData(defaultData);
     } catch (e) {
-      debugPrint('Error restoring from backup: $e');
+      // Error restoring from backup
     }
   }
 
@@ -379,7 +376,7 @@ class CurrencyNotifier extends StateNotifier<CurrencyData> {
         await _saveCurrencyData(serverCurrency);
       }
     } catch (e) {
-      debugPrint('Error importing from backend: $e');
+      // Error importing from backend
     }
   }
 
