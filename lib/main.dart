@@ -46,9 +46,7 @@ class MyApp extends ConsumerWidget {
   }
 
   Widget _getInitialScreen(AuthState authState) {
-    if (authState.isLoggedIn) {
-      return const HomeScreenV1();
-    }
+    // Always show splash screen first to ensure proper timing
     return const SplashScreenV1();
   }
 }

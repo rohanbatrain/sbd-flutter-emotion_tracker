@@ -5,6 +5,8 @@ import 'package:emotion_tracker/providers/secure_storage_provider.dart';
 import 'dart:convert';
 import 'package:emotion_tracker/providers/user_agent_util.dart';
 import 'package:emotion_tracker/utils/http_util.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 // Navigation service provider
 class NavigationService {
@@ -39,49 +41,170 @@ final navigationServiceProvider = Provider<NavigationService>((ref) {
 class AuthState {
   final bool isLoggedIn;
   final String? userEmail;
+  final String? accessToken;
+  final bool isInitialized; // Track if we've checked for existing auth
 
   const AuthState({
     this.isLoggedIn = false,
     this.userEmail,
+    this.accessToken,
+    this.isInitialized = false,
   });
 
   AuthState copyWith({
     bool? isLoggedIn,
     String? userEmail,
+    String? accessToken,
+    bool? isInitialized,
   }) {
     return AuthState(
       isLoggedIn: isLoggedIn ?? this.isLoggedIn,
       userEmail: userEmail ?? this.userEmail,
+      accessToken: accessToken ?? this.accessToken,
+      isInitialized: isInitialized ?? this.isInitialized,
     );
   }
 }
 
 class AuthNotifier extends StateNotifier<AuthState> {
-  AuthNotifier() : super(const AuthState());
+  final FlutterSecureStorage _secureStorage;
+  late final SharedPreferences _prefs;
 
-  Future<void> login(String email, String password) async {
-    // Simulate login process
-    await Future.delayed(const Duration(milliseconds: 500));
+  AuthNotifier(this._secureStorage) : super(const AuthState()) {
+    _initializeAuth();
+  }
+
+  // Check for existing authentication on app startup
+  Future<void> _initializeAuth() async {
+    try {
+      _prefs = await SharedPreferences.getInstance();
+      
+      // Check if we have stored authentication data
+      final accessToken = await _secureStorage.read(key: 'access_token');
+      final userEmail = await _secureStorage.read(key: 'user_email');
+      final isVerified = _prefs.getBool('is_verified') ?? false;
+      final expiresAtString = _prefs.getString('expires_at');
+      
+      // Check if token exists and is not expired
+      bool isValidToken = false;
+      if (accessToken != null && accessToken.isNotEmpty) {
+        if (expiresAtString != null) {
+          try {
+            final expiresAt = DateTime.parse(expiresAtString);
+            final now = DateTime.now();
+            isValidToken = now.isBefore(expiresAt);
+          } catch (e) {
+            // Invalid date format, consider token invalid
+            isValidToken = false;
+          }
+        } else {
+          // No expiry data, assume token is valid for now
+          // You might want to validate with server here
+          isValidToken = true;
+        }
+      }
+      
+      if (isValidToken && isVerified) {
+        // User has valid authentication, restore session
+        state = state.copyWith(
+          isLoggedIn: true,
+          userEmail: userEmail,
+          accessToken: accessToken,
+          isInitialized: true,
+        );
+      } else {
+        // No valid authentication or not verified, clear any stale data
+        if (!isValidToken) {
+          await _clearStoredAuth();
+        }
+        state = state.copyWith(isInitialized: true);
+      }
+    } catch (e) {
+      // Error during initialization, assume not logged in
+      state = state.copyWith(isInitialized: true);
+    }
+  }
+
+  Future<void> login(String usernameOrEmail, String password) async {
+    // This method is called after successful API login
+    // The actual API call happens in the login screen
     
-    // In a real app, you'd validate credentials here
-    state = state.copyWith(isLoggedIn: true, userEmail: email);
+    // Get the latest user data from secure storage
+    final userEmail = await _secureStorage.read(key: 'user_email');
+    final accessToken = await _secureStorage.read(key: 'access_token');
+    
+    state = state.copyWith(
+      isLoggedIn: true,
+      userEmail: userEmail ?? usernameOrEmail,
+      accessToken: accessToken,
+    );
   }
 
   Future<void> signup(String username, String email, String password) async {
-    // Simulate signup process
-    await Future.delayed(const Duration(milliseconds: 500));
+    // This method is called after successful API signup
+    // The actual API call happens in the signup screen
     
-    // In a real app, you'd create the account here
-    state = state.copyWith(isLoggedIn: true, userEmail: email);
+    final accessToken = await _secureStorage.read(key: 'access_token');
+    
+    state = state.copyWith(
+      isLoggedIn: true,
+      userEmail: email,
+      accessToken: accessToken,
+    );
   }
 
   Future<void> logout() async {
-    state = const AuthState();
+    // Clear all stored authentication data
+    await _clearStoredAuth();
+    
+    // Reset state
+    state = const AuthState(isInitialized: true);
+  }
+
+  Future<void> _clearStoredAuth() async {
+    try {
+      // Clear secure storage
+      await _secureStorage.deleteAll();
+      
+      // Clear shared preferences auth-related data
+      await _prefs.remove('issued_at');
+      await _prefs.remove('expires_at');
+      await _prefs.remove('is_verified');
+      
+      // You might want to keep some non-sensitive settings like theme preferences
+      // So we're not calling _prefs.clear() here
+    } catch (e) {
+      // Error clearing storage, but continue with logout
+    }
+  }
+
+  // Method to refresh token if needed
+  Future<bool> refreshTokenIfNeeded() async {
+    try {
+      final expiresAtString = _prefs.getString('expires_at');
+      if (expiresAtString != null) {
+        final expiresAt = DateTime.parse(expiresAtString);
+        final now = DateTime.now();
+        
+        // If token expires in less than 5 minutes, consider refreshing
+        final shouldRefresh = expiresAt.difference(now).inMinutes < 5;
+        
+        if (shouldRefresh) {
+          // Here you would implement token refresh logic
+          // For now, we'll just return false to indicate refresh is needed
+          return false;
+        }
+      }
+      return true;
+    } catch (e) {
+      return false;
+    }
   }
 }
 
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
-  return AuthNotifier();
+  final secureStorage = ref.read(secureStorageProvider);
+  return AuthNotifier(secureStorage);
 });
 
 /// Provides the full API base URL (e.g., https://dev-app-sbd.rohanbatra.in)
