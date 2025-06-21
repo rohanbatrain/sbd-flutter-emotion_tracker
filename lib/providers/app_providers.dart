@@ -250,7 +250,13 @@ Future<Map<String, dynamic>> loginWithApi(WidgetRef ref, String usernameOrEmail,
       // Server should respond with: raise HTTPException(status_code=403, detail="Email not verified")
       // This ensures we only trigger email verification for actual unverified emails, not wrong passwords
       final responseBody = jsonDecode(response.body) as Map<String, dynamic>;
-      await _processAndStoreAuthData(ref, responseBody, loginEmail: isEmail ? usernameOrEmail : null);
+      final secureStorage = ref.read(secureStorageProvider);
+      if (responseBody['email'] != null) {
+        await secureStorage.write(key: 'user_email', value: responseBody['email']);
+      }
+      if (responseBody['username'] != null) {
+        await secureStorage.write(key: 'user_username', value: responseBody['username']);
+      }
       return {'error': 'email_not_verified', ...responseBody};
     } else {
       throw Exception('Login failed: ${response.statusCode} ${response.body}');

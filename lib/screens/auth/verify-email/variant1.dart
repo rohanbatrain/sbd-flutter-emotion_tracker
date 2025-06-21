@@ -22,6 +22,26 @@ class VerifyEmailScreenV1 extends ConsumerStatefulWidget {
 
 class _VerifyEmailScreenV1State extends ConsumerState<VerifyEmailScreenV1> {
   Map<String, dynamic>? flowArguments;
+  String? _email;
+  String? _username;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    final storage = ref.read(secureStorageProvider);
+    final email = await storage.read(key: 'user_email');
+    final username = await storage.read(key: 'user_username');
+    if (mounted) {
+      setState(() {
+        _email = email;
+        _username = username;
+      });
+    }
+  }
 
   @override
   void didChangeDependencies() {
@@ -163,6 +183,23 @@ class _VerifyEmailScreenV1State extends ConsumerState<VerifyEmailScreenV1> {
                   ),
                   textAlign: TextAlign.center,
                 ),
+                const SizedBox(height: 16),
+                if (_email != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4.0),
+                    child: Text(
+                      "Email: $_email",
+                      style: theme.textTheme.bodyMedium,
+                    ),
+                  ),
+                if (_username != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4.0),
+                    child: Text(
+                      "Username: $_username",
+                      style: theme.textTheme.bodyMedium,
+                    ),
+                  ),
                 const SizedBox(height: 32),
                 // Buttons
                 Column(
