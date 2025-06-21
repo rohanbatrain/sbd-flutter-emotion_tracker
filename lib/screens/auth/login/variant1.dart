@@ -334,7 +334,6 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('issued_at', result['issued_at']?.toString() ?? '');
       await prefs.setString('expires_at', result['expires_at']?.toString() ?? '');
-      await prefs.setString('login_app_id', result['login_app_id']?.toString() ?? '');
       await prefs.setBool('is_verified', result['is_verified'] ?? false);
 
       // Ensure all storage operations are complete before continuing

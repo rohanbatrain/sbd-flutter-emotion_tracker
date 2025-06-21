@@ -657,7 +657,6 @@ class _RegisterScreenV1State extends ConsumerState<RegisterScreenV1> with Ticker
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('issued_at', result['issued_at']?.toString() ?? '');
       await prefs.setString('expires_at', result['expires_at']?.toString() ?? '');
-      await prefs.setString('login_app_id', result['login_app_id']?.toString() ?? '');
       await prefs.setBool('is_verified', result['is_verified'] ?? false);
 
       if (mounted) {
