@@ -3,19 +3,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:emotion_tracker/providers/theme_provider.dart';
 import 'package:emotion_tracker/providers/secure_storage_provider.dart';
 import 'package:emotion_tracker/providers/shared_prefs_provider.dart';
-import 'package:emotion_tracker/providers/app_providers.dart';
 import 'package:lottie/lottie.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:emotion_tracker/utils/http_util.dart';
 import 'dart:convert';
 
 class VerifyEmailScreenV1 extends ConsumerStatefulWidget {
-  final VoidCallback? onResend;
   final VoidCallback? onRefresh;
 
   const VerifyEmailScreenV1({
     Key? key,
-    this.onResend,
     this.onRefresh,
   }) : super(key: key);
 
@@ -24,10 +21,6 @@ class VerifyEmailScreenV1 extends ConsumerStatefulWidget {
 }
 
 class _VerifyEmailScreenV1State extends ConsumerState<VerifyEmailScreenV1> {
-  final TextEditingController emailController = TextEditingController();
-  String? emailError;
-  bool showEmailInput = false;
-  bool isLoading = false;
   Map<String, dynamic>? flowArguments;
 
   @override
@@ -39,7 +32,6 @@ class _VerifyEmailScreenV1State extends ConsumerState<VerifyEmailScreenV1> {
 
   @override
   void dispose() {
-    emailController.dispose();
     super.dispose();
   }
 
@@ -55,9 +47,9 @@ class _VerifyEmailScreenV1State extends ConsumerState<VerifyEmailScreenV1> {
     final url = Uri.parse('$protocol://$domain/auth/is-verified');
     
     if (token == null || token.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No access token found. Please login again.')),
-      );
+      if (mounted) {
+        Navigator.of(context).pushReplacementNamed('/auth/v1');
+      }
       return;
     }
     try {
@@ -104,77 +96,6 @@ class _VerifyEmailScreenV1State extends ConsumerState<VerifyEmailScreenV1> {
           SnackBar(content: Text('Error: $e')),
         );
       }
-    }
-  }
-
-  Future<void> _resendVerificationEmail(BuildContext context, WidgetRef ref) async {
-    setState(() {
-      isLoading = true;
-    });
-    
-    // Add a small delay to ensure token is saved if we just logged in
-    await Future.delayed(const Duration(milliseconds: 100));
-    
-    String? email = emailController.text.trim();
-    if (showEmailInput && (email.isEmpty || !RegExp(r'^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$').hasMatch(email))) {
-      setState(() {
-        emailError = 'Enter a valid email address.';
-        isLoading = false;
-      });
-      return;
-    }
-    
-    try {
-      // Get stored username if available
-      final storage = ref.read(secureStorageProvider);
-      final storedUsername = await storage.read(key: 'user_username');
-      
-      await resendVerificationEmail(
-        ref, 
-        email: showEmailInput ? email : null,
-        username: storedUsername,
-      );
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Verification email resent! Please check your inbox.')),
-      );
-    } catch (e) {
-      // Handle custom error messages from resendVerificationEmail
-      final msg = e.toString();
-      if (msg.contains('NO_EMAIL_FOUND')) {
-        setState(() {
-          showEmailInput = true;
-        });
-      } else if (msg.contains('CLOUDFLARE_TUNNEL_DOWN')) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Cloudflare tunnel is down. Please try again later.'),
-            backgroundColor: Colors.orange,
-          ),
-        );
-      } else if (msg.contains('NETWORK_ERROR')) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Network error. Please check your connection.'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      } else if (msg.contains('TOO_MANY_REQUESTS')) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('You have requested too many verification emails. Please wait and try again later.'), backgroundColor: Colors.orange),
-        );
-      } else if (msg.contains('IP_BLACKLISTED')) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Your IP has been temporarily blacklisted due to excessive requests. Please try again later.'), backgroundColor: Colors.red),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to resend email: $e')),
-        );
-      }
-    } finally {
-      setState(() {
-        isLoading = false;
-      });
     }
   }
 
@@ -242,55 +163,10 @@ class _VerifyEmailScreenV1State extends ConsumerState<VerifyEmailScreenV1> {
                   ),
                   textAlign: TextAlign.center,
                 ),
-                if (showEmailInput) ...[
-                  const SizedBox(height: 18),
-                  TextField(
-                    controller: emailController,
-                    keyboardType: TextInputType.emailAddress,
-                    decoration: InputDecoration(
-                      labelText: 'Enter your email',
-                      errorText: emailError,
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                  ),
-                ],
                 const SizedBox(height: 32),
                 // Buttons
                 Column(
                   children: [
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: isLoading ? null : () => _resendVerificationEmail(context, ref),
-                        icon: isLoading
-                            ? SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: theme.colorScheme.onPrimary,
-                                ),
-                              )
-                            : Icon(Icons.refresh, color: theme.colorScheme.onPrimary),
-                        label: Text(
-                          'Resend Email',
-                          style: theme.textTheme.labelLarge?.copyWith(
-                            color: theme.colorScheme.onPrimary,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: theme.primaryColor,
-                          minimumSize: const Size.fromHeight(50),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          elevation: 3,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
                     TextButton.icon(
                       onPressed: () => _checkVerification(context, ref),
                       icon: Icon(Icons.check_circle_outline, color: theme.primaryColor),
