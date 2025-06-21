@@ -153,13 +153,13 @@ class SettingsScreenV1 extends ConsumerWidget {
                                             Container(
                                               padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                               decoration: BoxDecoration(
-                                                color: Colors.orange,
+                                                color: theme.colorScheme.secondary,
                                                 borderRadius: BorderRadius.circular(12),
                                               ),
                                               child: Text(
                                                 'DEV',
                                                 style: TextStyle(
-                                                  color: Colors.white,
+                                                  color: theme.colorScheme.onSecondary,
                                                   fontWeight: FontWeight.bold,
                                                   fontSize: 10,
                                                 ),
@@ -177,8 +177,8 @@ class SettingsScreenV1 extends ConsumerWidget {
                                             borderRadius: BorderRadius.circular(18),
                                             gradient: LinearGradient(
                                               colors: [
-                                                Colors.orange.withOpacity(0.1),
-                                                Colors.red.withOpacity(0.05),
+                                                theme.colorScheme.secondary.withOpacity(0.1),
+                                                theme.colorScheme.tertiary.withOpacity(0.05),
                                               ],
                                               begin: Alignment.topLeft,
                                               end: Alignment.bottomRight,
@@ -188,8 +188,8 @@ class SettingsScreenV1 extends ConsumerWidget {
                                             contentPadding: EdgeInsets.symmetric(horizontal: 24, vertical: 14),
                                             leading: CircleAvatar(
                                               radius: 22,
-                                              backgroundColor: Colors.orange.withOpacity(0.2),
-                                              child: Icon(Icons.developer_mode, color: Colors.orange, size: 26),
+                                              backgroundColor: theme.colorScheme.secondary.withOpacity(0.2),
+                                              child: Icon(Icons.developer_mode, color: theme.colorScheme.secondary, size: 26),
                                             ),
                                             title: Text(
                                               'Developer Options',

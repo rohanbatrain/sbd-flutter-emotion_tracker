@@ -85,6 +85,7 @@ class _DeveloperOptionsScreenV1State extends ConsumerState<DeveloperOptionsScree
   }
 
   void _clearAllData() {
+    final theme = ref.read(currentThemeProvider);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -100,7 +101,7 @@ class _DeveloperOptionsScreenV1State extends ConsumerState<DeveloperOptionsScree
               Navigator.pop(context);
               await _performClearAll();
             },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(backgroundColor: theme.colorScheme.error),
             child: Text('Clear All'),
           ),
         ],
