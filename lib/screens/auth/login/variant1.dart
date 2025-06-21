@@ -4,7 +4,6 @@ import 'package:emotion_tracker/providers/theme_provider.dart';
 import 'package:emotion_tracker/providers/app_providers.dart';
 import 'package:emotion_tracker/screens/auth/server-settings/variant1.dart';
 import 'package:emotion_tracker/providers/secure_storage_provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class LoginScreenV1 extends ConsumerStatefulWidget {
   const LoginScreenV1({Key? key}) : super(key: key);
@@ -316,39 +315,14 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
     try {
       final authNotifier = ref.read(authProvider.notifier);
       final result = await loginWithApi(ref, userInput, password);
-      await authNotifier.login(userInput, password);
 
-      final secureStorage = ref.read(secureStorageProvider);
-      await secureStorage.write(key: 'access_token', value: result['access_token'] ?? '');
-      await secureStorage.write(key: 'token_type', value: result['token_type'] ?? '');
-      await secureStorage.write(key: 'client_side_encryption', value: result['client_side_encryption']?.toString() ?? 'false');
-      await secureStorage.write(key: 'user_role', value: result['role'] ?? 'user');
-      
-      // Store username and email from server response
-      if (result['username'] != null && result['username'].isNotEmpty) {
-        await secureStorage.write(key: 'user_username', value: result['username']);
-      }
-      if (result['email'] != null && result['email'].isNotEmpty) {
-        await secureStorage.write(key: 'user_email', value: result['email']);
-      }
-      
-      // Store first name and last name from server response
-      if (result['first_name'] != null && result['first_name'].isNotEmpty) {
-        await secureStorage.write(key: 'user_first_name', value: result['first_name']);
-      }
-      if (result['last_name'] != null && result['last_name'].isNotEmpty) {
-        await secureStorage.write(key: 'user_last_name', value: result['last_name']);
-      }
-
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('issued_at', result['issued_at']?.toString() ?? '');
-      await prefs.setString('expires_at', result['expires_at']?.toString() ?? '');
-      await prefs.setBool('is_verified', result['is_verified'] ?? false);
+      await authNotifier.login(userInput);
 
       // Ensure all storage operations are complete before continuing
       await Future.delayed(const Duration(milliseconds: 50));
 
       if (mounted) {
+        final secureStorage = ref.read(secureStorageProvider);
         // Check for special email not verified error (login failed due to unverified email)
         if (result['error'] == 'email_not_verified') {
           // Even with email not verified, check if encryption is also required

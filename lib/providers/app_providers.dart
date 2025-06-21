@@ -125,7 +125,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  Future<void> login(String usernameOrEmail, String password) async {
+  Future<void> login(String usernameOrEmail) async {
     // This method is called after successful API login
     // The actual API call happens in the login screen
     
@@ -243,25 +243,14 @@ Future<Map<String, dynamic>> loginWithApi(WidgetRef ref, String usernameOrEmail,
     );
     if (response.statusCode == 200) {
       final result = jsonDecode(response.body) as Map<String, dynamic>;
-      // Store user_email in secure storage
-      final secureStorage = ref.read(secureStorageProvider);
-      if (isEmail) {
-        await secureStorage.write(key: 'user_email', value: usernameOrEmail);
-      } else if (result['email'] != null) {
-        await secureStorage.write(key: 'user_email', value: result['email']);
-      }
+      await _processAndStoreAuthData(ref, result, loginEmail: isEmail ? usernameOrEmail : null);
       return result;
     } else if (response.statusCode == 403 && response.body.contains('Email not verified')) {
       // Special case: email not verified
       // Server should respond with: raise HTTPException(status_code=403, detail="Email not verified")
       // This ensures we only trigger email verification for actual unverified emails, not wrong passwords
-      final secureStorage = ref.read(secureStorageProvider);
       final responseBody = jsonDecode(response.body) as Map<String, dynamic>;
-      if (isEmail) {
-        await secureStorage.write(key: 'user_email', value: usernameOrEmail);
-      } else if (responseBody['email'] != null) {
-        await secureStorage.write(key: 'user_email', value: responseBody['email'] as String);
-      }
+      await _processAndStoreAuthData(ref, responseBody, loginEmail: isEmail ? usernameOrEmail : null);
       return {'error': 'email_not_verified', ...responseBody};
     } else {
       throw Exception('Login failed: ${response.statusCode} ${response.body}');
@@ -278,6 +267,40 @@ Future<Map<String, dynamic>> loginWithApi(WidgetRef ref, String usernameOrEmail,
     }
     throw Exception('Could not connect to the server. Please check your domain/IP and try again.');
   }
+}
+
+Future<void> _processAndStoreAuthData(WidgetRef ref, Map<String, dynamic> result, {String? loginEmail}) async {
+  final secureStorage = ref.read(secureStorageProvider);
+  
+  // Store tokens and other data
+  await secureStorage.write(key: 'access_token', value: result['access_token'] ?? '');
+  await secureStorage.write(key: 'token_type', value: result['token_type'] ?? '');
+  await secureStorage.write(key: 'client_side_encryption', value: result['client_side_encryption']?.toString() ?? 'false');
+  await secureStorage.write(key: 'user_role', value: result['role'] ?? 'user');
+  
+  // Store user details
+  if (result['username'] != null && result['username'].isNotEmpty) {
+    await secureStorage.write(key: 'user_username', value: result['username']);
+  }
+  if (result['first_name'] != null && result['first_name'].isNotEmpty) {
+    await secureStorage.write(key: 'user_first_name', value: result['first_name']);
+  }
+  if (result['last_name'] != null && result['last_name'].isNotEmpty) {
+    await secureStorage.write(key: 'user_last_name', value: result['last_name']);
+  }
+
+  // Store email (handle case where login is via email)
+  if (loginEmail != null && loginEmail.isNotEmpty) {
+      await secureStorage.write(key: 'user_email', value: loginEmail);
+  } else if (result['email'] != null && result['email'].isNotEmpty) {
+    await secureStorage.write(key: 'user_email', value: result['email']);
+  }
+
+  // Store data in SharedPreferences
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setString('issued_at', result['issued_at']?.toString() ?? '');
+  await prefs.setString('expires_at', result['expires_at']?.toString() ?? '');
+  await prefs.setBool('is_verified', result['is_verified'] ?? false);
 }
 
 /// Function to validate password strength
