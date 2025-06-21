@@ -367,6 +367,48 @@ Future<Map<String, dynamic>> registerWithApi(
   }
 }
 
+/// Function to resend verification email
+Future<void> resendVerificationEmail(WidgetRef ref) async {
+  final storage = ref.read(secureStorageProvider);
+  final email = await storage.read(key: 'user_email');
+  final username = await storage.read(key: 'user_username');
+
+  if ((email == null || email.isEmpty) && (username == null || username.isEmpty)) {
+    throw Exception('Could not find your email or username to resend verification.');
+  }
+
+  final baseUrl = ref.read(apiBaseUrlProvider);
+  final url = Uri.parse('$baseUrl/auth/resend-verification-email');
+
+  final body = <String, String>{};
+  if (email != null && email.isNotEmpty) {
+    body['email'] = email;
+  } else if (username != null && username.isNotEmpty) {
+    body['username'] = username;
+  }
+
+  try {
+    final response = await HttpUtil.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(body),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to resend verification email: ${response.statusCode} ${response.body}');
+    }
+  } catch (e) {
+    if (e is CloudflareTunnelException) {
+      throw Exception('CLOUDFLARE_TUNNEL_DOWN: ${e.message}');
+    } else if (e is NetworkException) {
+      throw Exception('NETWORK_ERROR: ${e.message}');
+    } else if (e.toString().contains('Failed to resend verification email:')) {
+      rethrow;
+    }
+    throw Exception('Could not connect to the server. Please check your domain/IP and try again.');
+  }
+}
+
 /// Function to check username availability
 Future<bool> checkUsernameAvailability(WidgetRef ref, String username) async {
   final baseUrl = ref.read(apiBaseUrlProvider);

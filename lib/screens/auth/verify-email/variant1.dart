@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:emotion_tracker/providers/theme_provider.dart';
 import 'package:emotion_tracker/providers/secure_storage_provider.dart';
 import 'package:emotion_tracker/providers/shared_prefs_provider.dart';
+import 'package:emotion_tracker/providers/app_providers.dart';
 import 'package:lottie/lottie.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:emotion_tracker/utils/http_util.dart';
@@ -36,60 +37,21 @@ class _VerifyEmailScreenV1State extends ConsumerState<VerifyEmailScreenV1> {
   }
 
   Future<void> _resendVerificationEmail() async {
-    final storage = ref.read(secureStorageProvider);
-    final email = await storage.read(key: 'user_email');
-    final username = await storage.read(key: 'user_username');
-
-    if ((email == null || email.isEmpty) && (username == null || username.isEmpty)) {
+    try {
+      await resendVerificationEmail(ref);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not find your email or username to resend verification.')),
+          const SnackBar(
+            content: Text('Verification email sent successfully.'),
+            backgroundColor: Colors.green,
+          ),
         );
-      }
-      return;
-    }
-
-    final prefs = await ref.read(sharedPrefsProvider.future);
-    final protocol = prefs.getString('server_protocol') ?? 'https';
-    final domain = prefs.getString('server_domain') ?? 'dev-app-sbd.rohanbatra.in';
-    final url = Uri.parse('$protocol://$domain/auth/resend-verification-email');
-
-    final body = <String, String>{};
-    if (email != null && email.isNotEmpty) {
-      body['email'] = email;
-    } else if (username != null && username.isNotEmpty) {
-      body['username'] = username;
-    }
-
-    try {
-      final response = await HttpUtil.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(body),
-      );
-
-      if (mounted) {
-        if (response.statusCode == 200) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Verification email sent successfully.'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to resend verification email: ${response.body}'),
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
-          );
-        }
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('An error occurred: $e'),
+            content: Text('Failed to resend verification email: $e'),
             backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
