@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:emotion_tracker/providers/theme_provider.dart';
+import 'package:emotion_tracker/providers/app_providers.dart';
 import 'package:lottie/lottie.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -28,10 +29,12 @@ class _ForgotPasswordScreenV1State extends ConsumerState<ForgotPasswordScreenV1>
       errorText = null;
     });
     final email = emailController.text.trim().toLowerCase();
-    final validEmailRegExp = RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'); // FIX: Correct email regex
-    if (!validEmailRegExp.hasMatch(email)) {
+    
+    // Use centralized email validation
+    final emailValidationError = InputValidator.validateEmail(email);
+    if (emailValidationError != null) {
       setState(() {
-        errorText = 'Please enter a valid email address.';
+        errorText = emailValidationError;
       });
       return;
     }

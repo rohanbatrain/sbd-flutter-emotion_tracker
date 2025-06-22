@@ -5,18 +5,13 @@ import 'package:flutter/material.dart';
 /// HTTP utility class that wraps all HTTP requests with Cloudflare tunnel error detection
 class HttpUtil {
   
-  /// Performs an HTTP GET request with Cloudflare error detection
-  static Future<http.Response> get(
-    Uri url, {
-    Map<String, String>? headers,
+  /// Common method to handle HTTP requests with error detection
+  static Future<http.Response> _performRequest(
+    Future<http.Response> Function() requestFunction, {
     Duration? timeout,
   }) async {
     try {
-      final response = await http.get(
-        url,
-        headers: headers,
-      ).timeout(timeout ?? const Duration(seconds: 30));
-      
+      final response = await requestFunction().timeout(timeout ?? const Duration(seconds: 30));
       _checkCloudflareErrors(response);
       return response;
     } catch (e) {
@@ -25,6 +20,18 @@ class HttpUtil {
       }
       throw _handleNetworkError(e);
     }
+  }
+  
+  /// Performs an HTTP GET request with Cloudflare error detection
+  static Future<http.Response> get(
+    Uri url, {
+    Map<String, String>? headers,
+    Duration? timeout,
+  }) async {
+    return _performRequest(
+      () => http.get(url, headers: headers),
+      timeout: timeout,
+    );
   }
 
   /// Performs an HTTP POST request with Cloudflare error detection
@@ -35,22 +42,10 @@ class HttpUtil {
     Encoding? encoding,
     Duration? timeout,
   }) async {
-    try {
-      final response = await http.post(
-        url,
-        headers: headers,
-        body: body,
-        encoding: encoding,
-      ).timeout(timeout ?? const Duration(seconds: 30));
-      
-      _checkCloudflareErrors(response);
-      return response;
-    } catch (e) {
-      if (e is CloudflareTunnelException) {
-        rethrow;
-      }
-      throw _handleNetworkError(e);
-    }
+    return _performRequest(
+      () => http.post(url, headers: headers, body: body, encoding: encoding),
+      timeout: timeout,
+    );
   }
 
   /// Performs an HTTP PUT request with Cloudflare error detection
@@ -61,22 +56,10 @@ class HttpUtil {
     Encoding? encoding,
     Duration? timeout,
   }) async {
-    try {
-      final response = await http.put(
-        url,
-        headers: headers,
-        body: body,
-        encoding: encoding,
-      ).timeout(timeout ?? const Duration(seconds: 30));
-      
-      _checkCloudflareErrors(response);
-      return response;
-    } catch (e) {
-      if (e is CloudflareTunnelException) {
-        rethrow;
-      }
-      throw _handleNetworkError(e);
-    }
+    return _performRequest(
+      () => http.put(url, headers: headers, body: body, encoding: encoding),
+      timeout: timeout,
+    );
   }
 
   /// Performs an HTTP DELETE request with Cloudflare error detection
@@ -87,22 +70,10 @@ class HttpUtil {
     Encoding? encoding,
     Duration? timeout,
   }) async {
-    try {
-      final response = await http.delete(
-        url,
-        headers: headers,
-        body: body,
-        encoding: encoding,
-      ).timeout(timeout ?? const Duration(seconds: 30));
-      
-      _checkCloudflareErrors(response);
-      return response;
-    } catch (e) {
-      if (e is CloudflareTunnelException) {
-        rethrow;
-      }
-      throw _handleNetworkError(e);
-    }
+    return _performRequest(
+      () => http.delete(url, headers: headers, body: body, encoding: encoding),
+      timeout: timeout,
+    );
   }
 
   /// Checks if the response contains Cloudflare tunnel errors
@@ -111,39 +82,58 @@ class HttpUtil {
     final cfRay = response.headers['cf-ray'];
     final server = response.headers['server']?.toLowerCase();
     
-    // Check for 502 Bad Gateway from Cloudflare (like the error you encountered)
-    if (response.statusCode == 502) {
-      // Check if it's a Cloudflare 502 error
-      if (cfRay != null || 
-          server?.contains('cloudflare') == true ||
-          responseBody.contains('cloudflare') ||
-          responseBody.contains('bad gateway') && responseBody.contains('web server') ||
-          responseBody.contains('performance & security by cloudflare')) {
+    // Helper method to check if response has Cloudflare indicators
+    bool hasCloudflareIndicators() {
+      return cfRay != null || 
+             server?.contains('cloudflare') == true ||
+             responseBody.contains('cloudflare') ||
+             responseBody.contains('performance & security by cloudflare');
+    }
+    
+    // Check for specific error codes
+    switch (response.statusCode) {
+      case 502:
+        if (hasCloudflareIndicators() || 
+            responseBody.contains('bad gateway') && responseBody.contains('web server')) {
+          throw CloudflareTunnelException(
+            'Bad Gateway (Error 502): The server is temporarily unavailable. This is likely a Cloudflare tunnel issue.',
+            response.statusCode,
+            response.body,
+          );
+        }
+        break;
+        
+      case 503:
+      case 504:
+        if (hasCloudflareIndicators() ||
+            responseBody.contains('service unavailable') ||
+            responseBody.contains('gateway timeout')) {
+          throw CloudflareTunnelException(
+            'Service temporarily unavailable (Error ${response.statusCode}). The Cloudflare tunnel may be down.',
+            response.statusCode,
+            response.body,
+          );
+        }
+        break;
+        
+      case 522:
+      case 523:
+      case 524:
         throw CloudflareTunnelException(
-          'Bad Gateway (Error 502): The server is temporarily unavailable. This is likely a Cloudflare tunnel issue.',
+          'Server connection timeout (Cloudflare Error ${response.statusCode}). The tunnel may be down.',
           response.statusCode,
           response.body,
         );
-      }
-    }
-    
-    // Check for other Cloudflare tunnel errors (503, 504, etc.)
-    if (response.statusCode == 503 || response.statusCode == 504) {
-      // Check for Cloudflare indicators
-      if (cfRay != null || 
-          server?.contains('cloudflare') == true ||
-          responseBody.contains('cloudflare') ||
-          responseBody.contains('service unavailable') ||
-          responseBody.contains('gateway timeout')) {
+        
+      case 530:
         throw CloudflareTunnelException(
-          'Service temporarily unavailable (Error ${response.statusCode}). The Cloudflare tunnel may be down.',
+          'Origin DNS Error (Error 530): Cloudflare cannot resolve the server DNS. The server configuration may need attention.',
           response.statusCode,
           response.body,
         );
-      }
     }
     
-    // Check for Cloudflare Error 1033 (tunnel down) and other tunnel errors
+    // Check for Cloudflare Error 1033 and tunnel-specific errors
     if (responseBody.contains('error 1033') || 
         responseBody.contains('cloudflare') && responseBody.contains('tunnel') ||
         responseBody.contains('argo tunnel error') ||
@@ -156,29 +146,17 @@ class HttpUtil {
     }
 
     // Additional check for Cloudflare-specific 5xx errors with tunnel indicators
-    if (cfRay != null && server?.contains('cloudflare') == true) {
-      if (response.statusCode >= 500 && response.statusCode < 600) {
-        // Check for tunnel-related errors
-        if (responseBody.contains('tunnel') || 
-            responseBody.contains('origin') && responseBody.contains('unreachable') ||
-            responseBody.contains('connection failed') ||
-            responseBody.contains('gateway timeout') && responseBody.contains('cloudflare')) {
-          throw CloudflareTunnelException(
-            'The server tunnel appears to be down. Please try again later.',
-            response.statusCode,
-            response.body,
-          );
-        }
+    if (hasCloudflareIndicators() && response.statusCode >= 500 && response.statusCode < 600) {
+      if (responseBody.contains('tunnel') || 
+          responseBody.contains('origin') && responseBody.contains('unreachable') ||
+          responseBody.contains('connection failed') ||
+          responseBody.contains('gateway timeout') && responseBody.contains('cloudflare')) {
+        throw CloudflareTunnelException(
+          'The server tunnel appears to be down. Please try again later.',
+          response.statusCode,
+          response.body,
+        );
       }
-    }
-
-    // Check for common Cloudflare error pages
-    if (response.statusCode == 522 || response.statusCode == 523 || response.statusCode == 524) {
-      throw CloudflareTunnelException(
-        'Server connection timeout (Cloudflare Error ${response.statusCode}). The tunnel may be down.',
-        response.statusCode,
-        response.body,
-      );
     }
   }
 
@@ -205,28 +183,54 @@ class HttpUtil {
       builder: (BuildContext context) {
         final theme = Theme.of(context);
         
-        // Determine error details based on status code
-        String title = 'Server Connection Issue';
-        IconData icon = Icons.cloud_off;
-        String explanation = 'The server is temporarily unavailable. This is usually a temporary issue.';
-        
-        if (error.statusCode == 502) {
-          title = 'Bad Gateway (502)';
-          icon = Icons.warning_rounded;
-          explanation = 'The Cloudflare proxy received an invalid response from the server. This typically means the backend server is down or unreachable.';
-        } else if (error.statusCode == 503) {
-          title = 'Service Unavailable (503)';
-          icon = Icons.build_circle;
-          explanation = 'The server is temporarily overloaded or under maintenance. Please wait a few minutes and try again.';
-        } else if (error.statusCode == 504) {
-          title = 'Gateway Timeout (504)';
-          icon = Icons.timer_off;
-          explanation = 'The server took too long to respond. This could indicate server overload or network issues.';
-        } else if (error.statusCode == 522 || error.statusCode == 523 || error.statusCode == 524) {
-          title = 'Cloudflare Connection Error (${error.statusCode})';
-          icon = Icons.link_off;
-          explanation = 'Cloudflare could not establish a connection to the origin server. The tunnel configuration may need attention.';
+        // Helper method to get error details based on status code
+        Map<String, dynamic> getErrorDetails(int statusCode) {
+          switch (statusCode) {
+            case 502:
+              return {
+                'title': 'Bad Gateway (502)',
+                'icon': Icons.warning_rounded,
+                'explanation': 'The Cloudflare proxy received an invalid response from the server. This typically means the backend server is down or unreachable.',
+              };
+            case 503:
+              return {
+                'title': 'Service Unavailable (503)',
+                'icon': Icons.build_circle,
+                'explanation': 'The server is temporarily overloaded or under maintenance. Please wait a few minutes and try again.',
+              };
+            case 504:
+              return {
+                'title': 'Gateway Timeout (504)',
+                'icon': Icons.timer_off,
+                'explanation': 'The server took too long to respond. This could indicate server overload or network issues.',
+              };
+            case 522:
+            case 523:
+            case 524:
+              return {
+                'title': 'Cloudflare Connection Error ($statusCode)',
+                'icon': Icons.link_off,
+                'explanation': 'Cloudflare could not establish a connection to the origin server. The tunnel configuration may need attention.',
+              };
+            case 530:
+              return {
+                'title': 'Origin DNS Error (530)',
+                'icon': Icons.dns_rounded,
+                'explanation': 'Cloudflare cannot resolve the server DNS. This usually means the server configuration needs to be fixed by the administrator.',
+              };
+            default:
+              return {
+                'title': 'Server Connection Issue',
+                'icon': Icons.cloud_off,
+                'explanation': 'The server is temporarily unavailable. This is usually a temporary issue.',
+              };
+          }
         }
+        
+        final errorDetails = getErrorDetails(error.statusCode);
+        final title = errorDetails['title'] as String;
+        final icon = errorDetails['icon'] as IconData;
+        final explanation = errorDetails['explanation'] as String;
         
         return AlertDialog(
           backgroundColor: theme.cardColor,

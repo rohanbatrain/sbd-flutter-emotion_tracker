@@ -34,6 +34,11 @@ class _ServerSettingsDialogState extends ConsumerState<ServerSettingsDialog> {
     final healthCheckUrl = ref.watch(healthCheckEndpointProvider);
     domainController ??= TextEditingController(text: domain);
     preview = '$protocol://${domainController!.text.trim().isEmpty ? 'dev-app-sbd.rohanbatra.in' : domainController!.text.trim()}';
+    
+    // Check if domain contains rohanbatra.in for uptime monitoring
+    final currentDomain = domainController!.text.trim().isEmpty ? 'dev-app-sbd.rohanbatra.in' : domainController!.text.trim();
+    final showUptimeButton = currentDomain.contains('rohanbatra.in');
+    
     return AlertDialog(
       backgroundColor: theme.cardTheme.color,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
@@ -89,7 +94,6 @@ class _ServerSettingsDialogState extends ConsumerState<ServerSettingsDialog> {
                 fillColor: theme.cardColor,
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
                 contentPadding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
-                errorText: errorText,
               ),
               onChanged: (val) {
                 setState(() {
@@ -105,18 +109,19 @@ class _ServerSettingsDialogState extends ConsumerState<ServerSettingsDialog> {
             Row(
               children: [
                 Expanded(
+                  flex: showUptimeButton ? 2 : 1,
                   child: ElevatedButton(
                     onPressed: testing
                         ? null
                         : () async {
                             setState(() { testing = true; errorText = null; });
                             final inputDomain = domainController!.text.trim();
-                            // Allow domain, IP, and optional :port
-                            final isValidDomain = RegExp(r'^[a-zA-Z0-9.-]+(:[0-9]{1,5})?$').hasMatch(inputDomain) && inputDomain.isNotEmpty;
-                            if (!isValidDomain) {
+                            // Use centralized domain validation
+                            final domainError = InputValidator.validateDomain(inputDomain);
+                            if (domainError != null) {
                               setState(() {
                                 testSuccess = false;
-                                errorText = 'Please enter a valid domain, IP, or domain:port (no spaces or special characters).';
+                                errorText = domainError;
                                 testing = false;
                               });
                               return;
@@ -163,6 +168,50 @@ class _ServerSettingsDialogState extends ConsumerState<ServerSettingsDialog> {
                         : const Text('Test Connection'),
                   ),
                 ),
+                if (showUptimeButton) ...[
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 1,
+                    child: OutlinedButton.icon(
+                      onPressed: testSuccess ? () {
+                        // TODO: Navigate to uptime webview screen
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Row(
+                              children: [
+                                Icon(Icons.info_outline, color: theme.colorScheme.onSecondary),
+                                SizedBox(width: 8),
+                                Expanded(child: Text('Uptime monitoring screen coming soon!')),
+                              ],
+                            ),
+                            backgroundColor: theme.colorScheme.secondary,
+                            behavior: SnackBarBehavior.floating,
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      } : null,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: testSuccess ? theme.primaryColor : theme.disabledColor,
+                        side: BorderSide(color: testSuccess ? theme.primaryColor : theme.disabledColor, width: 1.5),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      icon: Icon(
+                        Icons.timeline_rounded,
+                        size: 18,
+                        color: testSuccess ? theme.primaryColor : theme.disabledColor,
+                      ),
+                      label: Text(
+                        'Uptime',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: testSuccess ? theme.primaryColor : theme.disabledColor,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
             if (testSuccess)
@@ -197,13 +246,10 @@ class _ServerSettingsDialogState extends ConsumerState<ServerSettingsDialog> {
           child: const Text('Save'),
           onPressed: () async {
             final domain = domainController!.text.trim();
-            final isValidDomain = RegExp(r'^[a-zA-Z0-9.-]+(:[0-9]{1,5})?$').hasMatch(domain) && domain.isNotEmpty;
-            if (domain.isEmpty) {
-              setState(() { errorText = 'Please enter a domain or IP.'; });
-              return;
-            }
-            if (!isValidDomain) {
-              setState(() { errorText = 'Please enter a valid domain, IP, or domain:port (no spaces or special characters).'; });
+            // Use centralized domain validation
+            final domainError = InputValidator.validateDomain(domain);
+            if (domainError != null) {
+              setState(() { errorText = domainError; });
               return;
             }
             if (!testSuccess) {

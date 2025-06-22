@@ -8,6 +8,7 @@ import 'package:emotion_tracker/providers/user_agent_util.dart';
 import 'package:emotion_tracker/utils/http_util.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:http/http.dart' as http;
 
 // Navigation service provider
 class NavigationService {
@@ -88,6 +89,227 @@ final navigationServiceProvider = Provider<NavigationService>((ref) {
   return NavigationService();
 });
 
+// Common error handling utility for API calls
+class _ApiErrorHandler {
+  static Exception handleError(dynamic error) {
+    if (error is CloudflareTunnelException) {
+      return Exception('CLOUDFLARE_TUNNEL_DOWN: ${error.message}');
+    } else if (error is NetworkException) {
+      return Exception('NETWORK_ERROR: ${error.message}');
+    } else if (error.toString().contains('Login failed:') || 
+               error.toString().contains('Registration failed:') ||
+               error.toString().contains('Failed to resend verification email:')) {
+      // Re-throw authentication/API errors as-is (don't wrap them)
+      return error as Exception;
+    }
+    return Exception('Could not connect to the server. Please check your domain/IP and try again.');
+  }
+}
+
+// Common utility for API request headers
+class _ApiHeaders {
+  static Future<Map<String, String>> getCommonHeaders() async {
+    final userAgent = await getUserAgent();
+    return {
+      'Content-Type': 'application/json',
+      'User-Agent': userAgent,
+      'X-User-Agent': userAgent,
+    };
+  }
+}
+
+// Common utility for storing auth data
+class _AuthDataStorage {
+  static Future<void> storeAuthData(
+    WidgetRef ref, 
+    Map<String, dynamic> result, {
+    String? loginEmail,
+  }) async {
+    final secureStorage = ref.read(secureStorageProvider);
+    
+    // Define what goes to secure storage vs shared preferences
+    final secureData = {
+      'access_token': result['access_token'] ?? '',
+      'token_type': result['token_type'] ?? '',
+      'client_side_encryption': result['client_side_encryption']?.toString() ?? 'false',
+      'user_role': result['role'] ?? 'user',
+    };
+    
+    final userData = {
+      'user_username': result['username'],
+      'user_first_name': result['first_name'],
+      'user_last_name': result['last_name'],
+    };
+    
+    final prefsData = {
+      'issued_at': result['issued_at']?.toString() ?? '',
+      'expires_at': result['expires_at']?.toString() ?? '',
+      'is_verified': result['is_verified'] ?? false,
+    };
+    
+    // Store secure data
+    final secureStoreFutures = secureData.entries
+        .map((entry) => secureStorage.write(key: entry.key, value: entry.value))
+        .toList();
+    
+    // Store user data (only if not empty)
+    for (final entry in userData.entries) {
+      if (entry.value != null && entry.value.toString().isNotEmpty) {
+        secureStoreFutures.add(secureStorage.write(key: entry.key, value: entry.value.toString()));
+      }
+    }
+    
+    // Handle email storage
+    if (loginEmail != null && loginEmail.isNotEmpty) {
+      secureStoreFutures.add(secureStorage.write(key: 'user_email', value: loginEmail));
+    } else if (result['email'] != null && result['email'].toString().isNotEmpty) {
+      secureStoreFutures.add(secureStorage.write(key: 'user_email', value: result['email'].toString()));
+    }
+    
+    // Store preferences data
+    final prefs = await SharedPreferences.getInstance();
+    final prefsFutures = [
+      prefs.setString('issued_at', prefsData['issued_at']!),
+      prefs.setString('expires_at', prefsData['expires_at']!),
+      prefs.setBool('is_verified', prefsData['is_verified']!),
+    ];
+    
+    // Execute all storage operations in parallel
+    await Future.wait([
+      ...secureStoreFutures,
+      ...prefsFutures,
+      secureStorage.delete(key: 'temp_user_password'), // Cleanup
+    ]);
+  }
+}
+
+// Common utility for API response validation
+class _ApiResponseValidator {
+  static Map<String, dynamic> validateAndParseResponse(http.Response response, String operation) {
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } else {
+      throw Exception('$operation failed: ${response.statusCode} ${response.body}');
+    }
+  }
+  
+  static bool validateAvailabilityResponse(http.Response response, String field) {
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      return data['available'] == true;
+    } else {
+      throw Exception('Failed to check $field: ${response.statusCode}');
+    }
+  }
+}
+
+// Common utility for input validation
+class InputValidator {
+  // Email validation patterns
+  static final RegExp _emailRegExp = RegExp(r'^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$');
+  static final RegExp _emailRegExpCaseInsensitive = RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
+  
+  // Username validation pattern
+  static final RegExp _usernameRegExp = RegExp(r'^[a-z0-9_-]{3,50}$');
+  static final RegExp _usernamePatternRegExp = RegExp(r'^[a-z0-9_-]+$');
+  
+  // Domain validation pattern
+  static final RegExp _domainRegExp = RegExp(r'^[a-zA-Z0-9.-]+(:[0-9]{1,5})?$');
+  
+  // Password strength patterns
+  static final RegExp _upperCaseRegExp = RegExp(r'[A-Z]');
+  static final RegExp _lowerCaseRegExp = RegExp(r'[a-z]');
+  static final RegExp _digitRegExp = RegExp(r'\d');
+  static final RegExp _specialCharRegExp = RegExp(r'[!@#\$&*~%^()_\-+=\[\]{}|;:,.<>?/]');
+  
+  static bool isEmail(String input) => _emailRegExp.hasMatch(input.toLowerCase());
+  
+  static bool isEmailCaseInsensitive(String input) => _emailRegExpCaseInsensitive.hasMatch(input);
+  
+  static bool isValidUsername(String username) => _usernameRegExp.hasMatch(username.toLowerCase());
+  
+  static bool hasValidUsernamePattern(String username) => _usernamePatternRegExp.hasMatch(username.toLowerCase());
+  
+  static bool isValidDomain(String domain) => _domainRegExp.hasMatch(domain) && domain.isNotEmpty;
+  
+  static bool isPasswordStrong(String password) {
+    final lengthCheck = password.length >= 8;
+    final upperCheck = _upperCaseRegExp.hasMatch(password);
+    final lowerCheck = _lowerCaseRegExp.hasMatch(password);
+    final digitCheck = _digitRegExp.hasMatch(password);
+    final specialCheck = _specialCharRegExp.hasMatch(password);
+    return lengthCheck && upperCheck && lowerCheck && digitCheck && specialCheck;
+  }
+  
+  // Validation with detailed error messages
+  static String? validateEmail(String email, {bool caseSensitive = false}) {
+    if (email.isEmpty) return 'Email cannot be empty';
+    final isValid = caseSensitive ? isEmailCaseInsensitive(email) : isEmail(email);
+    return isValid ? null : 'Please enter a valid email address';
+  }
+  
+  static String? validateUsername(String username) {
+    if (username.isEmpty) return 'Username cannot be empty';
+    if (username.length < 3) return 'Username must be at least 3 characters';
+    if (username.length > 50) return 'Username must be less than 50 characters';
+    if (!hasValidUsernamePattern(username)) {
+      return 'Only lowercase letters, numbers, dash (-), and underscore (_)';
+    }
+    return null;
+  }
+  
+  static String? validatePassword(String password) {
+    if (password.isEmpty) return 'Password cannot be empty';
+    if (password.length < 8) return 'Password must be at least 8 characters';
+    if (!_upperCaseRegExp.hasMatch(password)) return 'Password must contain an uppercase letter';
+    if (!_lowerCaseRegExp.hasMatch(password)) return 'Password must contain a lowercase letter';
+    if (!_digitRegExp.hasMatch(password)) return 'Password must contain a digit';
+    if (!_specialCharRegExp.hasMatch(password)) return 'Password must contain a special character';
+    return null;
+  }
+  
+  static String? validateDomain(String domain) {
+    if (domain.isEmpty) return 'Please enter a domain or IP';
+    if (!isValidDomain(domain)) {
+      return 'Please enter a valid domain, IP, or domain:port (no spaces or special characters)';
+    }
+    return null;
+  }
+}
+
+// Common utility for UI feedback
+class UIHelper {
+  static void showErrorSnackBar(BuildContext context, String message, {Color? backgroundColor}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: backgroundColor ?? Theme.of(context).colorScheme.error,
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+  
+  static void showSuccessSnackBar(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.green,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+  
+  static void showInfoSnackBar(BuildContext context, String message, {Color? backgroundColor}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: backgroundColor ?? Colors.blue,
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+}
+
 // Auth state provider for managing login/signup state
 class AuthState {
   final bool isLoggedIn;
@@ -128,11 +350,18 @@ class AuthNotifier extends StateNotifier<AuthState> {
   // Check for existing authentication on app startup
   Future<void> _initializeAuth() async {
     try {
-      _prefs = await SharedPreferences.getInstance();
+      // Initialize SharedPreferences and read auth data in parallel
+      final futures = await Future.wait([
+        SharedPreferences.getInstance(),
+        _secureStorage.read(key: 'access_token'),
+        _secureStorage.read(key: 'user_email'),
+      ]);
       
-      // Check if we have stored authentication data
-      final accessToken = await _secureStorage.read(key: 'access_token');
-      final userEmail = await _secureStorage.read(key: 'user_email');
+      _prefs = futures[0] as SharedPreferences;
+      final accessToken = futures[1] as String?;
+      final userEmail = futures[2] as String?;
+      
+      // Read remaining data from SharedPreferences (these are fast local reads)
       final isVerified = _prefs.getBool('is_verified') ?? false;
       final expiresAtString = _prefs.getString('expires_at');
       
@@ -276,25 +505,20 @@ Future<Map<String, dynamic>> loginWithApi(WidgetRef ref, String usernameOrEmail,
   final baseUrl = ref.read(apiBaseUrlProvider);
   final url = Uri.parse('$baseUrl/auth/login');
   try {
-    final userAgent = await getUserAgent();
+    final headers = await _ApiHeaders.getCommonHeaders();
     // Determine if input is email or username
-    final emailRegExp = RegExp(r'^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}?$');
-    final isEmail = emailRegExp.hasMatch(usernameOrEmail);
+    final isEmail = InputValidator.isEmail(usernameOrEmail);
     final body = isEmail
         ? {'email': usernameOrEmail, 'password': password}
         : {'username': usernameOrEmail, 'password': password};
     final response = await HttpUtil.post(
       url,
-      headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': userAgent,
-        'X-User-Agent': userAgent,
-      },
+      headers: headers,
       body: jsonEncode(body),
     );
     if (response.statusCode == 200) {
-      final result = jsonDecode(response.body) as Map<String, dynamic>;
-      await _processAndStoreAuthData(ref, result, loginEmail: isEmail ? usernameOrEmail : null);
+      final result = _ApiResponseValidator.validateAndParseResponse(response, 'Login');
+      await _AuthDataStorage.storeAuthData(ref, result, loginEmail: isEmail ? usernameOrEmail : null);
       return result;
     } else if (response.statusCode == 403 && response.body.contains('Email not verified')) {
       // Special case: email not verified
@@ -315,63 +539,8 @@ Future<Map<String, dynamic>> loginWithApi(WidgetRef ref, String usernameOrEmail,
     }
   } catch (e) {
     // Only catch network and Cloudflare errors here, let authentication errors pass through
-    if (e is CloudflareTunnelException) {
-      throw Exception('CLOUDFLARE_TUNNEL_DOWN: ${e.message}');
-    } else if (e is NetworkException) {
-      throw Exception('NETWORK_ERROR: ${e.message}');
-    } else if (e.toString().contains('Login failed:')) {
-      // Re-throw login/authentication errors as-is (don't wrap them)
-      rethrow;
-    }
-    throw Exception('Could not connect to the server. Please check your domain/IP and try again.');
+    throw _ApiErrorHandler.handleError(e);
   }
-}
-
-Future<void> _processAndStoreAuthData(WidgetRef ref, Map<String, dynamic> result, {String? loginEmail}) async {
-  final secureStorage = ref.read(secureStorageProvider);
-  
-  // Store tokens and other data
-  await secureStorage.write(key: 'access_token', value: result['access_token'] ?? '');
-  await secureStorage.write(key: 'token_type', value: result['token_type'] ?? '');
-  await secureStorage.write(key: 'client_side_encryption', value: result['client_side_encryption']?.toString() ?? 'false');
-  await secureStorage.write(key: 'user_role', value: result['role'] ?? 'user');
-  
-  // Store user details
-  if (result['username'] != null && result['username'].isNotEmpty) {
-    await secureStorage.write(key: 'user_username', value: result['username']);
-  }
-  if (result['first_name'] != null && result['first_name'].isNotEmpty) {
-    await secureStorage.write(key: 'user_first_name', value: result['first_name']);
-  }
-  if (result['last_name'] != null && result['last_name'].isNotEmpty) {
-    await secureStorage.write(key: 'user_last_name', value: result['last_name']);
-  }
-
-  // Store email (handle case where login is via email)
-  if (loginEmail != null && loginEmail.isNotEmpty) {
-      await secureStorage.write(key: 'user_email', value: loginEmail);
-  } else if (result['email'] != null && result['email'].isNotEmpty) {
-    await secureStorage.write(key: 'user_email', value: result['email']);
-  }
-
-  // Store data in SharedPreferences
-  final prefs = await SharedPreferences.getInstance();
-  await prefs.setString('issued_at', result['issued_at']?.toString() ?? '');
-  await prefs.setString('expires_at', result['expires_at']?.toString() ?? '');
-  await prefs.setBool('is_verified', result['is_verified'] ?? false);
-
-  // After successful login, remove the temporary password
-  await secureStorage.delete(key: 'temp_user_password');
-}
-
-/// Function to validate password strength
-bool isPasswordStrong(String password) {
-  final lengthCheck = password.length >= 8;
-  final upperCheck = password.contains(RegExp(r'[A-Z]'));
-  final lowerCheck = password.contains(RegExp(r'[a-z]'));
-  final digitCheck = password.contains(RegExp(r'\d'));
-  final specialCheck = password.contains(RegExp(r'[!@#\$&*~%^()_\-+=\[\]{}|;:,.<>?/]'));
-  return lengthCheck && upperCheck && lowerCheck && digitCheck && specialCheck;
 }
 
 /// Function to perform registration POST request
@@ -382,45 +551,32 @@ Future<Map<String, dynamic>> registerWithApi(
   String password,
   {bool? clientSideEncryption}
 ) async {
-  if (!isPasswordStrong(password)) {
+  if (!InputValidator.isPasswordStrong(password)) {
     throw Exception('Password must be at least 8 characters long and contain uppercase, lowercase, digit, and special character.');
   }
   final baseUrl = ref.read(apiBaseUrlProvider);
   final url = Uri.parse('$baseUrl/auth/register');
   try {
-    final userAgent = await getUserAgent();
+    final headers = await _ApiHeaders.getCommonHeaders();
     final body = <String, dynamic>{
       'username': username,
       'email': email,
       'password': password,
-      'user_agent': userAgent, // custom user agent
+      'user_agent': headers['User-Agent']!, // reuse user agent from headers
     };
     if (clientSideEncryption != null) {
       body['client_side_encryption'] = clientSideEncryption;
     }
     final response = await HttpUtil.post(
       url,
-      headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': userAgent,
-        'X-User-Agent': userAgent,
-      },
+      headers: headers,
       body: jsonEncode(body),
     );
-    if (response.statusCode == 200) {
-      final result = jsonDecode(response.body) as Map<String, dynamic>;
-      await _processAndStoreAuthData(ref, result, loginEmail: email);
-      return result;
-    } else {
-      throw Exception('Registration failed: ${response.statusCode} ${response.body}');
-    }
+    final result = _ApiResponseValidator.validateAndParseResponse(response, 'Registration');
+    await _AuthDataStorage.storeAuthData(ref, result, loginEmail: email);
+    return result;
   } catch (e) {
-    if (e is CloudflareTunnelException) {
-      throw Exception('CLOUDFLARE_TUNNEL_DOWN: ${e.message}');
-    } else if (e is NetworkException) {
-      throw Exception('NETWORK_ERROR: ${e.message}');
-    }
-    throw Exception('Could not connect to the server. Please check your domain/IP and try again.');
+    throw _ApiErrorHandler.handleError(e);
   }
 }
 
@@ -445,24 +601,19 @@ Future<void> resendVerificationEmail(WidgetRef ref) async {
   }
 
   try {
+    final headers = await _ApiHeaders.getCommonHeaders();
     final response = await HttpUtil.post(
       url,
-      headers: {'Content-Type': 'application/json'},
+      headers: headers,
       body: jsonEncode(body),
     );
 
+    // Validate response - 200 means success for this endpoint
     if (response.statusCode != 200) {
       throw Exception('Failed to resend verification email: ${response.statusCode} ${response.body}');
     }
   } catch (e) {
-    if (e is CloudflareTunnelException) {
-      throw Exception('CLOUDFLARE_TUNNEL_DOWN: ${e.message}');
-    } else if (e is NetworkException) {
-      throw Exception('NETWORK_ERROR: ${e.message}');
-    } else if (e.toString().contains('Failed to resend verification email:')) {
-      rethrow;
-    }
-    throw Exception('Could not connect to the server. Please check your domain/IP and try again.');
+    throw _ApiErrorHandler.handleError(e);
   }
 }
 
@@ -471,27 +622,14 @@ Future<bool> checkUsernameAvailability(WidgetRef ref, String username) async {
   final baseUrl = ref.read(apiBaseUrlProvider);
   final url = Uri.parse('$baseUrl/auth/check-username?username=$username');
   try {
-    final userAgent = await getUserAgent();
+    final headers = await _ApiHeaders.getCommonHeaders();
     final response = await HttpUtil.get(
       url,
-      headers: {
-        'User-Agent': userAgent,
-        'X-User-Agent': userAgent,
-      },
+      headers: headers,
     );
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      return data['available'] == true;
-    } else {
-      throw Exception('Failed to check username: ${response.statusCode}');
-    }
+    return _ApiResponseValidator.validateAvailabilityResponse(response, 'username');
   } catch (e) {
-    if (e is CloudflareTunnelException) {
-      throw Exception('CLOUDFLARE_TUNNEL_DOWN: ${e.message}');
-    } else if (e is NetworkException) {
-      throw Exception('NETWORK_ERROR: ${e.message}');
-    }
-    throw Exception('Could not check username. Please check your connection.');
+    throw _ApiErrorHandler.handleError(e);
   }
 }
 
@@ -500,26 +638,13 @@ Future<bool> checkEmailAvailability(WidgetRef ref, String email) async {
   final baseUrl = ref.read(apiBaseUrlProvider);
   final url = Uri.parse('$baseUrl/auth/check-email?email=$email');
   try {
-    final userAgent = await getUserAgent();
+    final headers = await _ApiHeaders.getCommonHeaders();
     final response = await HttpUtil.get(
       url,
-      headers: {
-        'User-Agent': userAgent,
-        'X-User-Agent': userAgent,
-      },
+      headers: headers,
     );
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      return data['available'] == true;
-    } else {
-      throw Exception('Failed to check email: ${response.statusCode}');
-    }
+    return _ApiResponseValidator.validateAvailabilityResponse(response, 'email');
   } catch (e) {
-    if (e is CloudflareTunnelException) {
-      throw Exception('CLOUDFLARE_TUNNEL_DOWN: ${e.message}');
-    } else if (e is NetworkException) {
-      throw Exception('NETWORK_ERROR: ${e.message}');
-    }
-    throw Exception('Could not check email. Please check your connection.');
+    throw _ApiErrorHandler.handleError(e);
   }
 }

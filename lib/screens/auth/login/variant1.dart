@@ -4,9 +4,12 @@ import 'package:emotion_tracker/providers/theme_provider.dart';
 import 'package:emotion_tracker/providers/app_providers.dart';
 import 'package:emotion_tracker/screens/auth/server-settings/variant1.dart';
 import 'package:emotion_tracker/providers/secure_storage_provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class LoginScreenV1 extends ConsumerStatefulWidget {
-  const LoginScreenV1({Key? key}) : super(key: key);
+  final String? connectivityIssue;
+  
+  const LoginScreenV1({Key? key, this.connectivityIssue}) : super(key: key);
 
   @override
   ConsumerState<LoginScreenV1> createState() => _LoginScreenV1State();
@@ -44,6 +47,13 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
       curve: Curves.easeOutBack,
     ));
     _animationController!.forward();
+    
+    // Show connectivity issue from splash screen if present
+    if (widget.connectivityIssue != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _showConnectivityNotification(widget.connectivityIssue!);
+      });
+    }
   }
 
   @override
@@ -287,11 +297,8 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
     final userInput = usernameOrEmailController.text.trim();
     final password = passwordController.text;
 
-    // Regex for email and username
-    final emailRegExp = RegExp(r'^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$');
-    final usernameRegExp = RegExp(r'^[a-z0-9_-]{3,50}$');
-
-    if (!emailRegExp.hasMatch(userInput) && !usernameRegExp.hasMatch(userInput)) {
+    // Use centralized validation
+    if (!InputValidator.isEmail(userInput) && !InputValidator.isValidUsername(userInput)) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('Please enter a valid username or email.'),
@@ -302,10 +309,11 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
     }
 
     // Password validation
-    if (password.isEmpty || password.length < 8) {
+    final passwordError = InputValidator.validatePassword(password);
+    if (passwordError != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Password must be at least 8 characters.'),
+          content: Text(passwordError),
           backgroundColor: Theme.of(context).colorScheme.error,
         ),
       );
@@ -453,6 +461,259 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
         );
       }
     }
+  }
+
+  void _showConnectivityNotification(String connectivityIssue) {
+    if (!mounted) return;
+    
+    final theme = ref.read(currentThemeProvider);
+    final warningColor = theme.colorScheme.error;
+    
+    // Determine if this is a network connectivity issue vs server issue
+    final isNetworkIssue = connectivityIssue.toLowerCase().contains('no internet') ||
+                          connectivityIssue.toLowerCase().contains('network') ||
+                          connectivityIssue.toLowerCase().contains('unable to connect');
+    
+    // Delay to ensure the login screen is fully loaded
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (!mounted) return;
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Container(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: warningColor.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Icon(
+                    isNetworkIssue ? Icons.wifi_off_rounded : Icons.cloud_off_rounded,
+                    color: warningColor.withOpacity(0.8),
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        isNetworkIssue ? 'Network Connection Issue' : 'Server Connection Issue',
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          color: theme.colorScheme.onError,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        connectivityIssue,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onError.withOpacity(0.9),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.all(4),
+                  child: Icon(
+                    Icons.info_outline_rounded,
+                    color: warningColor.withOpacity(0.7),
+                    size: 16,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          backgroundColor: warningColor.withOpacity(0.9),
+          duration: const Duration(seconds: 6),
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          elevation: 8,
+          action: SnackBarAction(
+            label: 'Settings',
+            textColor: theme.colorScheme.onError,
+            backgroundColor: warningColor.withOpacity(0.8),
+            onPressed: () {
+              if (!mounted) return;
+              ScaffoldMessenger.of(context).hideCurrentSnackBar();
+              
+              // Open device network settings for network issues, server settings for server issues
+              if (isNetworkIssue) {
+                _openDeviceNetworkSettings();
+              } else {
+                _showServerChangeDialog();
+              }
+            },
+          ),
+        ),
+      );
+    });
+  }
+
+  void _openDeviceNetworkSettings() async {
+    if (!mounted) return;
+    
+    // Get platform information and capture context-dependent values before any async operations
+    final platform = Theme.of(context).platform;
+    final theme = ref.read(currentThemeProvider);
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    
+    try {
+      // Try to open WiFi settings on Android
+      if (platform == TargetPlatform.android) {
+        // Use url_launcher to open Android WiFi settings
+        const String wifiSettingsUrl = 'android.settings.WIFI_SETTINGS';
+        const String generalSettingsUrl = 'android.settings.SETTINGS';
+        
+        try {
+          // Try to launch WiFi settings intent
+          final Uri wifiUri = Uri.parse('android-app://com.android.settings/$wifiSettingsUrl');
+          if (await canLaunchUrl(wifiUri)) {
+            await launchUrl(wifiUri);
+          } else {
+            throw Exception('Cannot launch WiFi settings');
+          }
+        } catch (e) {
+          // Fallback to general settings
+          try {
+            final Uri settingsUri = Uri.parse('android-app://com.android.settings/$generalSettingsUrl');
+            if (await canLaunchUrl(settingsUri)) {
+              await launchUrl(settingsUri);
+            } else {
+              throw Exception('Cannot launch settings');
+            }
+          } catch (e2) {
+            // Final fallback - show guidance dialog
+            if (mounted) _showConnectionGuidance();
+          }
+        }
+      } else if (platform == TargetPlatform.iOS) {
+        // iOS doesn't allow direct navigation to WiFi settings
+        // Try to open general settings
+        try {
+          final Uri settingsUri = Uri.parse('App-Prefs:root=WIFI');
+          if (await canLaunchUrl(settingsUri)) {
+            await launchUrl(settingsUri);
+          } else {
+            throw Exception('Cannot launch iOS settings');
+          }
+        } catch (e) {
+          // Show helpful message for iOS
+          if (mounted) {
+            scaffoldMessenger.showSnackBar(
+              SnackBar(
+                content: Text('Please go to Settings > Wi-Fi to check your connection'),
+                backgroundColor: theme.primaryColor,
+                duration: const Duration(seconds: 3),
+              ),
+            );
+          }
+        }
+      } else {
+        // For other platforms, show guidance
+        if (mounted) _showConnectionGuidance();
+      }
+    } catch (e) {
+      // If all else fails, show helpful guidance
+      if (mounted) _showConnectionGuidance();
+    }
+  }
+
+  void _showConnectionGuidance() {
+    if (!mounted) return;
+    
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        final theme = ref.read(currentThemeProvider);
+        final warningColor = theme.colorScheme.error;
+        
+        return AlertDialog(
+          backgroundColor: theme.cardColor,
+          title: Row(
+            children: [
+              Icon(Icons.wifi_off_rounded, color: warningColor, size: 24),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Connection Issue',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    color: warningColor,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'To fix your connection, please try:',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              SizedBox(height: 12),
+              _buildGuidanceItem('Go to Settings > Wi-Fi', Icons.wifi),
+              _buildGuidanceItem('Check if Wi-Fi is enabled', Icons.wifi_tethering),
+              _buildGuidanceItem('Try connecting to a network', Icons.network_wifi),
+              _buildGuidanceItem('Or enable mobile data', Icons.signal_cellular_alt),
+              SizedBox(height: 8),
+              Text(
+                'Then try logging in again.',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: warningColor.withOpacity(0.7),
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              style: TextButton.styleFrom(
+                foregroundColor: theme.primaryColor,
+              ),
+              child: Text('Got it'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildGuidanceItem(String text, IconData icon) {
+    final theme = ref.read(currentThemeProvider);
+    final warningColor = theme.colorScheme.error;
+    
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: warningColor.withOpacity(0.8)),
+          SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: theme.textTheme.bodySmall,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showServerChangeDialog() {

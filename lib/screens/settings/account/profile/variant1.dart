@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:emotion_tracker/providers/theme_provider.dart';
 import 'package:emotion_tracker/providers/secure_storage_provider.dart';
+import 'package:emotion_tracker/providers/app_providers.dart';
 import 'package:emotion_tracker/widgets/custom_avatar.dart';
 
 class ProfileScreenV1 extends ConsumerStatefulWidget {
@@ -214,24 +215,14 @@ class _ProfileScreenV1State extends ConsumerState<ProfileScreenV1> {
               ),
               child: const Text('Save'),
               onPressed: () async {
-                // Validation
+                // Use centralized validation
                 String value = controller.text.trim();
                 String? error;
                 
                 if (fieldName == 'user_username') {
-                  final usernameRegExp = RegExp(r'^[a-z0-9_-]{3,50}$');
-                  if (value.isEmpty) {
-                    error = 'Username cannot be empty';
-                  } else if (!usernameRegExp.hasMatch(value)) {
-                    error = 'Username must be 3-50 characters and contain only a-z, 0-9, _, -';
-                  }
+                  error = InputValidator.validateUsername(value);
                 } else if (fieldName == 'user_email') {
-                  final emailRegExp = RegExp(r'^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$');
-                  if (value.isEmpty) {
-                    error = 'Email cannot be empty';
-                  } else if (!emailRegExp.hasMatch(value)) {
-                    error = 'Please enter a valid email address';
-                  }
+                  error = InputValidator.validateEmail(value);
                 } else if (fieldName == 'user_first_name' || fieldName == 'user_last_name') {
                   if (value.isEmpty) {
                     error = '$title cannot be empty';

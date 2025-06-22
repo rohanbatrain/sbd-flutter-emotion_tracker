@@ -3,7 +3,9 @@ import 'package:emotion_tracker/screens/auth/login/variant1.dart';
 import 'package:emotion_tracker/screens/auth/register/variant1.dart';
 
 class AuthScreenV1 extends StatefulWidget {
-  const AuthScreenV1({Key? key}) : super(key: key);
+  final String? connectivityIssue;
+  
+  const AuthScreenV1({Key? key, this.connectivityIssue}) : super(key: key);
 
   @override
   State<AuthScreenV1> createState() => _AuthScreenV1State();
@@ -107,7 +109,7 @@ class _AuthScreenV1State extends State<AuthScreenV1> {
             const SizedBox(height: 10), // Reduced from 24
             Expanded(
               child: isLogin
-                  ? const LoginScreenV1()
+                  ? LoginScreenV1(connectivityIssue: widget.connectivityIssue)
                   : const RegisterScreenV1(),
             ),
           ],

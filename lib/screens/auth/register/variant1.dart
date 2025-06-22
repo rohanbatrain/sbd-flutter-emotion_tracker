@@ -69,27 +69,13 @@ class _RegisterScreenV1State extends ConsumerState<RegisterScreenV1> with Ticker
 
   void _onUsernameChanged() {
     final username = usernameController.text.trim().toLowerCase();
-    // Only check if length and pattern are valid
-    if (username.length < 3) {
+    
+    // Use centralized validation
+    final validationError = InputValidator.validateUsername(username);
+    if (validationError != null) {
       setState(() {
         isUsernameAvailable = null;
-        usernameError = 'Username must be at least 3 characters.';
-        isCheckingUsername = false;
-      });
-      _usernameDebounce?.cancel();
-      return;
-    } else if (username.length > 50) {
-      setState(() {
-        isUsernameAvailable = null;
-        usernameError = 'Username must be less than 50 characters.';
-        isCheckingUsername = false;
-      });
-      _usernameDebounce?.cancel();
-      return;
-    } else if (!RegExp(r'^[a-z0-9_-]+$').hasMatch(username)) {
-      setState(() {
-        isUsernameAvailable = null;
-        usernameError = 'Only lowercase letters, numbers, dash (-), and underscore (_).';
+        usernameError = validationError;
         isCheckingUsername = false;
       });
       _usernameDebounce?.cancel();
@@ -123,11 +109,13 @@ class _RegisterScreenV1State extends ConsumerState<RegisterScreenV1> with Ticker
 
   void _onEmailChanged() {
     final email = emailController.text.trim().toLowerCase();
-    final emailRegExp = RegExp(r'^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$');
-    if (!emailRegExp.hasMatch(email)) {
+    
+    // Use centralized validation
+    final validationError = InputValidator.validateEmail(email);
+    if (validationError != null) {
       setState(() {
         isEmailAvailable = null;
-        emailError = 'Enter a valid email address.';
+        emailError = validationError;
         isCheckingEmail = false;
       });
       return;
@@ -157,45 +145,10 @@ class _RegisterScreenV1State extends ConsumerState<RegisterScreenV1> with Ticker
   }
 
   void _onPasswordChanged(String val) {
-    // Password strength: min 8, upper, lower, digit, special
-    if (val.isEmpty) {
-      setState(() {
-        passwordError = null;
-      });
-      return;
-    }
-    if (val.length < 8) {
-      setState(() {
-        passwordError = 'Password must be at least 8 characters.';
-      });
-      return;
-    }
-    if (!RegExp(r'[A-Z]').hasMatch(val)) {
-      setState(() {
-        passwordError = 'Password must contain an uppercase letter.';
-      });
-      return;
-    }
-    if (!RegExp(r'[a-z]').hasMatch(val)) {
-      setState(() {
-        passwordError = 'Password must contain a lowercase letter.';
-      });
-      return;
-    }
-    if (!RegExp(r'\d').hasMatch(val)) {
-      setState(() {
-        passwordError = 'Password must contain a digit.';
-      });
-      return;
-    }
-    if (!RegExp(r'[!@#\$&*~%^()_\-+=\[\]{}|;:,.<>?/]').hasMatch(val)) {
-      setState(() {
-        passwordError = 'Password must contain a special character.';
-      });
-      return;
-    }
+    // Use centralized password validation
+    final validationError = InputValidator.validatePassword(val);
     setState(() {
-      passwordError = null;
+      passwordError = validationError;
     });
   }
 
@@ -554,9 +507,19 @@ class _RegisterScreenV1State extends ConsumerState<RegisterScreenV1> with Ticker
     final email = emailController.text.trim().toLowerCase();
     final password = passwordController.text;
 
-    // Username validation
-    final usernameRegExp = RegExp(r'^[a-z0-9_-]{3,50}$');
-    if (!usernameRegExp.hasMatch(username)) {
+    // Use centralized validation
+    final usernameValidationError = InputValidator.validateUsername(username);
+    if (usernameValidationError != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(usernameValidationError),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+      return;
+    }
+
+    if (!InputValidator.isValidUsername(username)) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('Username must be 3-50 characters, only letters, numbers, dash (-), and underscore (_). No spaces or special characters.'),
@@ -593,12 +556,12 @@ class _RegisterScreenV1State extends ConsumerState<RegisterScreenV1> with Ticker
       setState(() { isCheckingUsername = false; });
     }
 
-    // Email validation
-    final emailRegExp = RegExp(r'^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$');
-    if (!emailRegExp.hasMatch(email)) {
+    // Email validation using centralized validator
+    final emailValidationError = InputValidator.validateEmail(email);
+    if (emailValidationError != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Please enter a valid email address.'),
+          content: Text(emailValidationError),
           backgroundColor: Theme.of(context).colorScheme.error,
         ),
       );
@@ -616,11 +579,12 @@ class _RegisterScreenV1State extends ConsumerState<RegisterScreenV1> with Ticker
       return;
     }
 
-    // Password validation
-    if (password.isEmpty || password.length < 8) {
+    // Password validation using centralized validator
+    final passwordValidationError = InputValidator.validatePassword(password);
+    if (passwordValidationError != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Password must be at least 8 characters.'),
+          content: Text(passwordValidationError),
           backgroundColor: Theme.of(context).colorScheme.error,
         ),
       );

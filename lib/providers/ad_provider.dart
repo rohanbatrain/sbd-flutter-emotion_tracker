@@ -69,10 +69,22 @@ class AdNotifier extends StateNotifier<AdState> {
 
   Future<void> _initializeAdMob() async {
     try {
-      await MobileAds.instance.initialize();
-      state = state.copyWith(isAdMobInitialized: true);
+      // Initialize AdMob in the background without blocking
+      MobileAds.instance.initialize().then((_) {
+        if (mounted) {
+          state = state.copyWith(isAdMobInitialized: true);
+        }
+      }).catchError((e) {
+        // AdMob initialization failed, but don't block the app
+        if (kDebugMode) {
+          print('AdMob initialization failed: $e');
+        }
+      });
     } catch (e) {
-      // AdMob initialization failed
+      // AdMob initialization failed, but don't block the app
+      if (kDebugMode) {
+        print('AdMob initialization error: $e');
+      }
     }
   }
 
