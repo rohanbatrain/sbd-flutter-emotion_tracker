@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:emotion_tracker/providers/theme_provider.dart';
 import 'package:emotion_tracker/providers/secure_storage_provider.dart';
+import 'package:emotion_tracker/widgets/custom_avatar.dart';
 
 class ProfileScreenV1 extends ConsumerStatefulWidget {
   const ProfileScreenV1({Key? key}) : super(key: key);
@@ -15,6 +16,7 @@ class _ProfileScreenV1State extends ConsumerState<ProfileScreenV1> {
   String lastName = '';
   String username = '';
   String userEmail = '';
+  String selectedAvatarId = 'person'; // Default avatar
   bool isLoading = true;
 
   final TextEditingController firstNameController = TextEditingController();
@@ -46,12 +48,14 @@ class _ProfileScreenV1State extends ConsumerState<ProfileScreenV1> {
       final firstNameData = await secureStorage.read(key: 'user_first_name') ?? '';
       final lastNameData = await secureStorage.read(key: 'user_last_name') ?? '';
       final usernameData = await secureStorage.read(key: 'user_username') ?? '';
+      final avatarId = await secureStorage.read(key: 'user_avatar_id') ?? 'person';
       
       setState(() {
         userEmail = email;
         firstName = firstNameData;
         lastName = lastNameData;
         username = usernameData;
+        selectedAvatarId = avatarId;
         
         // Set controller values
         firstNameController.text = firstNameData;
@@ -77,6 +81,7 @@ class _ProfileScreenV1State extends ConsumerState<ProfileScreenV1> {
       await secureStorage.write(key: 'user_last_name', value: lastNameController.text);
       await secureStorage.write(key: 'user_username', value: usernameController.text);
       await secureStorage.write(key: 'user_email', value: emailController.text);
+      await secureStorage.write(key: 'user_avatar_id', value: selectedAvatarId);
       
       // Update local state
       setState(() {
@@ -102,6 +107,31 @@ class _ProfileScreenV1State extends ConsumerState<ProfileScreenV1> {
             content: Text('Error saving profile: ${e.toString()}'),
             backgroundColor: Theme.of(context).colorScheme.error,
             duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _showAvatarSelectionDialog() async {
+    final newAvatarId = await showDialog<String>(
+      context: context,
+      builder: (context) => AvatarSelectionDialog(currentAvatarId: selectedAvatarId),
+    );
+
+    if (newAvatarId != null && newAvatarId != selectedAvatarId) {
+      final secureStorage = ref.read(secureStorageProvider);
+      await secureStorage.write(key: 'user_avatar_id', value: newAvatarId);
+      setState(() {
+        selectedAvatarId = newAvatarId;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Avatar updated!'),
+            backgroundColor: Theme.of(context).colorScheme.secondary,
+            duration: const Duration(seconds: 2),
           ),
         );
       }
@@ -261,10 +291,17 @@ class _ProfileScreenV1State extends ConsumerState<ProfileScreenV1> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            CircleAvatar(
-              radius: 44,
-              backgroundColor: theme.primaryColor.withOpacity(0.15),
-              child: Icon(Icons.person, size: 54, color: theme.primaryColor),
+            GestureDetector(
+              onTap: _showAvatarSelectionDialog,
+              child: CircleAvatar(
+                radius: 44,
+                backgroundColor: theme.primaryColor.withOpacity(0.15),
+                child: AvatarDisplay(
+                  avatar: getAvatarById(selectedAvatarId),
+                  size: 54,
+                  staticIconColor: theme.primaryColor,
+                ),
+              ),
             ),
             const SizedBox(height: 24),
             Container(
@@ -376,6 +413,7 @@ class _ProfileScreenV1State extends ConsumerState<ProfileScreenV1> {
                 ),
               ),
             */
+            /* HIDDEN FOR NOW - Email editing will be available in future release
             if (userEmail.isNotEmpty)
               Card(
                 elevation: 2,
@@ -404,6 +442,7 @@ class _ProfileScreenV1State extends ConsumerState<ProfileScreenV1> {
                   ),
                 ),
               ),
+            */
             // Add more profile info here as needed
           ],
         ),

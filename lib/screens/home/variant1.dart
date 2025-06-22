@@ -4,6 +4,7 @@ import 'package:emotion_tracker/providers/theme_provider.dart';
 import 'package:emotion_tracker/widgets/custom_app_bar.dart';
 import 'package:emotion_tracker/widgets/sidebar_widget.dart';
 import 'package:emotion_tracker/screens/settings/variant1.dart';
+import 'package:emotion_tracker/screens/shop/variant1.dart';
 
 class HomeScreenV1 extends ConsumerStatefulWidget {
   const HomeScreenV1({Key? key}) : super(key: key);
@@ -41,26 +42,7 @@ class _HomeScreenV1State extends ConsumerState<HomeScreenV1> {
       case 'settings':
         return const SettingsScreenV1();
       case 'shop':
-        return Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.shopping_bag_rounded,
-                size: 64,
-                color: theme.primaryColor,
-              ),
-              SizedBox(height: 16),
-              Text(
-                'Shop Coming Soon!',
-                style: theme.textTheme.headlineLarge?.copyWith(
-                  color: theme.primaryColor,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-        );
+        return const ShopScreenV1();
       case 'dashboard':
       default:
         return Center(

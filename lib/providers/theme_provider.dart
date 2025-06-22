@@ -44,6 +44,21 @@ class AppThemes {
     'goldenYellow': 'Golden Yellow',
     'deepPurple': 'Deep Purple',
   };
+
+  static final Map<String, int> themePrices = {
+    'lightTheme': 0,
+    'darkTheme': 0,
+    'serenityGreen': 100,
+    'pacificBlue': 100,
+    'blushRose': 150,
+    'cloudGray': 150,
+    'sunsetPeach': 200,
+    'midnightLavender': 200,
+    'crimsonRed': 250,
+    'forestGreen': 250,
+    'goldenYellow': 300,
+    'deepPurple': 300,
+  };
 }
 
 // Storage provider
