@@ -127,7 +127,7 @@ class HttpUtil {
         
       case 530:
         throw CloudflareTunnelException(
-          'Origin DNS Error (Error 530): Cloudflare cannot resolve the server DNS. The server configuration may need attention.',
+          'Origin DNS Error (Error 530): Cloudflare cannot resolve the server DNS. The server configuration may need attention. This typically indicates that the cloudflared tunnel service has lost connectivity to Cloudflare servers.',
           response.statusCode,
           response.body,
         );

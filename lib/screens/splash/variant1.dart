@@ -136,7 +136,7 @@ class _SplashScreenV1State extends ConsumerState<SplashScreenV1>
         } else if (e.statusCode == 504) {
           errorMessage = 'Server timeout - Cloudflare gateway issue';
         } else if (e.statusCode == 530) {
-          errorMessage = 'Server DNS configuration error';
+          errorMessage = 'Server DNS / Cloudflared configuration error';
         } else if (e.statusCode >= 520 && e.statusCode <= 529) {
           errorMessage = 'Cloudflare tunnel issue (${e.statusCode})';
         } else {
