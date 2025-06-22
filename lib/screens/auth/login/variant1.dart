@@ -573,23 +573,20 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
       // Try to open WiFi settings on Android
       if (platform == TargetPlatform.android) {
         // Use url_launcher to open Android WiFi settings
-        const String wifiSettingsUrl = 'android.settings.WIFI_SETTINGS';
-        const String generalSettingsUrl = 'android.settings.SETTINGS';
-        
         try {
-          // Try to launch WiFi settings intent
-          final Uri wifiUri = Uri.parse('android-app://com.android.settings/$wifiSettingsUrl');
+          // Try to launch WiFi settings intent directly
+          final Uri wifiUri = Uri.parse('android.settings.WIFI_SETTINGS');
           if (await canLaunchUrl(wifiUri)) {
-            await launchUrl(wifiUri);
+            await launchUrl(wifiUri, mode: LaunchMode.externalApplication);
           } else {
             throw Exception('Cannot launch WiFi settings');
           }
         } catch (e) {
           // Fallback to general settings
           try {
-            final Uri settingsUri = Uri.parse('android-app://com.android.settings/$generalSettingsUrl');
+            final Uri settingsUri = Uri.parse('android.settings.SETTINGS');
             if (await canLaunchUrl(settingsUri)) {
-              await launchUrl(settingsUri);
+              await launchUrl(settingsUri, mode: LaunchMode.externalApplication);
             } else {
               throw Exception('Cannot launch settings');
             }
