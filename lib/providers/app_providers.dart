@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:emotion_tracker/providers/shared_prefs_provider.dart';
 import 'package:emotion_tracker/providers/secure_storage_provider.dart';
+import 'package:emotion_tracker/providers/transition_provider.dart';
 import 'dart:convert';
 import 'package:emotion_tracker/providers/user_agent_util.dart';
 import 'package:emotion_tracker/utils/http_util.dart';
@@ -22,6 +23,56 @@ class NavigationService {
       (route) => false,
       arguments: arguments,
     );
+  }
+
+  // Enhanced navigation with custom transitions
+  Future<T?> navigateWithTransition<T extends Object?>(
+    Widget page, {
+    TransitionConfig? config,
+    String? routeName,
+  }) {
+    if (navigatorKey.currentState != null) {
+      return navigatorKey.currentState!.pushWithTransition<T>(
+        page,
+        config: config,
+        routeName: routeName,
+      );
+    }
+    return Future.value(null);
+  }
+
+  Future<T?> navigateAndReplaceWithTransition<T extends Object?, TO extends Object?>(
+    Widget page, {
+    TransitionConfig? config,
+    String? routeName,
+    TO? result,
+  }) {
+    if (navigatorKey.currentState != null) {
+      return navigatorKey.currentState!.pushReplacementWithTransition<T, TO>(
+        page,
+        config: config,
+        routeName: routeName,
+        result: result,
+      );
+    }
+    return Future.value(null);
+  }
+
+  Future<T?> navigateAndClearWithTransition<T extends Object?>(
+    Widget page,
+    RoutePredicate predicate, {
+    TransitionConfig? config,
+    String? routeName,
+  }) {
+    if (navigatorKey.currentState != null) {
+      return navigatorKey.currentState!.pushAndRemoveUntilWithTransition<T>(
+        page,
+        predicate,
+        config: config,
+        routeName: routeName,
+      );
+    }
+    return Future.value(null);
   }
 
   void goBack() {

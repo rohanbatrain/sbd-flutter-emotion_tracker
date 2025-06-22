@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:emotion_tracker/providers/theme_provider.dart';
 import 'package:emotion_tracker/providers/app_providers.dart';
+import 'package:emotion_tracker/providers/transition_provider.dart';
 import 'package:emotion_tracker/screens/splash/variant1.dart';
 import 'package:emotion_tracker/screens/auth/variant1.dart';
 import 'package:emotion_tracker/screens/home/variant1.dart';
@@ -32,6 +33,7 @@ class MyApp extends ConsumerWidget {
       theme: theme,
       navigatorKey: navigationService.navigatorKey,
       home: _getInitialScreen(authState),
+      onGenerateRoute: (settings) => _generateRoute(settings),
       routes: {
         // Variant 1 Routes
         '/splash/v1': (context) => const SplashScreenV1(),
@@ -42,6 +44,47 @@ class MyApp extends ConsumerWidget {
         '/client-side-encryption/v1': (context) => const ClientSideEncryptionScreenV1(),
         // Variant 2 Routes
       },
+    );
+  }
+
+  Route<dynamic>? _generateRoute(RouteSettings settings) {
+    // Custom route generation with beautiful transitions
+    Widget page;
+    TransitionConfig config;
+
+    switch (settings.name) {
+      case '/splash/v1':
+        page = const SplashScreenV1();
+        config = const TransitionConfig(type: TransitionType.fade);
+        break;
+      case '/auth/v1':
+        page = const AuthScreenV1();
+        config = PageTransitionService.splashToAuth;
+        break;
+      case '/home/v1':
+        page = const AuthGuard(child: HomeScreenV1());
+        config = PageTransitionService.authToHome;
+        break;
+      case '/verify-email/v1':
+        page = const VerifyEmailScreenV1();
+        config = PageTransitionService.modalTransition;
+        break;
+      case '/forgot-password/v1':
+        page = const ForgotPasswordScreenV1();
+        config = PageTransitionService.modalTransition;
+        break;
+      case '/client-side-encryption/v1':
+        page = const ClientSideEncryptionScreenV1();
+        config = PageTransitionService.modalTransition;
+        break;
+      default:
+        return null; // Let Flutter handle other routes normally
+    }
+
+    return PageTransitionService.createRoute(
+      page: page,
+      config: config,
+      settings: settings,
     );
   }
 
