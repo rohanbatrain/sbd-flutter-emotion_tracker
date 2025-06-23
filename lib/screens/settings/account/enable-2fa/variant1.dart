@@ -91,6 +91,16 @@ class _Enable2FAScreenV1State extends ConsumerState<Enable2FAScreenV1> {
       });
       try {
         final result = await ref.read(twoFAServiceProvider).setup2FA();
+        // Store backup codes from setup endpoint if present
+        if (result['backup_codes'] != null) {
+          final codes = List<String>.from(result['backup_codes']);
+          final secureStorage = ref.read(secureStorageProvider);
+          await secureStorage.write(
+            key: 'user_2fa_backup_codes',
+            value: jsonEncode(codes),
+          );
+          _backupCodes = codes;
+        }
         if (mounted) {
           setState(() {
             _qrCodeUrl = result['qr_code_url'];
@@ -240,17 +250,19 @@ class _Enable2FAScreenV1State extends ConsumerState<Enable2FAScreenV1> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Enable Two-Factor Authentication',
-                      style: theme.textTheme.headlineSmall
-                          ?.copyWith(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      "Two-factor authentication (2FA) adds an extra layer of security to your account. When enabled, you'll need to enter a verification code from your authenticator app in addition to your password when you sign in.",
-                      style: theme.textTheme.bodyMedium,
-                    ),
-                    const SizedBox(height: 24),
+                    if (!_is2faEnabled) ...[
+                      Text(
+                        'Enable Two-Factor Authentication',
+                        style: theme.textTheme.headlineSmall
+                            ?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        "Two-factor authentication (2FA) adds an extra layer of security to your account. When enabled, you'll need to enter a verification code from your authenticator app in addition to your password when you sign in.",
+                        style: theme.textTheme.bodyMedium,
+                      ),
+                      const SizedBox(height: 24),
+                    ],
                     if (_errorMessage != null) ...[
                       Text(
                         _errorMessage!,
@@ -459,7 +471,7 @@ class _Enable2FAScreenV1State extends ConsumerState<Enable2FAScreenV1> {
           const SizedBox(height: 24),
         ],
         Text(
-          'Then enter the 6-digit code from your app below.',
+          'Enter the 6-digit code from your app below.',
           style: theme.textTheme.bodyMedium,
           textAlign: TextAlign.center,
         ),

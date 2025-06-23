@@ -353,13 +353,22 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
               ),
             ),
           const SizedBox(height: 16),
-          _buildTextField(
-            controller: _2faCodeController,
-            hintText: 'Verification Code',
-            prefixIcon: Icons.shield_outlined,
-            theme: theme,
-            keyboardType: TextInputType.number,
-          ),
+          if (_selected2faMethod == 'backup_code')
+            _buildTextField(
+              controller: _2faCodeController,
+              hintText: 'Backup Code',
+              prefixIcon: Icons.vpn_key,
+              theme: theme,
+              keyboardType: TextInputType.text,
+            )
+          else
+            _buildTextField(
+              controller: _2faCodeController,
+              hintText: 'Verification Code',
+              prefixIcon: Icons.shield_outlined,
+              theme: theme,
+              keyboardType: TextInputType.text, // Always use full keyboard
+            ),
         ],
       ),
     );
