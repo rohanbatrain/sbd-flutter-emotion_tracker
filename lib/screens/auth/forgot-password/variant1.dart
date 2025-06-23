@@ -4,6 +4,8 @@ import 'package:emotion_tracker/providers/theme_provider.dart';
 import 'package:emotion_tracker/providers/app_providers.dart';
 import 'package:lottie/lottie.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 
 class ForgotPasswordScreenV1 extends ConsumerStatefulWidget {
   const ForgotPasswordScreenV1({Key? key}) : super(key: key);
@@ -29,7 +31,6 @@ class _ForgotPasswordScreenV1State extends ConsumerState<ForgotPasswordScreenV1>
       errorText = null;
     });
     final email = emailController.text.trim().toLowerCase();
-    
     // Use centralized email validation
     final emailValidationError = InputValidator.validateEmail(email);
     if (emailValidationError != null) {
@@ -41,11 +42,18 @@ class _ForgotPasswordScreenV1State extends ConsumerState<ForgotPasswordScreenV1>
     setState(() {
       isLoading = true;
     });
-    await Future.delayed(const Duration(seconds: 2)); // Simulate API call
-    setState(() {
-      isLoading = false;
-      isSubmitted = true;
-    });
+    try {
+      await forgotPasswordApi(ref, email);
+      setState(() {
+        isLoading = false;
+        isSubmitted = true;
+      });
+    } catch (e) {
+      setState(() {
+        isLoading = false;
+        errorText = 'Failed to send reset link. Please try again.';
+      });
+    }
   }
 
   void _resend() async {
@@ -53,13 +61,24 @@ class _ForgotPasswordScreenV1State extends ConsumerState<ForgotPasswordScreenV1>
       isLoading = true;
       errorText = null;
     });
-    await Future.delayed(const Duration(seconds: 2)); // Simulate resend
-    setState(() {
-      isLoading = false;
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Reset link resent!')),
-    );
+    final email = emailController.text.trim().toLowerCase();
+    try {
+      final response = await forgotPasswordApi(ref, email);
+      setState(() {
+        isLoading = false;
+      });
+      final globalContext = ref.read(navigationServiceProvider).currentContext;
+      if (globalContext != null) {
+        ScaffoldMessenger.of(globalContext).showSnackBar(
+          const SnackBar(content: Text('Reset link resent!')),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        isLoading = false;
+        errorText = 'Failed to resend reset link. Please try again.';
+      });
+    }
   }
 
   void _backToEmail() {
@@ -374,5 +393,20 @@ class _EmailClientButton extends StatelessWidget {
         }
       },
     );
+  }
+}
+
+Future<Map<String, dynamic>> forgotPasswordApi(WidgetRef ref, String email) async {
+  final baseUrl = ref.read(apiBaseUrlProvider);
+  final url = Uri.parse('$baseUrl/auth/forgot-password');
+  final response = await http.post(
+    url,
+    headers: {'Content-Type': 'application/json'},
+    body: jsonEncode({'email': email}), // Send email in JSON body
+  );
+  if (response.statusCode >= 200 && response.statusCode < 300) {
+    return jsonDecode(response.body);
+  } else {
+    throw Exception('Failed to send reset link: ${response.statusCode} ${response.body}');
   }
 }

@@ -108,9 +108,20 @@ class _AuthScreenV1State extends State<AuthScreenV1> {
             ),
             const SizedBox(height: 10), // Reduced from 24
             Expanded(
-              child: isLogin
-                  ? LoginScreenV1(connectivityIssue: widget.connectivityIssue)
-                  : const RegisterScreenV1(),
+              child: GestureDetector(
+                onHorizontalDragEnd: (details) {
+                  if (details.primaryVelocity != null && details.primaryVelocity! < -100) {
+                    // Swiped Left
+                    if (isLogin) setState(() => isLogin = false);
+                  } else if (details.primaryVelocity != null && details.primaryVelocity! > 100) {
+                    // Swiped Right
+                    if (!isLogin) setState(() => isLogin = true);
+                  }
+                },
+                child: isLogin
+                    ? LoginScreenV1(connectivityIssue: widget.connectivityIssue)
+                    : const RegisterScreenV1(),
+              ),
             ),
           ],
         ),
