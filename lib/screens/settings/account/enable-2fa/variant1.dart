@@ -66,6 +66,7 @@ class _Enable2FAScreenV1State extends ConsumerState<Enable2FAScreenV1> {
 
   Future<bool> _authenticate(BuildContext context) async {
     final LocalAuthentication auth = LocalAuthentication();
+    final BuildContext? globalContext = ref.read(navigationServiceProvider).currentContext;
     try {
       final bool didAuthenticate = await auth.authenticate(
         localizedReason: 'Please authenticate to enable/disable 2FA',
@@ -73,8 +74,8 @@ class _Enable2FAScreenV1State extends ConsumerState<Enable2FAScreenV1> {
       );
       return didAuthenticate;
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+      if (mounted && globalContext != null) {
+        ScaffoldMessenger.of(globalContext).showSnackBar(
           SnackBar(content: Text('Authentication error: ${e.toString()}')),
         );
       }
@@ -143,9 +144,12 @@ class _Enable2FAScreenV1State extends ConsumerState<Enable2FAScreenV1> {
             _showBackupCodes = false;
             _backupCodes = [];
           });
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('2FA disabled successfully!')),
-          );
+          BuildContext? globalContext = ref.read(navigationServiceProvider).currentContext;
+          if (globalContext != null) {
+            ScaffoldMessenger.of(globalContext).showSnackBar(
+              const SnackBar(content: Text('2FA disabled successfully!')),
+            );
+          }
         }
       } catch (e) {
         if (mounted) {
@@ -211,22 +215,27 @@ class _Enable2FAScreenV1State extends ConsumerState<Enable2FAScreenV1> {
   Future<void> _deleteBackupCodes() async {
     final secureStorage = ref.read(secureStorageProvider);
     await secureStorage.delete(key: 'user_2fa_backup_codes');
-    setState(() {
-      _backupCodes = [];
-      _showBackupCodes = false;
-    });
+    if (mounted) {
+      setState(() {
+        _backupCodes = [];
+        _showBackupCodes = false;
+      });
+    }
   }
 
   void _handleUnauthorized() {
+    BuildContext? unauthorizedContext = ref.read(navigationServiceProvider).currentContext;
     if (!mounted) return;
     final navigationService = ref.read(navigationServiceProvider);
     navigationService.navigateToAndClearStack('/auth/v1');
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Your session has expired. Please log in again.'),
-        backgroundColor: Colors.red,
-      ),
-    );
+    if (unauthorizedContext != null) {
+      ScaffoldMessenger.of(unauthorizedContext).showSnackBar(
+        const SnackBar(
+          content: Text('Your session has expired. Please log in again.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override
@@ -360,136 +369,8 @@ class _Enable2FAScreenV1State extends ConsumerState<Enable2FAScreenV1> {
                   ),
                 ],
               )
-            : _showBackupCodes
-                ? _buildBackupCodesSection(theme)
-                : _buildVerificationSection(theme),
+            : _buildBackupCodesSection(theme),
       ),
-    );
-  }
-
-  Widget _buildVerificationSection(ThemeData theme) {
-    return Column(
-      children: [
-        Text(
-          'Scan the QR Code with your authenticator app',
-          style: theme.textTheme.titleMedium,
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 16),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: theme.dividerColor)),
-          child: _buildQrCodeWidget(),
-        ),
-        const SizedBox(height: 24),
-        if (_qrCodeData != null) ...[
-          Text(
-            'Or copy the setup URI:',
-            style: theme.textTheme.bodyMedium,
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: TextEditingController(text: _qrCodeData),
-                  readOnly: true,
-                  decoration: InputDecoration(
-                    labelText: 'Setup URI',
-                    border: const OutlineInputBorder(),
-                  ),
-                  style: theme.textTheme.bodyMedium?.copyWith(fontFamily: 'monospace'),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Tooltip(
-                message: 'Copy to clipboard',
-                child: IconButton(
-                  icon: const Icon(Icons.copy),
-                  onPressed: () {
-                    Clipboard.setData(ClipboardData(text: _qrCodeData!));
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Setup URI copied to clipboard!')),
-                    );
-                  },
-                ),
-              ),
-              Tooltip(
-                message: 'Open in Authenticator App',
-                child: IconButton(
-                  icon: const Icon(Icons.open_in_new),
-                  onPressed: () async {
-                    final uri = Uri.parse(_qrCodeData!);
-                    // Use url_launcher to open in external app
-                    try {
-                      if (await canLaunchUrl(uri)) {
-                        await launchUrl(uri, mode: LaunchMode.externalApplication);
-                      } else {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Could not open authenticator app.')),
-                        );
-                      }
-                    } catch (e) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Error: ${e.toString()}')),
-                      );
-                    }
-                  },
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-        ],
-        if (_totpSecret != null) ...[
-          Text(
-            'Or enter this secret key manually:',
-            style: theme.textTheme.bodyMedium,
-          ),
-          const SizedBox(height: 8),
-          TextField(
-            controller: TextEditingController(text: _totpSecret),
-            readOnly: true,
-            decoration: InputDecoration(
-              labelText: 'Secret Key',
-              border: const OutlineInputBorder(),
-              suffixIcon: IconButton(
-                icon: const Icon(Icons.copy),
-                onPressed: () {
-                  Clipboard.setData(ClipboardData(text: _totpSecret!));
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text('Secret key copied to clipboard!')),
-                  );
-                },
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
-        ],
-        Text(
-          'Enter the 6-digit code from your app below.',
-          style: theme.textTheme.bodyMedium,
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 16),
-        TextField(
-          controller: _verificationCodeController,
-          decoration: const InputDecoration(
-            labelText: 'Verification Code',
-            border: OutlineInputBorder(),
-          ),
-          keyboardType: TextInputType.number,
-        ),
-        const SizedBox(height: 16),
-        ElevatedButton(
-          onPressed: _verifyAndCompleteSetup,
-          child: const Text('Verify & Complete Setup'),
-        ),
-      ],
     );
   }
 
@@ -501,19 +382,28 @@ class _Enable2FAScreenV1State extends ConsumerState<Enable2FAScreenV1> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Icon(Icons.check_circle, color: Colors.green, size: 50),
+        Icon(Icons.verified_user, color: theme.primaryColor, size: 60),
         const SizedBox(height: 16),
         Text(
-          '2FA Enabled Successfully!',
-          style: theme.textTheme.headlineSmall,
+          'Two-Factor Authentication is Active',
+          style: theme.textTheme.headlineSmall?.copyWith(
+            color: theme.primaryColor,
+            fontWeight: FontWeight.bold,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Your account is protected with 2FA. Keep your backup codes safe.',
+          style: theme.textTheme.bodyMedium,
+          textAlign: TextAlign.center,
         ),
         const SizedBox(height: 24),
         Text(
-          'Save these backup codes in a secure place. They can be used to access your account if you lose your device.',
-          textAlign: TextAlign.center,
-          style: theme.textTheme.bodyMedium,
+          'Backup Codes',
+          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 8),
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -534,98 +424,158 @@ class _Enable2FAScreenV1State extends ConsumerState<Enable2FAScreenV1> {
                           ))
                       .toList(),
                 )
-              : Column(
-                  children: [
-                    Text(
-                      'No backup codes available.\n\n'
-                      'Backup codes are only shown the first time you set up 2FA.\n'
-                      'If you need new codes, use the "Regenerate Backup Codes" option.',
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.error),
-                    ),
-                    const SizedBox(height: 16),
-                    ElevatedButton.icon(
-                      icon: const Icon(Icons.refresh),
-                      label: const Text('Regenerate Backup Codes'),
-                      onPressed: () async {
-                        setState(() { _isLoading = true; _errorMessage = null; });
-                        try {
-                          final result = await ref.read(twoFAServiceProvider).regenerateBackupCodes();
-                          final codes = List<String>.from(result['backup_codes'] ?? []);
-                          final secureStorage = ref.read(secureStorageProvider);
-                          await secureStorage.write(
-                            key: 'user_2fa_backup_codes',
-                            value: jsonEncode(codes),
-                          );
-                          setState(() {
-                            _backupCodes = codes;
-                            _isLoading = false;
-                          });
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Backup codes regenerated!')),
-                          );
-                        } catch (e) {
-                          setState(() {
-                            _isLoading = false;
-                            _errorMessage = 'Failed to regenerate backup codes: ${e.toString()}';
-                          });
-                        }
-                      },
-                    ),
-                  ],
+              : Text(
+                  'No backup codes are currently available. For your security, backup codes are encrypted and cannot be recovered once generated. Please regenerate and securely save them now, as you will not be able to view them again later.',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.error),
                 ),
         ),
-        const SizedBox(height: 24),
-        ElevatedButton(
-          onPressed: () async {
-            await _deleteBackupCodes();
+        const SizedBox(height: 16),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final isNarrow = constraints.maxWidth < 400;
+            return isNarrow
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('Regenerate Backup Codes'),
+                        onPressed: _isLoading
+                            ? null
+                            : () async {
+                                setState(() { _isLoading = true; _errorMessage = null; });
+                                try {
+                                  final result = await ref.read(twoFAServiceProvider).regenerateBackupCodes();
+                                  final codes = List<String>.from(result['backup_codes'] ?? []);
+                                  final secureStorage = ref.read(secureStorageProvider);
+                                  await secureStorage.write(
+                                    key: 'user_2fa_backup_codes',
+                                    value: jsonEncode(codes),
+                                  );
+                                  BuildContext? globalContext = ref.read(navigationServiceProvider).currentContext;
+                                  if (mounted && globalContext != null) {
+                                    setState(() {
+                                      _backupCodes = codes;
+                                      _isLoading = false;
+                                    });
+                                    ScaffoldMessenger.of(globalContext).showSnackBar(
+                                      const SnackBar(content: Text('Backup codes regenerated!')),
+                                    );
+                                  }
+                                } catch (e) {
+                                  String errorMsg = e.toString();
+                                  String displayMsg = 'Failed to regenerate backup codes: ';
+                                  if (errorMsg.contains('429') || errorMsg.toLowerCase().contains('too many')) {
+                                    displayMsg += 'You have made too many requests. Please wait a few minutes before trying again.';
+                                  } else {
+                                    displayMsg += errorMsg;
+                                  }
+                                  BuildContext? globalContext = ref.read(navigationServiceProvider).currentContext;
+                                  if (mounted && globalContext != null) {
+                                    setState(() {
+                                      _isLoading = false;
+                                      _errorMessage = displayMsg;
+                                    });
+                                    ScaffoldMessenger.of(globalContext).showSnackBar(
+                                      SnackBar(
+                                        content: Text(displayMsg),
+                                        backgroundColor: Colors.orange,
+                                        duration: const Duration(seconds: 5),
+                                      ),
+                                    );
+                                  }
+                                }
+                              },
+                      ),
+                      const SizedBox(height: 12),
+                      ElevatedButton(
+                        onPressed: () async {
+                          await _deleteBackupCodes();
+                          if (mounted) Navigator.of(context).pop();
+                        },
+                        child: const Text('Done'),
+                      ),
+                    ],
+                  )
+                : Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('Regenerate Backup Codes'),
+                          onPressed: _isLoading
+                              ? null
+                              : () async {
+                                  setState(() { _isLoading = true; _errorMessage = null; });
+                                  try {
+                                    final result = await ref.read(twoFAServiceProvider).regenerateBackupCodes();
+                                    final codes = List<String>.from(result['backup_codes'] ?? []);
+                                    final secureStorage = ref.read(secureStorageProvider);
+                                    await secureStorage.write(
+                                      key: 'user_2fa_backup_codes',
+                                      value: jsonEncode(codes),
+                                    );
+                                    BuildContext? globalContext = ref.read(navigationServiceProvider).currentContext;
+                                    if (mounted && globalContext != null) {
+                                      setState(() {
+                                        _backupCodes = codes;
+                                        _isLoading = false;
+                                      });
+                                      ScaffoldMessenger.of(globalContext).showSnackBar(
+                                        const SnackBar(content: Text('Backup codes regenerated!')),
+                                      );
+                                    }
+                                  } catch (e) {
+                                    String errorMsg = e.toString();
+                                    String displayMsg = 'Failed to regenerate backup codes: ';
+                                    if (errorMsg.contains('429') || errorMsg.toLowerCase().contains('too many')) {
+                                      displayMsg += 'You have made too many requests. Please wait a few minutes before trying again.';
+                                    } else {
+                                      displayMsg += errorMsg;
+                                    }
+                                    BuildContext? globalContext = ref.read(navigationServiceProvider).currentContext;
+                                    if (mounted && globalContext != null) {
+                                      setState(() {
+                                        _isLoading = false;
+                                        _errorMessage = displayMsg;
+                                      });
+                                      ScaffoldMessenger.of(globalContext).showSnackBar(
+                                        SnackBar(
+                                          content: Text(displayMsg),
+                                          backgroundColor: Colors.orange,
+                                          duration: const Duration(seconds: 5),
+                                        ),
+                                      );
+                                    }
+                                  }
+                                },
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            await _deleteBackupCodes();
+                            if (mounted) Navigator.of(context).pop();
+                          },
+                          child: const Text('Done'),
+                        ),
+                      ),
+                    ],
+                  );
           },
-          child: const Text('Done'),
-        )
+        ),
+        if (_errorMessage != null) ...[
+          const SizedBox(height: 16),
+          Text(
+            _errorMessage!,
+            style: TextStyle(color: theme.colorScheme.error),
+            textAlign: TextAlign.center,
+          ),
+        ],
       ],
     );
-  }
-
-  Widget _buildQrCodeWidget() {
-    if (_qrCodeUrl == null) {
-      return const Text('QR Code not available.');
-    }
-
-    if (_qrCodeUrl!.startsWith('data:image')) {
-      try {
-        final parts = _qrCodeUrl!.split(',');
-        if (parts.length != 2) {
-          return const Text('Invalid QR Code data URI.');
-        }
-        final imageData = base64.decode(parts[1]);
-        return Image.memory(
-          imageData,
-          width: 150,
-          height: 150,
-          fit: BoxFit.contain,
-        );
-      } catch (e) {
-        return const Text('Failed to decode QR code.');
-      }
-    } else {
-      return Image.network(
-        _qrCodeUrl!,
-        width: 150,
-        height: 150,
-        fit: BoxFit.contain,
-        loadingBuilder: (context, child, progress) {
-          return progress == null ? child : const CircularProgressIndicator();
-        },
-        errorBuilder: (context, error, stackTrace) {
-          return Column(
-            children: [
-              const Icon(Icons.error_outline, color: Colors.red, size: 48),
-              const SizedBox(height: 8),
-              const Text('Failed to load QR Code.'),
-            ],
-          );
-        },
-      );
-    }
   }
 }
