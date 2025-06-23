@@ -369,7 +369,7 @@ packages:
     source: hosted
     version: "1.9.1"
   path_provider:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: path_provider
       sha256: "50c5dd5b6e1aaf6fb3a78b33f6aa3afca52bf903a8a5298f53101fdaee55bbcd"
@@ -440,6 +440,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "6.0.2"
+  qr_code_tools:
+    dependency: "direct main"
+    description:
+      name: qr_code_tools
+      sha256: b468fcd215c77cca87306dccb509f02cbee03d82173369d5f2048be082943eac
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.2.0"
   riverpod:
     dependency: transitive
     description:

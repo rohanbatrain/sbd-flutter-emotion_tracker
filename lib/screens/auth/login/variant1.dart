@@ -5,10 +5,11 @@ import 'package:emotion_tracker/providers/app_providers.dart';
 import 'package:emotion_tracker/screens/auth/server-settings/variant1.dart';
 import 'package:emotion_tracker/providers/secure_storage_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'dart:convert';
 
 class LoginScreenV1 extends ConsumerStatefulWidget {
   final String? connectivityIssue;
-  
+
   const LoginScreenV1({Key? key, this.connectivityIssue}) : super(key: key);
 
   @override
@@ -24,6 +25,15 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
   AnimationController? _animationController;
   Animation<double>? _fadeAnimation;
   Animation<Offset>? _slideAnimation;
+
+  // 2FA State
+  bool _is2faRequired = false;
+  List<String> _available2faMethods = [];
+  String? _selected2faMethod;
+  final TextEditingController _2faCodeController = TextEditingController();
+  AnimationController? _2faAnimationController;
+  Animation<double>? _2faSectionFadeAnimation;
+  Animation<Offset>? _2faSectionSlideAnimation;
 
   @override
   void initState() {
@@ -47,7 +57,23 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
       curve: Curves.easeOutBack,
     ));
     _animationController!.forward();
-    
+
+    _2faAnimationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
+    );
+    _2faSectionFadeAnimation = CurvedAnimation(
+      parent: _2faAnimationController!,
+      curve: Curves.easeInOut,
+    );
+    _2faSectionSlideAnimation = Tween<Offset>(
+      begin: const Offset(0, -0.2),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _2faAnimationController!,
+      curve: Curves.easeOut,
+    ));
+
     // Show connectivity issue from splash screen if present
     if (widget.connectivityIssue != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -63,6 +89,8 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
     emailController.dispose();
     passwordController.dispose();
     passwordFocusNode.dispose();
+    _2faAnimationController?.dispose();
+    _2faCodeController.dispose();
     super.dispose();
   }
 
@@ -84,7 +112,7 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
                   children: [
                     const SizedBox(height: 60),
                     Text(
-                      'Welcome to',
+                      'Welcome Back to',
                       style: theme.textTheme.headlineSmall?.copyWith(
                         color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
                         fontWeight: FontWeight.w300,
@@ -134,6 +162,18 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
                       keyboardType: TextInputType.text,
                       focusNode: passwordFocusNode,
                     ),
+                    if (_is2faRequired)
+                      FadeTransition(
+                        opacity: _2faSectionFadeAnimation!,
+                        child: SlideTransition(
+                          position: _2faSectionSlideAnimation!,
+                          child: SizeTransition(
+                            sizeFactor: _2faSectionFadeAnimation!,
+                            axisAlignment: -1.0,
+                            child: _build2faSection(theme),
+                          ),
+                        ),
+                      ),
                     const SizedBox(height: 24),
                     Container(
                       width: double.infinity,
@@ -224,6 +264,107 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
     );
   }
 
+  Widget _build2faSection(ThemeData theme) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (_available2faMethods.length > 1)
+            DropdownButtonFormField<String>(
+              value: _selected2faMethod,
+              items: _available2faMethods.map((String method) {
+                return DropdownMenuItem<String>(
+                  value: method,
+                  child: Row(
+                    children: [
+                      Icon(
+                        method == 'totp' ? Icons.shield : Icons.vpn_key,
+                        color: theme.primaryColor,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        method == 'totp' ? 'Authenticator App Code' : 'Backup Code',
+                        style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+              onChanged: (String? newValue) {
+                setState(() {
+                  _selected2faMethod = newValue;
+                });
+              },
+              decoration: InputDecoration(
+                labelText: 'Verification Method',
+                hintText: 'Select a method',
+                filled: true,
+                fillColor: theme.cardTheme.color,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide.none,
+                ),
+                prefixIcon: Container(
+                  margin: const EdgeInsets.only(left: 12, right: 8),
+                  child: Icon(
+                    Icons.verified_user_outlined,
+                    color: theme.iconTheme.color?.withOpacity(0.7),
+                    size: 20,
+                  ),
+                ),
+                contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+              ),
+              style: theme.textTheme.bodyLarge,
+              dropdownColor: theme.cardTheme.color,
+              icon: Icon(Icons.arrow_drop_down, color: theme.primaryColor),
+            )
+          else if (_available2faMethods.length == 1)
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+              decoration: BoxDecoration(
+                color: theme.cardTheme.color,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: theme.dividerColor.withOpacity(0.1)),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    _available2faMethods[0] == 'totp' ? Icons.shield : Icons.vpn_key,
+                    color: theme.primaryColor,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    _available2faMethods[0] == 'totp' ? 'Authenticator App Code' : 'Backup Code',
+                    style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: theme.primaryColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text('Only option', style: theme.textTheme.bodySmall?.copyWith(color: theme.primaryColor)),
+                  ),
+                ],
+              ),
+            ),
+          const SizedBox(height: 16),
+          _buildTextField(
+            controller: _2faCodeController,
+            hintText: 'Verification Code',
+            prefixIcon: Icons.shield_outlined,
+            theme: theme,
+            keyboardType: TextInputType.number,
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildTextField({
     required TextEditingController controller,
     required String hintText,
@@ -296,33 +437,17 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
   void _handleSubmit() async {
     final userInput = usernameOrEmailController.text.trim();
     final password = passwordController.text;
-
-    // Use centralized validation
-    if (!InputValidator.isEmail(userInput) && !InputValidator.isValidUsername(userInput)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Please enter a valid username or email.'),
-          backgroundColor: Theme.of(context).colorScheme.error,
-        ),
-      );
-      return;
-    }
-
-    // Password validation
-    final passwordError = InputValidator.validatePassword(password);
-    if (passwordError != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(passwordError),
-          backgroundColor: Theme.of(context).colorScheme.error,
-        ),
-      );
-      return;
-    }
+    final twoFaCode = _2faCodeController.text.trim();
 
     try {
       final authNotifier = ref.read(authProvider.notifier);
-      final result = await loginWithApi(ref, userInput, password);
+      final result = await loginWithApi(
+        ref,
+        userInput,
+        password,
+        twoFaCode: _is2faRequired ? twoFaCode : null,
+        twoFaMethod: _is2faRequired ? _selected2faMethod : null,
+      );
 
       await authNotifier.login(userInput);
 
@@ -335,7 +460,7 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
         if (result['error'] == 'email_not_verified') {
           // Even with email not verified, check if encryption is also required
           final needsEncryption = result['client_side_encryption'] == true || result['client_side_encryption'] == 'true';
-          
+
           if (needsEncryption) {
             // Check if we already have an encryption key
             final existingKey = await secureStorage.read(key: 'client_side_encryption_key');
@@ -361,11 +486,11 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
           }
           return;
         }
-        
+
         // Login was successful, now check what additional steps are needed
         final needsEncryption = result['client_side_encryption'] == true || result['client_side_encryption'] == 'true';
         final isVerified = result['is_verified'] == true || result['is_verified'] == 'true';
-        
+
         if (needsEncryption && !isVerified) {
           // Check if we already have an encryption key
           final existingKey = await secureStorage.read(key: 'client_side_encryption_key');
@@ -406,7 +531,7 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
           );
           return;
         }
-        
+
         // Neither required, go directly to home
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -419,11 +544,61 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
     } catch (e) {
       if (mounted) {
         final errorMsg = e.toString();
-        
+
+        // Handle invalid TOTP code error
+        if (errorMsg.contains('Login failed: 401') && errorMsg.contains('Invalid TOTP code')) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Invalid verification code. Please try again.'),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+          return;
+        }
+        // Handle invalid or already used backup code error
+        if (errorMsg.contains('Login failed: 401') && errorMsg.contains('Invalid or already used backup code')) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Invalid or already used backup code. Please use a valid backup code.'),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+          return;
+        }
+
+        if (errorMsg.contains('Login failed: 422')) {
+          try {
+            final jsonString = errorMsg.substring(errorMsg.indexOf('{'), errorMsg.lastIndexOf('}') + 1);
+            final errorJson = jsonDecode(jsonString);
+            if (errorJson['two_fa_required'] == true) {
+              setState(() {
+                _is2faRequired = true;
+                _available2faMethods = List<String>.from(errorJson['available_methods'] ?? []);
+                if (_available2faMethods.isNotEmpty) {
+                  _selected2faMethod = _available2faMethods[0];
+                }
+              });
+              _2faAnimationController!.forward();
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(errorJson['detail'] ?? '2FA authentication required.'),
+                  backgroundColor: Colors.orange,
+                ),
+              );
+              return;
+            }
+          } catch (jsonError) {
+            // Fallback for JSON parsing error
+            print('Error parsing 2FA error from server: $jsonError');
+          }
+        }
+
         // Handle different types of errors with user-friendly messages
         String displayMessage = 'Authentication failed';
         Color? backgroundColor = Theme.of(context).colorScheme.error;
-        
+
         if (errorMsg.contains('CLOUDFLARE_TUNNEL_DOWN:')) {
           displayMessage = 'Cloudflare tunnel is down. Please try again later or contact support.';
           backgroundColor = Colors.orange;
@@ -451,7 +626,7 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
         } else if (errorMsg.contains('Could not connect')) {
           displayMessage = 'Could not connect to server. Please check your internet connection.';
         }
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(displayMessage),
@@ -465,19 +640,19 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
 
   void _showConnectivityNotification(String connectivityIssue) {
     if (!mounted) return;
-    
+
     final theme = ref.read(currentThemeProvider);
     final warningColor = theme.colorScheme.error;
-    
+
     // Determine if this is a network connectivity issue vs server issue
     final isNetworkIssue = connectivityIssue.toLowerCase().contains('no internet') ||
-                          connectivityIssue.toLowerCase().contains('network') ||
-                          connectivityIssue.toLowerCase().contains('unable to connect');
-    
+        connectivityIssue.toLowerCase().contains('network') ||
+        connectivityIssue.toLowerCase().contains('unable to connect');
+
     // Delay to ensure the login screen is fully loaded
     Future.delayed(const Duration(milliseconds: 300), () {
       if (!mounted) return;
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Container(
@@ -547,7 +722,7 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
             onPressed: () {
               if (!mounted) return;
               ScaffoldMessenger.of(context).hideCurrentSnackBar();
-              
+
               // Open device network settings for network issues, server settings for server issues
               if (isNetworkIssue) {
                 _openDeviceNetworkSettings();
@@ -563,12 +738,12 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
 
   void _openDeviceNetworkSettings() async {
     if (!mounted) return;
-    
+
     // Get platform information and capture context-dependent values before any async operations
     final platform = Theme.of(context).platform;
     final theme = ref.read(currentThemeProvider);
     final scaffoldMessenger = ScaffoldMessenger.of(context);
-    
+
     try {
       // Try to open WiFi settings on Android
       if (platform == TargetPlatform.android) {
@@ -629,13 +804,13 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
 
   void _showConnectionGuidance() {
     if (!mounted) return;
-    
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
         final theme = ref.read(currentThemeProvider);
         final warningColor = theme.colorScheme.error;
-        
+
         return AlertDialog(
           backgroundColor: theme.cardColor,
           title: Row(
@@ -695,7 +870,7 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
   Widget _buildGuidanceItem(String text, IconData icon) {
     final theme = ref.read(currentThemeProvider);
     final warningColor = theme.colorScheme.error;
-    
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -714,6 +889,7 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
   }
 
   void _showServerChangeDialog() {
+    ref.read(currentThemeProvider);
     showDialog(
       context: context,
       barrierDismissible: false,

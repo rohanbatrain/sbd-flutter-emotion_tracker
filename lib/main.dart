@@ -50,7 +50,16 @@ class MyApp extends ConsumerWidget {
       debugShowCheckedModeBanner: false,
       theme: theme,
       navigatorKey: navigationService.navigatorKey,
-      home: _getInitialScreen(authState),
+      home: WillPopScope(
+        onWillPop: () async {
+          if (navigationService.navigatorKey.currentState?.canPop() ?? false) {
+            navigationService.navigatorKey.currentState?.pop();
+            return false;
+          }
+          return true;
+        },
+        child: _getInitialScreen(authState),
+      ),
       onGenerateRoute: (settings) => _generateRoute(settings),
       routes: {
         // Variant 1 Routes

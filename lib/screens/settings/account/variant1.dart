@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:emotion_tracker/providers/theme_provider.dart';
 import 'package:local_auth/local_auth.dart';
+import 'package:flutter/services.dart';
 import 'change-password/variant1.dart';
 import 'enable-2fa/variant1.dart';
 import 'profile/variant1.dart';
@@ -9,14 +10,47 @@ import 'profile/variant1.dart';
 class AccountSettingsScreenV1 extends ConsumerWidget {
   const AccountSettingsScreenV1({Key? key}) : super(key: key);
 
-  Future<bool> _authenticate(BuildContext context) async {
+  Future<bool> _authenticate(BuildContext context, {String? reason, bool allowSkip = false, VoidCallback? onSkip}) async {
     final LocalAuthentication auth = LocalAuthentication();
     try {
       final bool didAuthenticate = await auth.authenticate(
-        localizedReason: 'Please authenticate to change your password',
+        localizedReason: reason ?? 'Please authenticate',
         options: const AuthenticationOptions(biometricOnly: false, stickyAuth: true),
       );
       return didAuthenticate;
+    } on PlatformException catch (e) {
+      if (e.code == 'NotAvailable' && allowSkip) {
+        final proceed = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text('Device Security Not Enabled'),
+            content: Text(
+              'No device security (PIN, password, or biometrics) is enabled.\n\n'
+              'Enabling 2FA without device protection is less secure.\n\n'
+              'Would you like to continue anyway?'
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: Text('Continue Anyway'),
+              ),
+            ],
+          ),
+        );
+        if (proceed == true) {
+          if (onSkip != null) onSkip();
+          return true;
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Authentication error: ${e.message ?? e.code}')),
+        );
+      }
+      return false;
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Authentication error: ${e.toString()}')),
@@ -57,7 +91,7 @@ class AccountSettingsScreenV1 extends ConsumerWidget {
             leading: Icon(Icons.lock, color: theme.primaryColor),
             title: Text('Change Password'),
             onTap: () async {
-              final authenticated = await _authenticate(context);
+              final authenticated = await _authenticate(context, reason: 'Please authenticate to change your password');
               if (authenticated) {
                 Navigator.of(context).push(
                   MaterialPageRoute(
@@ -72,10 +106,11 @@ class AccountSettingsScreenV1 extends ConsumerWidget {
             leading: Icon(Icons.verified_user, color: theme.primaryColor),
             title: Text('Enable 2FA'),
             onTap: () async {
-              final LocalAuthentication auth = LocalAuthentication();
-              final authenticated = await auth.authenticate(
-                localizedReason: 'Please authenticate to enable 2FA',
-                options: const AuthenticationOptions(biometricOnly: false, stickyAuth: true),
+              final authenticated = await _authenticate(
+                context,
+                reason: 'Please authenticate to enable 2FA',
+                allowSkip: true,
+                onSkip: null, // Optionally handle skip event
               );
               if (authenticated) {
                 Navigator.of(context).push(

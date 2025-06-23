@@ -23,17 +23,47 @@ class _HomeScreenV1State extends ConsumerState<HomeScreenV1> {
     Navigator.of(context).pop(); // Close drawer
   }
 
+  Future<bool> _onWillPop() async {
+    if (selectedItem != 'dashboard') {
+      setState(() {
+        selectedItem = 'dashboard';
+      });
+      return false;
+    }
+    return (await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Exit App?'),
+            content: const Text('Are you sure you want to quit?'),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('No'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('Yes'),
+              ),
+            ],
+          ),
+        )) ??
+        false;
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = ref.watch(currentThemeProvider);
     
-    return Scaffold(
-      appBar: const CustomAppBar(title: 'Emotion Tracker'),
-      drawer: SidebarWidget(
-        selectedItem: selectedItem,
-        onItemSelected: _onItemSelected,
+    return WillPopScope(
+      onWillPop: _onWillPop,
+      child: Scaffold(
+        appBar: const CustomAppBar(title: 'Emotion Tracker'),
+        drawer: SidebarWidget(
+          selectedItem: selectedItem,
+          onItemSelected: _onItemSelected,
+        ),
+        body: _buildBody(theme),
       ),
-      body: _buildBody(theme),
     );
   }
 

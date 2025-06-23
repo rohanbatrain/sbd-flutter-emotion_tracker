@@ -501,16 +501,29 @@ final healthCheckEndpointProvider = Provider<String>((ref) {
 });
 
 /// Function to perform login POST request
-Future<Map<String, dynamic>> loginWithApi(WidgetRef ref, String usernameOrEmail, String password) async {
+Future<Map<String, dynamic>> loginWithApi(
+  WidgetRef ref,
+  String usernameOrEmail,
+  String password, {
+  String? twoFaCode,
+  String? twoFaMethod,
+}) async {
   final baseUrl = ref.read(apiBaseUrlProvider);
   final url = Uri.parse('$baseUrl/auth/login');
   try {
     final headers = await _ApiHeaders.getCommonHeaders();
     // Determine if input is email or username
     final isEmail = InputValidator.isEmail(usernameOrEmail);
-    final body = isEmail
-        ? {'email': usernameOrEmail, 'password': password}
-        : {'username': usernameOrEmail, 'password': password};
+    final body = <String, dynamic>{
+      if (isEmail) 'email': usernameOrEmail else 'username': usernameOrEmail,
+      'password': password,
+    };
+
+    if (twoFaCode != null && twoFaMethod != null) {
+      body['two_fa_code'] = twoFaCode;
+      body['two_fa_method'] = twoFaMethod;
+    }
+
     final response = await HttpUtil.post(
       url,
       headers: headers,
@@ -535,7 +548,7 @@ Future<Map<String, dynamic>> loginWithApi(WidgetRef ref, String usernameOrEmail,
       await secureStorage.write(key: 'temp_user_password', value: password);
       return {'error': 'email_not_verified', ...responseBody};
     } else {
-      throw Exception('Login failed: ${response.statusCode} ${response.body}');
+throw Exception('Login failed: ${response.statusCode} ${response.body}');
     }
   } catch (e) {
     // Only catch network and Cloudflare errors here, let authentication errors pass through
