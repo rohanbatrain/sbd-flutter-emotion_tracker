@@ -420,6 +420,25 @@ class AuthNotifier extends StateNotifier<AuthState> {
     );
   }
 
+  Future<Map<String, dynamic>> loginWithToken(WidgetRef ref, String token) async {
+    final result = await loginWithTokenApi(ref, token);
+    // Update state if login was successful
+    if (result['access_token'] != null) {
+      final userEmail = result['email'] ?? result['username'];
+      final accessToken = result['access_token'];
+      state = state.copyWith(
+        isLoggedIn: true,
+        userEmail: userEmail,
+        accessToken: accessToken,
+      );
+      // Ensure is_verified is up-to-date from SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      final isVerified = prefs.getBool('is_verified');
+      result['is_verified'] = isVerified;
+    }
+    return result;
+  }
+
   Future<void> signup(String username, String email, String password) async {
     // This method is called after successful API signup
     // The actual API call happens in the signup screen
@@ -556,6 +575,44 @@ throw Exception('Login failed: ${response.statusCode} ${response.body}');
   }
 }
 
+/// Function to perform login with token
+Future<Map<String, dynamic>> loginWithTokenApi(
+  WidgetRef ref,
+  String token,
+) async {
+  final baseUrl = ref.read(apiBaseUrlProvider);
+  final url = Uri.parse('$baseUrl/auth/validate-token');
+  try {
+    final headers = await _ApiHeaders.getCommonHeaders();
+    headers['Authorization'] = 'Bearer $token';
+    final response = await HttpUtil.get(
+      url,
+      headers: headers,
+      // No body needed, token is in Authorization header
+    );
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      // Store login data using the same logic as normal login
+      await _AuthDataStorage.storeAuthData(ref, data);
+      return data;
+    } else if (response.statusCode == 403 && response.body.contains('Email not verified')) {
+      final responseBody = jsonDecode(response.body) as Map<String, dynamic>;
+      final secureStorage = ref.read(secureStorageProvider);
+      if (responseBody['email'] != null) {
+        await secureStorage.write(key: 'user_email', value: responseBody['email']);
+      }
+      if (responseBody['username'] != null) {
+        await secureStorage.write(key: 'user_username', value: responseBody['username']);
+      }
+      return {'error': 'email_not_verified', ...responseBody};
+    } else {
+      throw Exception('Token Login failed: ${response.statusCode} ${response.body}');
+    }
+  } catch (e) {
+    throw _ApiErrorHandler.handleError(e);
+  }
+}
+
 /// Function to perform registration POST request
 Future<Map<String, dynamic>> registerWithApi(
   WidgetRef ref,
@@ -659,5 +716,37 @@ Future<bool> checkEmailAvailability(WidgetRef ref, String email) async {
     return _ApiResponseValidator.validateAvailabilityResponse(response, 'email');
   } catch (e) {
     throw _ApiErrorHandler.handleError(e);
+  }
+}
+
+/// Function to validate a JWT access token (user must be verified and have client-side encryption enabled)
+Future<bool> validateAccessToken(WidgetRef ref, String accessToken) async {
+  final baseUrl = ref.read(apiBaseUrlProvider);
+  final url = Uri.parse('$baseUrl/auth/validate-token');
+  try {
+    final headers = await _ApiHeaders.getCommonHeaders();
+    headers['Authorization'] = 'Bearer $accessToken';
+    final response = await HttpUtil.get(
+      url,
+      headers: headers,
+    );
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      // Always overwrite these fields on each login
+      final secureStorage = ref.read(secureStorageProvider);
+      final prefs = await SharedPreferences.getInstance();
+      await secureStorage.write(key: 'client_side_encryption', value: data['client_side_encryption']?.toString() ?? '');
+      await secureStorage.write(key: 'user_role', value: data['role']?.toString() ?? '');
+      await secureStorage.write(key: 'user_username', value: data['username']?.toString() ?? '');
+      await secureStorage.write(key: 'user_email', value: data['email']?.toString() ?? '');
+      await prefs.setString('issued_at', data['issued_at']?.toString() ?? '');
+      await prefs.setString('expires_at', data['expires_at']?.toString() ?? '');
+      await prefs.setBool('is_verified', data['is_verified'] == true || data['is_verified'] == 'true');
+      return data['token'] == 'valid';
+    }
+    return false;
+  } catch (e) {
+    // Treat any error as invalid token
+    return false;
   }
 }

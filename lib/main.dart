@@ -11,6 +11,7 @@ import 'package:emotion_tracker/widgets/auth_guard.dart';
 import 'package:emotion_tracker/screens/auth/verify-email/variant1.dart';
 import 'package:emotion_tracker/screens/auth/client-side-encryption/variant1.dart';
 import 'package:emotion_tracker/screens/auth/forgot-password/variant1.dart';
+import 'package:emotion_tracker/screens/auth/login-with-token/variant1.dart';
 
 const String registrationAppId = 'emotion_tracker';
 
@@ -69,6 +70,7 @@ class MyApp extends ConsumerWidget {
         '/verify-email/v1': (context) => const VerifyEmailScreenV1(),
         '/forgot-password/v1': (context) => const ForgotPasswordScreenV1(),
         '/client-side-encryption/v1': (context) => const ClientSideEncryptionScreenV1(),
+        '/login-with-token/v1': (context) => const LoginWithTokenScreenV1(), // <-- Added route
         // Variant 2 Routes
       },
     );
@@ -102,6 +104,10 @@ class MyApp extends ConsumerWidget {
         break;
       case '/client-side-encryption/v1':
         page = const ClientSideEncryptionScreenV1();
+        config = PageTransitionService.modalTransition;
+        break;
+      case '/login-with-token/v1':
+        page = const LoginWithTokenScreenV1();
         config = PageTransitionService.modalTransition;
         break;
       default:

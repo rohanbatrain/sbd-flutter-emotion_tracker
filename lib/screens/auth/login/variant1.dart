@@ -225,17 +225,37 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
                       ),
                     ),
                     const SizedBox(height: 16),
-                    TextButton(
-                      onPressed: () {
-                        Navigator.of(context).pushNamed('/forgot-password/v1');
-                      },
-                      child: Text(
-                        'Forgot Password?',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.primaryColor,
-                          fontWeight: FontWeight.w500,
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        TextButton(
+                          onPressed: () {
+                            Navigator.of(context).pushNamed('/forgot-password/v1');
+                          },
+                          child: Text(
+                            'Forgot Password?',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: theme.primaryColor,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
                         ),
-                      ),
+                        const SizedBox(width: 12),
+                        Text('|', style: theme.textTheme.bodyMedium?.copyWith(color: theme.dividerColor)),
+                        const SizedBox(width: 12),
+                        TextButton(
+                          onPressed: () {
+                            Navigator.of(context).pushNamed('/login-with-token/v1');
+                          },
+                          child: Text(
+                            'Login with Token',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: theme.primaryColor,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 16),
                     TextButton.icon(
