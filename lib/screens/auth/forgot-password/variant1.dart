@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:emotion_tracker/providers/theme_provider.dart';
 import 'package:emotion_tracker/providers/app_providers.dart';
+import 'package:emotion_tracker/providers/user_agent_util.dart';
 import 'package:lottie/lottie.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:convert';
+import 'dart:async';
 import 'package:http/http.dart' as http;
 
 class ForgotPasswordScreenV1 extends ConsumerStatefulWidget {
@@ -19,11 +21,30 @@ class _ForgotPasswordScreenV1State extends ConsumerState<ForgotPasswordScreenV1>
   bool isLoading = false;
   bool isSubmitted = false;
   String? errorText;
+  int resendCooldown = 0;
+  Timer? resendTimer;
 
   @override
   void dispose() {
     emailController.dispose();
+    resendTimer?.cancel();
     super.dispose();
+  }
+
+  void _startResendCooldown() {
+    setState(() {
+      resendCooldown = 60;
+    });
+    resendTimer?.cancel();
+    resendTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) return;
+      setState(() {
+        resendCooldown--;
+        if (resendCooldown <= 0) {
+          resendTimer?.cancel();
+        }
+      });
+    });
   }
 
   void _submit() async {
@@ -31,7 +52,6 @@ class _ForgotPasswordScreenV1State extends ConsumerState<ForgotPasswordScreenV1>
       errorText = null;
     });
     final email = emailController.text.trim().toLowerCase();
-    // Use centralized email validation
     final emailValidationError = InputValidator.validateEmail(email);
     if (emailValidationError != null) {
       setState(() {
@@ -48,6 +68,18 @@ class _ForgotPasswordScreenV1State extends ConsumerState<ForgotPasswordScreenV1>
         isLoading = false;
         isSubmitted = true;
       });
+    } on RateLimitException catch (e) {
+      setState(() {
+        isLoading = false;
+        errorText = e.message;
+      });
+      final globalContext = ref.read(navigationServiceProvider).currentContext;
+      if (globalContext != null) {
+        ScaffoldMessenger.of(globalContext).showSnackBar(
+          SnackBar(content: Text(e.message)),
+        );
+      }
+      if (resendCooldown <= 0) _startResendCooldown();
     } catch (e) {
       setState(() {
         isLoading = false;
@@ -63,7 +95,7 @@ class _ForgotPasswordScreenV1State extends ConsumerState<ForgotPasswordScreenV1>
     });
     final email = emailController.text.trim().toLowerCase();
     try {
-      final response = await forgotPasswordApi(ref, email);
+      await forgotPasswordApi(ref, email);
       setState(() {
         isLoading = false;
       });
@@ -73,6 +105,19 @@ class _ForgotPasswordScreenV1State extends ConsumerState<ForgotPasswordScreenV1>
           const SnackBar(content: Text('Reset link resent!')),
         );
       }
+      _startResendCooldown();
+    } on RateLimitException catch (e) {
+      setState(() {
+        isLoading = false;
+        errorText = e.message;
+      });
+      final globalContext = ref.read(navigationServiceProvider).currentContext;
+      if (globalContext != null) {
+        ScaffoldMessenger.of(globalContext).showSnackBar(
+          SnackBar(content: Text(e.message)),
+        );
+      }
+      if (resendCooldown <= 0) _startResendCooldown();
     } catch (e) {
       setState(() {
         isLoading = false;
@@ -266,16 +311,25 @@ class _ForgotPasswordScreenV1State extends ConsumerState<ForgotPasswordScreenV1>
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton.icon(
-                          onPressed: isLoading ? null : _resend,
+                          onPressed: (isLoading || resendCooldown > 0) ? null : _resend,
                           icon: Icon(Icons.refresh, color: theme.colorScheme.onPrimary),
-                          label: Text(
-                            'Resend Email',
-                            style: theme.textTheme.labelLarge?.copyWith(
-                              color: theme.colorScheme.onPrimary,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
+                          label: resendCooldown > 0
+                              ? Text(
+                                  'Resend in ${resendCooldown}s',
+                                  style: theme.textTheme.labelLarge?.copyWith(
+                                    color: theme.colorScheme.onPrimary,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                )
+                              : Text(
+                                  'Resend Email',
+                                  style: theme.textTheme.labelLarge?.copyWith(
+                                    color: theme.colorScheme.onPrimary,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: theme.primaryColor,
                             minimumSize: const Size.fromHeight(50),
@@ -399,14 +453,34 @@ class _EmailClientButton extends StatelessWidget {
 Future<Map<String, dynamic>> forgotPasswordApi(WidgetRef ref, String email) async {
   final baseUrl = ref.read(apiBaseUrlProvider);
   final url = Uri.parse('$baseUrl/auth/forgot-password');
+  final userAgent = await getUserAgent();
   final response = await http.post(
     url,
-    headers: {'Content-Type': 'application/json'},
-    body: jsonEncode({'email': email}), // Send email in JSON body
+    headers: {
+      'Content-Type': 'application/json',
+      'User-Agent': userAgent,
+    },
+    body: jsonEncode({'email': email}),
   );
   if (response.statusCode >= 200 && response.statusCode < 300) {
     return jsonDecode(response.body);
+  } else if (response.statusCode == 429) {
+    String message = 'Too many requests. Please wait before trying again.';
+    try {
+      final body = jsonDecode(response.body);
+      if (body is Map && body['detail'] is String) {
+        message = body['detail'];
+      }
+    } catch (_) {}
+    throw RateLimitException(message);
   } else {
     throw Exception('Failed to send reset link: ${response.statusCode} ${response.body}');
   }
+}
+
+class RateLimitException implements Exception {
+  final String message;
+  RateLimitException(this.message);
+  @override
+  String toString() => 'RateLimitException: $message';
 }
