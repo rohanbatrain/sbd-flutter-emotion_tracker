@@ -131,7 +131,7 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
                     Padding(
                       padding: const EdgeInsets.only(bottom: 12.0),
                       child: Text(
-                        'Please login with your username or email.',
+                        'Please login with your Second Brain Database \n username or email.',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.textTheme.bodySmall?.color?.withOpacity(0.7),
                         ),

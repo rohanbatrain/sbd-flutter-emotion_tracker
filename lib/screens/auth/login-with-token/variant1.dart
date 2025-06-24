@@ -420,11 +420,28 @@ class _LoginWithTokenScreenV1State extends ConsumerState<LoginWithTokenScreenV1>
                               shadowColor: theme.primaryColor.withOpacity(0.2),
                             ),
                             icon: isLoading
-                                ? const SizedBox.shrink()
+                                ? Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 2.0),
+                                    child: SizedBox(
+                                      width: 22,
+                                      height: 22,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 3.2,
+                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                        backgroundColor: theme.primaryColor.withOpacity(0.15),
+                                      ),
+                                    ),
+                                  )
                                 : const Icon(Icons.login, color: Colors.white),
                             label: isLoading
-                                ? const CircularProgressIndicator(
-                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                ? Text(
+                                    'Logging in...',
+                                    style: theme.textTheme.titleMedium?.copyWith(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                      letterSpacing: 0.2,
+                                    ),
                                   )
                                 : Text(
                                     'Login',
