@@ -137,19 +137,28 @@ class TwoFAService {
   }
 
   Future<Map<String, dynamic>> get2FAStatus() async {
+    // Returns enabled, methods, pending, never backup_codes
     return _request('GET', _Endpoints.status);
   }
 
   Future<Map<String, dynamic>> setup2FA() async {
+    // Only returns totp_secret, provisioning_uri, qr_code_url
     return _request('POST', _Endpoints.setup, data: {'method': 'totp'});
   }
 
   Future<Map<String, dynamic>> verify2FA(String code) async {
+    // Only returns backup_codes on first successful verification
     return _request('POST', _Endpoints.verify, data: {'method': 'totp', 'code': code});
   }
 
   Future<Map<String, dynamic>> disable2FA() async {
+    // Disables 2FA
     return _request('POST', _Endpoints.disable);
+  }
+
+  Future<Map<String, dynamic>> reset2FA() async {
+    // Resets TOTP secret, does not return backup codes
+    return _request('POST', '/auth/2fa/reset', data: {'method': 'totp'});
   }
 
   Future<Map<String, dynamic>> regenerateBackupCodes() async {
@@ -165,26 +174,6 @@ class TwoFAService {
       return DateTime.parse(value);
     } catch (_) {
       return null;
-    }
-  }
-
-  /// Stores backup codes and the regeneration timestamp securely.
-  Future<void> storeBackupCodes(List<String> codes) async {
-    final secureStorage = _ref.read(secureStorageProvider);
-    await secureStorage.write(key: TwoFAConstants.backupCodesKey, value: json.encode(codes));
-    await secureStorage.write(key: TwoFAConstants.backupCodesRegeneratedAtKey, value: DateTime.now().toIso8601String());
-  }
-
-  /// Loads backup codes from secure storage.
-  Future<List<String>> loadBackupCodes() async {
-    final secureStorage = _ref.read(secureStorageProvider);
-    final value = await secureStorage.read(key: TwoFAConstants.backupCodesKey);
-    if (value == null) return [];
-    try {
-      final decoded = json.decode(value);
-      return List<String>.from(decoded);
-    } catch (_) {
-      return [];
     }
   }
 

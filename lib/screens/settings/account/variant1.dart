@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:emotion_tracker/providers/theme_provider.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:flutter/services.dart';
 import 'change-password/variant1.dart';
-import 'enable-2fa/variant1.dart';
 import 'profile/variant1.dart';
+import 'enable-2fa/2fa_status_screen.dart';
 
 class AccountSettingsScreenV1 extends ConsumerWidget {
   const AccountSettingsScreenV1({Key? key}) : super(key: key);
@@ -104,7 +103,7 @@ class AccountSettingsScreenV1 extends ConsumerWidget {
           SizedBox(height: 14),
           ListTile(
             leading: Icon(Icons.verified_user, color: theme.primaryColor),
-            title: Text('Enable 2FA'),
+            title: Text('Enable/Disable 2FA'),
             onTap: () async {
               final authenticated = await _authenticate(
                 context,
@@ -115,7 +114,7 @@ class AccountSettingsScreenV1 extends ConsumerWidget {
               if (authenticated) {
                 Navigator.of(context).push(
                   MaterialPageRoute(
-                    builder: (_) => Enable2FAScreenV1(),
+                    builder: (_) => const TwoFAStatusScreen(),
                   ),
                 );
               }
