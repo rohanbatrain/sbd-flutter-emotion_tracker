@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'dart:convert';
 import 'dart:async';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ForgotPasswordScreenV1 extends ConsumerStatefulWidget {
   const ForgotPasswordScreenV1({Key? key}) : super(key: key);
@@ -23,17 +24,47 @@ class _ForgotPasswordScreenV1State extends ConsumerState<ForgotPasswordScreenV1>
   String? errorText;
   int resendCooldown = 0;
   Timer? resendTimer;
+  bool sendCooldownActive = false;
+
+  // Persist cooldown state
+  static const String _cooldownKey = 'forgot_password_cooldown_until';
 
   @override
-  void dispose() {
-    emailController.dispose();
-    resendTimer?.cancel();
-    super.dispose();
+  void initState() {
+    super.initState();
+    _restoreCooldown();
   }
 
-  void _startResendCooldown() {
+  Future<void> _restoreCooldown() async {
+    final prefs = await SharedPreferences.getInstance();
+    final until = prefs.getInt(_cooldownKey) ?? 0;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (until > now) {
+      setState(() {
+        resendCooldown = ((until - now) / 1000).ceil();
+        sendCooldownActive = true;
+      });
+      resendTimer?.cancel();
+      resendTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        if (!mounted) return;
+        setState(() {
+          resendCooldown--;
+          if (resendCooldown <= 0) {
+            resendTimer?.cancel();
+            sendCooldownActive = false;
+          }
+        });
+      });
+    }
+  }
+
+  Future<void> _startCooldown() async {
+    final until = DateTime.now().millisecondsSinceEpoch + 60000;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_cooldownKey, until);
     setState(() {
       resendCooldown = 60;
+      sendCooldownActive = true;
     });
     resendTimer?.cancel();
     resendTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
@@ -42,9 +73,17 @@ class _ForgotPasswordScreenV1State extends ConsumerState<ForgotPasswordScreenV1>
         resendCooldown--;
         if (resendCooldown <= 0) {
           resendTimer?.cancel();
+          sendCooldownActive = false;
         }
       });
     });
+  }
+
+  @override
+  void dispose() {
+    emailController.dispose();
+    resendTimer?.cancel();
+    super.dispose();
   }
 
   void _submit() async {
@@ -63,11 +102,12 @@ class _ForgotPasswordScreenV1State extends ConsumerState<ForgotPasswordScreenV1>
       isLoading = true;
     });
     try {
-      await forgotPasswordApi(ref, email);
+      await sendForgotPasswordResetLink(ref, email);
       setState(() {
         isLoading = false;
         isSubmitted = true;
       });
+      _startCooldown();
     } on RateLimitException catch (e) {
       setState(() {
         isLoading = false;
@@ -79,7 +119,7 @@ class _ForgotPasswordScreenV1State extends ConsumerState<ForgotPasswordScreenV1>
           SnackBar(content: Text(e.message)),
         );
       }
-      if (resendCooldown <= 0) _startResendCooldown();
+      if (!sendCooldownActive) _startCooldown();
     } catch (e) {
       setState(() {
         isLoading = false;
@@ -95,7 +135,7 @@ class _ForgotPasswordScreenV1State extends ConsumerState<ForgotPasswordScreenV1>
     });
     final email = emailController.text.trim().toLowerCase();
     try {
-      await forgotPasswordApi(ref, email);
+      await resendForgotPasswordResetLink(ref, email);
       setState(() {
         isLoading = false;
       });
@@ -105,7 +145,7 @@ class _ForgotPasswordScreenV1State extends ConsumerState<ForgotPasswordScreenV1>
           const SnackBar(content: Text('Reset link resent!')),
         );
       }
-      _startResendCooldown();
+      _startCooldown();
     } on RateLimitException catch (e) {
       setState(() {
         isLoading = false;
@@ -117,7 +157,7 @@ class _ForgotPasswordScreenV1State extends ConsumerState<ForgotPasswordScreenV1>
           SnackBar(content: Text(e.message)),
         );
       }
-      if (resendCooldown <= 0) _startResendCooldown();
+      if (!sendCooldownActive) _startCooldown();
     } catch (e) {
       setState(() {
         isLoading = false;
@@ -225,7 +265,7 @@ class _ForgotPasswordScreenV1State extends ConsumerState<ForgotPasswordScreenV1>
             width: double.infinity,
             height: 48,
             child: ElevatedButton(
-              onPressed: isLoading ? null : _submit,
+              onPressed: isLoading || sendCooldownActive ? null : _submit,
               style: ElevatedButton.styleFrom(
                 backgroundColor: theme.primaryColor,
                 shape: RoundedRectangleBorder(
@@ -240,7 +280,7 @@ class _ForgotPasswordScreenV1State extends ConsumerState<ForgotPasswordScreenV1>
                       child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                     )
                   : Text(
-                      'Send Reset Link',
+                      sendCooldownActive ? 'Send in ${resendCooldown}s' : 'Send Reset Link',
                       style: theme.textTheme.labelLarge?.copyWith(
                         color: theme.colorScheme.onPrimary,
                         fontSize: 16,
@@ -450,7 +490,7 @@ class _EmailClientButton extends StatelessWidget {
   }
 }
 
-Future<Map<String, dynamic>> forgotPasswordApi(WidgetRef ref, String email) async {
+Future<Map<String, dynamic>> sendForgotPasswordResetLink(WidgetRef ref, String email) async {
   final baseUrl = ref.read(apiBaseUrlProvider);
   final url = Uri.parse('$baseUrl/auth/forgot-password');
   final userAgent = await getUserAgent();
@@ -475,6 +515,34 @@ Future<Map<String, dynamic>> forgotPasswordApi(WidgetRef ref, String email) asyn
     throw RateLimitException(message);
   } else {
     throw Exception('Failed to send reset link: ${response.statusCode} ${response.body}');
+  }
+}
+
+Future<Map<String, dynamic>> resendForgotPasswordResetLink(WidgetRef ref, String email) async {
+  final baseUrl = ref.read(apiBaseUrlProvider);
+  final url = Uri.parse('$baseUrl/auth/resend-forgot-password');
+  final userAgent = await getUserAgent();
+  final response = await http.post(
+    url,
+    headers: {
+      'Content-Type': 'application/json',
+      'User-Agent': userAgent,
+    },
+    body: jsonEncode({'email': email}),
+  );
+  if (response.statusCode >= 200 && response.statusCode < 300) {
+    return jsonDecode(response.body);
+  } else if (response.statusCode == 429) {
+    String message = 'Too many requests. Please wait before trying again.';
+    try {
+      final body = jsonDecode(response.body);
+      if (body is Map && body['detail'] is String) {
+        message = body['detail'];
+      }
+    } catch (_) {}
+    throw RateLimitException(message);
+  } else {
+    throw Exception('Failed to resend reset link: ${response.statusCode} ${response.body}');
   }
 }
 

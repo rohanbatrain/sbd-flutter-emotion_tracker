@@ -343,9 +343,9 @@ class _LoginWithTokenScreenV1State extends ConsumerState<LoginWithTokenScreenV1>
                           builder: (context, ref, _) {
                             final theme = ref.watch(currentThemeProvider);
                             return Text(
-                              'Enter your token to log in.\nOnly verified users can log in with a token.\nInvalid, expired, or unverified tokens will show an error.',
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: theme.colorScheme.onBackground,
+                              'Verified users only. Expired or invalid tokens will not work.',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onBackground.withOpacity(0.75),
                               ),
                               textAlign: TextAlign.center,
                             );
@@ -383,6 +383,7 @@ class _LoginWithTokenScreenV1State extends ConsumerState<LoginWithTokenScreenV1>
                           controller: tokenController,
                           decoration: InputDecoration(
                             labelText: 'Token',
+                            hintText: 'Paste your login token',
                             prefixIcon: const Icon(Icons.vpn_key),
                             suffixIcon: tokenController.text.isNotEmpty
                                 ? IconButton(
@@ -399,7 +400,7 @@ class _LoginWithTokenScreenV1State extends ConsumerState<LoginWithTokenScreenV1>
                               borderRadius: BorderRadius.circular(24),
                             ),
                             filled: true,
-                            fillColor: Colors.white.withOpacity(0.95),
+                            fillColor: theme.inputDecorationTheme.fillColor ?? theme.colorScheme.surface,
                           ),
                           style: const TextStyle(letterSpacing: 1.1),
                           textInputAction: TextInputAction.done,

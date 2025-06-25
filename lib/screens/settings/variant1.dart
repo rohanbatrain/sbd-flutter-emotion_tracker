@@ -29,7 +29,7 @@ class SettingsScreenV1 extends ConsumerWidget {
     void _onItemSelected(String item) {
       Navigator.of(context).pop();
       if (item == 'dashboard') {
-        Navigator.of(context).pushReplacementNamed('/');
+        Navigator.of(context).pushReplacementNamed('/home/v1');
       } else if (item == 'shop') {
         Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => const ShopScreenV1()),

@@ -750,3 +750,62 @@ Future<bool> validateAccessToken(WidgetRef ref, String accessToken) async {
     return false;
   }
 }
+
+/// Function to send forgot password reset link (with rate limit handling)
+Future<void> sendForgotPasswordResetLink(WidgetRef ref, String email) async {
+  final baseUrl = ref.read(apiBaseUrlProvider);
+  final url = Uri.parse('$baseUrl/auth/forgot-password');
+  final headers = await _ApiHeaders.getCommonHeaders();
+  final response = await HttpUtil.post(
+    url,
+    headers: headers,
+    body: jsonEncode({'email': email}),
+  );
+  if (response.statusCode >= 200 && response.statusCode < 300) {
+    return;
+  } else if (response.statusCode == 429) {
+    String message = 'Too many requests. Please wait before trying again.';
+    try {
+      final body = jsonDecode(response.body);
+      if (body is Map && body['detail'] is String) {
+        message = body['detail'];
+      }
+    } catch (_) {}
+    throw RateLimitException(message);
+  } else {
+    throw Exception('Failed to send reset link: \\${response.statusCode} \\${response.body}');
+  }
+}
+
+/// Function to resend forgot password reset link (calls /resend-verification-email)
+Future<void> resendForgotPasswordResetLink(WidgetRef ref, String email) async {
+  final baseUrl = ref.read(apiBaseUrlProvider);
+  final url = Uri.parse('$baseUrl/resend-verification-email');
+  final headers = await _ApiHeaders.getCommonHeaders();
+  final response = await HttpUtil.post(
+    url,
+    headers: headers,
+    body: jsonEncode({'email': email}),
+  );
+  if (response.statusCode >= 200 && response.statusCode < 300) {
+    return;
+  } else if (response.statusCode == 429) {
+    String message = 'Too many requests. Please wait before trying again.';
+    try {
+      final body = jsonDecode(response.body);
+      if (body is Map && body['detail'] is String) {
+        message = body['detail'];
+      }
+    } catch (_) {}
+    throw RateLimitException(message);
+  } else {
+    throw Exception('Failed to resend reset link: \\${response.statusCode} \\${response.body}');
+  }
+}
+
+class RateLimitException implements Exception {
+  final String message;
+  RateLimitException(this.message);
+  @override
+  String toString() => 'RateLimitException: $message';
+}
