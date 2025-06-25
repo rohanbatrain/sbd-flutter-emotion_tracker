@@ -77,6 +77,16 @@ class TwoFAService {
 
   Future<Map<String, dynamic>> _processResponse(http.Response response) async {
     if (response.statusCode == 401) {
+      try {
+        final responseBody = json.decode(response.body);
+        if (responseBody is Map && responseBody['detail'] is String) {
+          final detail = responseBody['detail'] as String;
+          if (detail.toLowerCase().contains('invalid totp')) {
+            // Don't logout, just show error in UI
+            throw ApiException(detail, 401);
+          }
+        }
+      } catch (_) {}
       await _ref.read(authProvider.notifier).logout();
       throw UnauthorizedException(TwoFAConstants.errorSessionExpired);
     }
@@ -90,12 +100,16 @@ class TwoFAService {
       String errorMessage;
       try {
         final responseBody = json.decode(response.body);
-        errorMessage = responseBody['detail'] ?? response.body;
+        // Prefer 'detail' if present, else fallback to known error messages
+        if (responseBody is Map && responseBody.containsKey('detail')) {
+          errorMessage = responseBody['detail'];
+        } else {
+          errorMessage = response.body;
+        }
       } catch (e) {
         errorMessage = response.body;
       }
-      throw ApiException(
-          'Failed to perform 2FA operation: $errorMessage', response.statusCode);
+      throw ApiException(errorMessage, response.statusCode);
     }
   }
 

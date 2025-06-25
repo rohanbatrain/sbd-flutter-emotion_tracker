@@ -40,7 +40,11 @@ class _TwoFASetupScreenState extends ConsumerState<TwoFASetupScreen> {
       });
     } on UnauthorizedException catch (_) {
       if (mounted) {
-        Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+        setState(() {
+          error = '__unauthorized_redirect__';
+          isLoading = false;
+        });
+        Navigator.of(context).pushNamedAndRemoveUntil('auth/login/v1', (route) => false);
       }
     } catch (e) {
       setState(() { error = e.toString(); isLoading = false; });
@@ -73,7 +77,11 @@ class _TwoFASetupScreenState extends ConsumerState<TwoFASetupScreen> {
       }
     } on UnauthorizedException catch (_) {
       if (mounted) {
-        Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+        setState(() {
+          error = '__unauthorized_redirect__';
+          isLoading = false;
+        });
+        Navigator.of(context).pushNamedAndRemoveUntil('auth/login/v1', (route) => false);
       }
     } catch (e) {
       setState(() { error = e.toString(); isLoading = false; });
@@ -84,6 +92,13 @@ class _TwoFASetupScreenState extends ConsumerState<TwoFASetupScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     if (isLoading) {
+      // If session expired, don't show spinner
+      if (error == '__unauthorized_redirect__') {
+        return Scaffold(
+          backgroundColor: theme.scaffoldBackgroundColor,
+          body: Center(child: Text('Session expired. Redirecting to login...')),
+        );
+      }
       return Scaffold(
         backgroundColor: theme.scaffoldBackgroundColor,
         appBar: AppBar(

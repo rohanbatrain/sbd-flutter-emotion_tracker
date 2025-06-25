@@ -353,8 +353,13 @@ class _ServerSettingsDialogState extends ConsumerState<ServerSettingsDialog> {
                         }
                       },
                       dropdownColor: theme.cardColor,
-                      icon: Icon(Icons.arrow_drop_down_rounded, color: theme.primaryColor, size: 28),
                       style: theme.textTheme.bodyMedium,
+                      icon: (savedServers.contains(domainController!.text.trim()) && domainController!.text.trim() != 'dev-app-sbd.rohanbatra.in')
+                        ? Padding(
+                            padding: const EdgeInsets.only(right: 36.0), // shift arrow left when delete icon is visible
+                            child: Icon(Icons.arrow_drop_down_rounded, color: theme.primaryColor, size: 28),
+                          )
+                        : Icon(Icons.arrow_drop_down_rounded, color: theme.primaryColor, size: 28),
                       decoration: InputDecoration(
                         hintText: 'dev-app-sbd.rohanbatra.in',
                         filled: true,
@@ -366,17 +371,15 @@ class _ServerSettingsDialogState extends ConsumerState<ServerSettingsDialog> {
                       borderRadius: BorderRadius.circular(16),
                     ),
                   ),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (savedServers.contains(domainController!.text.trim()) && domainController!.text.trim() != 'dev-app-sbd.rohanbatra.in')
-                        IconButton(
-                          icon: Icon(Icons.delete, color: theme.colorScheme.error),
-                          tooltip: 'Remove server',
-                          onPressed: () => _removeServer(domainController!.text.trim()),
-                        ),
-                    ],
-                  ),
+                  if (savedServers.contains(domainController!.text.trim()) && domainController!.text.trim() != 'dev-app-sbd.rohanbatra.in')
+                    Positioned(
+                      right: 0,
+                      child: IconButton(
+                        icon: Icon(Icons.delete, color: theme.colorScheme.error),
+                        tooltip: 'Remove server',
+                        onPressed: () => _removeServer(domainController!.text.trim()),
+                      ),
+                    ),
                 ],
               ),
               const SizedBox(height: 10),

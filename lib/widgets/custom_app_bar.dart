@@ -10,6 +10,7 @@ class CustomAppBar extends ConsumerWidget implements PreferredSizeWidget {
   final Widget? leading;
   final bool showHamburger;
   final bool showCurrency;
+  final PreferredSizeWidget? bottom;
 
   const CustomAppBar({
     Key? key,
@@ -18,6 +19,7 @@ class CustomAppBar extends ConsumerWidget implements PreferredSizeWidget {
     this.leading,
     this.showHamburger = true,
     this.showCurrency = true,
+    this.bottom,
   }) : super(key: key);
 
   @override
@@ -81,6 +83,7 @@ class CustomAppBar extends ConsumerWidget implements PreferredSizeWidget {
       ],
       backgroundColor: theme.primaryColor,
       foregroundColor: theme.colorScheme.onPrimary,
+      bottom: bottom,
     );
   }
 

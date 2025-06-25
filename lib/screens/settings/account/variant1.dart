@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:flutter/services.dart';
-import 'change-password/variant1.dart';
 import 'profile/variant1.dart';
-import 'enable-2fa/2fa_status_screen.dart';
+import '../variant1.dart';
+import 'package:emotion_tracker/widgets/app_scaffold.dart';
+import 'package:emotion_tracker/screens/shop/variant1.dart';
+
+final _showAccountProvider = StateProvider<bool>((ref) => false);
 
 class AccountSettingsScreenV1 extends ConsumerWidget {
   const AccountSettingsScreenV1({Key? key}) : super(key: key);
@@ -61,66 +64,80 @@ class AccountSettingsScreenV1 extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    return Padding(
-      padding: EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Account Settings',
-            style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: theme.primaryColor,
-            ),
+    return WillPopScope(
+      onWillPop: () async {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const SettingsScreenV1()),
+          (route) => false,
+        );
+        return false;
+      },
+      child: AppScaffold(
+        title: 'Account Settings',
+        selectedItem: 'settings',
+        onItemSelected: (item) {
+          Navigator.of(context).pop();
+          if (item == 'dashboard') {
+            Navigator.of(context).pushReplacementNamed('/home/v1');
+          } else if (item == 'shop') {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const ShopScreenV1()),
+            );
+          } else if (item == 'settings') {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const SettingsScreenV1()),
+            );
+          }
+        },
+        body: Padding(
+          padding: EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(height: 16), // Add spacing below app bar
+              ListTile(
+                leading: Icon(Icons.person, color: theme.primaryColor),
+                title: Text('Profile'),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const ProfileScreenV1(),
+                    ),
+                  );
+                },
+              ),
+              SizedBox(height: 14),
+              ListTile(
+                leading: Icon(Icons.lock, color: theme.primaryColor),
+                title: Text('Change Password'),
+                onTap: () async {
+                  final authenticated = await _authenticate(context, reason: 'Please authenticate to change your password');
+                  if (authenticated) {
+                    final container = ProviderScope.containerOf(context);
+                    container.read(_showAccountProvider.notifier).state = true;
+                  }
+                },
+              ),
+              SizedBox(height: 14),
+              ListTile(
+                leading: Icon(Icons.verified_user, color: theme.primaryColor),
+                title: Text('Enable/Disable 2FA'),
+                onTap: () async {
+                  final authenticated = await _authenticate(
+                    context,
+                    reason: 'Please authenticate to enable 2FA',
+                    allowSkip: true,
+                    onSkip: null, // Optionally handle skip event
+                  );
+                  if (authenticated) {
+                    final container = ProviderScope.containerOf(context);
+                    container.read(_showAccountProvider.notifier).state = true;
+                  }
+                },
+              ),
+            ],
           ),
-          SizedBox(height: 16),
-          ListTile(
-            leading: Icon(Icons.person, color: theme.primaryColor),
-            title: Text('Profile'),
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const ProfileScreenV1(),
-                ),
-              );
-            },
-          ),
-          SizedBox(height: 14),
-          ListTile(
-            leading: Icon(Icons.lock, color: theme.primaryColor),
-            title: Text('Change Password'),
-            onTap: () async {
-              final authenticated = await _authenticate(context, reason: 'Please authenticate to change your password');
-              if (authenticated) {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => ChangePasswordScreenV1(),
-                  ),
-                );
-              }
-            },
-          ),
-          SizedBox(height: 14),
-          ListTile(
-            leading: Icon(Icons.verified_user, color: theme.primaryColor),
-            title: Text('Enable/Disable 2FA'),
-            onTap: () async {
-              final authenticated = await _authenticate(
-                context,
-                reason: 'Please authenticate to enable 2FA',
-                allowSkip: true,
-                onSkip: null, // Optionally handle skip event
-              );
-              if (authenticated) {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const TwoFAStatusScreen(),
-                  ),
-                );
-              }
-            },
-          ),
-        ],
+        ),
       ),
     );
   }

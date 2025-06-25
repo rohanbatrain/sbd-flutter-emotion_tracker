@@ -6,7 +6,9 @@ import 'package:emotion_tracker/providers/two_fa_service.dart';
 
 /// Entry point for 2FA settings. Decides which screen to show based on /2fa/status.
 class TwoFAStatusScreen extends ConsumerWidget {
-  const TwoFAStatusScreen({Key? key}) : super(key: key);
+  final VoidCallback? onBackToSettings;
+
+  const TwoFAStatusScreen({Key? key, this.onBackToSettings}) : super(key: key);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -27,19 +29,7 @@ class TwoFAStatusScreen extends ConsumerWidget {
             });
             return Scaffold(
               backgroundColor: theme.scaffoldBackgroundColor,
-              appBar: AppBar(
-                title: const Text('Two-Factor Authentication'),
-                leading: IconButton(
-                  icon: const Icon(Icons.arrow_back),
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
-                centerTitle: true,
-                elevation: 0,
-                backgroundColor: theme.scaffoldBackgroundColor,
-              ),
-              body: const Center(
-                child: Text('Session expired. Redirecting to login...'),
-              ),
+              body: Center(child: Text('Session expired. Redirecting to login...')),
             );
           }
           // Other errors
@@ -53,7 +43,13 @@ class TwoFAStatusScreen extends ConsumerWidget {
               title: const Text('Two-Factor Authentication'),
               leading: IconButton(
                 icon: const Icon(Icons.arrow_back),
-                onPressed: () => Navigator.of(context).pop(),
+                onPressed: () {
+                  if (onBackToSettings != null) {
+                    onBackToSettings!();
+                  } else {
+                    Navigator.of(context).pop();
+                  }
+                },
               ),
               centerTitle: true,
               elevation: 0,

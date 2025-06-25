@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:emotion_tracker/providers/theme_provider.dart';
-import 'package:emotion_tracker/widgets/custom_app_bar.dart';
-import 'package:emotion_tracker/widgets/sidebar_widget.dart';
 import 'package:emotion_tracker/screens/settings/variant1.dart';
 import 'package:emotion_tracker/screens/shop/variant1.dart';
+import 'package:emotion_tracker/screens/home/dashboard_screen_v1.dart';
+import 'package:emotion_tracker/widgets/app_scaffold.dart';
 
 class HomeScreenV1 extends ConsumerStatefulWidget {
   const HomeScreenV1({Key? key}) : super(key: key);
@@ -14,22 +13,32 @@ class HomeScreenV1 extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenV1State extends ConsumerState<HomeScreenV1> {
-  String selectedItem = 'dashboard';
-
   void _onItemSelected(String item) {
-    setState(() {
-      selectedItem = item;
-    });
     Navigator.of(context).pop(); // Close drawer
+    if (item == 'settings') {
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const SettingsScreenV1()),
+      );
+    } else if (item == 'shop') {
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const ShopScreenV1()),
+      );
+    } else if (item == 'dashboard') {
+      // Instead of popping to root, push dashboard if not already on it
+      final isDashboard = ModalRoute.of(context)?.settings.name == 'dashboard';
+      if (!isDashboard) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => const HomeScreenV1(),
+            settings: const RouteSettings(name: 'dashboard'),
+          ),
+        );
+      }
+      // If already on dashboard, just close the drawer
+    }
   }
 
   Future<bool> _onWillPop() async {
-    if (selectedItem != 'dashboard') {
-      setState(() {
-        selectedItem = 'dashboard';
-      });
-      return false;
-    }
     return (await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
@@ -52,56 +61,14 @@ class _HomeScreenV1State extends ConsumerState<HomeScreenV1> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = ref.watch(currentThemeProvider);
-    
     return WillPopScope(
       onWillPop: _onWillPop,
-      child: Scaffold(
-        appBar: const CustomAppBar(title: 'Emotion Tracker'),
-        drawer: SidebarWidget(
-          selectedItem: selectedItem,
-          onItemSelected: _onItemSelected,
-        ),
-        body: _buildBody(theme),
+      child: AppScaffold(
+        title: 'Emotion Tracker',
+        selectedItem: 'dashboard',
+        onItemSelected: _onItemSelected,
+        body: const DashboardScreenV1(),
       ),
     );
-  }
-
-  Widget _buildBody(ThemeData theme) {
-    switch (selectedItem) {
-      case 'settings':
-        return const SettingsScreenV1();
-      case 'shop':
-        return const ShopScreenV1();
-      case 'dashboard':
-      default:
-        return Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.dashboard_rounded,
-                size: 64,
-                color: theme.primaryColor,
-              ),
-              SizedBox(height: 16),
-              Text(
-                'Welcome to Dashboard',
-                style: theme.textTheme.headlineLarge?.copyWith(
-                  color: theme.primaryColor,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              SizedBox(height: 16),
-              Text(
-                'Your emotion tracking starts here!',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  color: theme.colorScheme.secondary,
-                ),
-              ),
-            ],
-          ),
-        );
-    }
   }
 }

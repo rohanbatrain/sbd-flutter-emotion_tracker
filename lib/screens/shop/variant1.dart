@@ -2,6 +2,8 @@ import 'package:emotion_tracker/widgets/custom_avatar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:emotion_tracker/providers/theme_provider.dart';
+import 'package:emotion_tracker/widgets/app_scaffold.dart';
+import 'package:emotion_tracker/screens/settings/variant1.dart';
 
 class ShopScreenV1 extends ConsumerStatefulWidget {
   const ShopScreenV1({Key? key}) : super(key: key);
@@ -25,46 +27,89 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
     super.dispose();
   }
 
+  void _onItemSelected(String item) {
+    Navigator.of(context).pop();
+    if (item == 'dashboard') {
+      Navigator.of(context).pushReplacementNamed('/home/v1');
+    } else if (item == 'settings') {
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const SettingsScreenV1()),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = ref.watch(currentThemeProvider);
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Shop for Emotion Tracker'),
-        bottom: TabBar(
-          controller: _tabController,
-          isScrollable: true,
-          tabAlignment: TabAlignment.start,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          indicatorPadding: const EdgeInsets.symmetric(horizontal: 8),
-          labelColor: theme.colorScheme.onPrimary,
-          unselectedLabelColor: theme.colorScheme.onSurface.withOpacity(0.7),
-          indicatorColor: theme.colorScheme.primary,
-          indicator: BoxDecoration(
-            color: theme.colorScheme.primary,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          labelStyle: const TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 14,
-          ),
-          unselectedLabelStyle: const TextStyle(
-            fontWeight: FontWeight.normal,
-            fontSize: 14,
-          ),
-          tabs: const [
-            Tab(text: 'Static Avatars'),
-            Tab(text: 'Animated Avatars'),
-            Tab(text: 'Themes'),
-          ],
+    final tabTitles = ['Avatars', 'Animated Avatars', 'Themes'];
+    return AppScaffold(
+      title: 'Shop',
+      selectedItem: 'shop',
+      onItemSelected: _onItemSelected,
+      actions: [
+        IconButton(
+          icon: Icon(Icons.shopping_cart_outlined),
+          tooltip: 'Cart',
+          onPressed: () {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Cart feature coming soon!')),
+            );
+          },
         ),
-      ),
-      body: TabBarView(
-        controller: _tabController,
+      ],
+      showCurrency: false,
+      body: Column(
         children: [
-          _buildAvatarsGrid(theme, AvatarType.static),
-          _buildAvatarsGrid(theme, AvatarType.animated),
-          _buildThemesGrid(theme),
+          TabBar(
+            controller: _tabController,
+            isScrollable: true,
+            tabAlignment: TabAlignment.start,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            indicatorPadding: const EdgeInsets.symmetric(horizontal: 8),
+            labelColor: theme.colorScheme.primary,
+            unselectedLabelColor: theme.colorScheme.onSurface.withOpacity(0.7),
+            indicatorColor: theme.colorScheme.primary,
+            indicator: BoxDecoration(
+              color: theme.colorScheme.primary.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            labelStyle: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+            ),
+            unselectedLabelStyle: const TextStyle(
+              fontWeight: FontWeight.normal,
+              fontSize: 14,
+            ),
+            tabs: const [
+              Tab(text: 'Static Avatars'),
+              Tab(text: 'Animated Avatars'),
+              Tab(text: 'Themes'),
+            ],
+          ),
+          AnimatedBuilder(
+            animation: _tabController,
+            builder: (context, _) => Padding(
+              padding: const EdgeInsets.only(top: 16, bottom: 8),
+              child: Text(
+                tabTitles[_tabController.index],
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  color: theme.primaryColor,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildAvatarsGrid(theme, AvatarType.static),
+                _buildAvatarsGrid(theme, AvatarType.animated),
+                _buildThemesGrid(theme),
+              ],
+            ),
+          ),
         ],
       ),
     );

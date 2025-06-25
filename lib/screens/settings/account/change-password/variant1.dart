@@ -3,7 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:emotion_tracker/providers/theme_provider.dart';
 
 class ChangePasswordScreenV1 extends ConsumerStatefulWidget {
-  const ChangePasswordScreenV1({Key? key}) : super(key: key);
+  final VoidCallback? onBackToSettings;
+  const ChangePasswordScreenV1({Key? key, this.onBackToSettings}) : super(key: key);
 
   @override
   ConsumerState<ChangePasswordScreenV1> createState() => _ChangePasswordScreenV1State();
@@ -46,7 +47,13 @@ class _ChangePasswordScreenV1State extends ConsumerState<ChangePasswordScreenV1>
         foregroundColor: theme.colorScheme.onPrimary,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () {
+            if (widget.onBackToSettings != null) {
+              widget.onBackToSettings!();
+            } else {
+              Navigator.of(context).pop();
+            }
+          },
         ),
         title: const Text('Update Password', style: TextStyle(fontWeight: FontWeight.bold)),
         centerTitle: true,
