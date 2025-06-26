@@ -6,8 +6,8 @@ import 'profile/variant1.dart';
 import '../variant1.dart';
 import 'package:emotion_tracker/widgets/app_scaffold.dart';
 import 'package:emotion_tracker/screens/shop/variant1.dart';
-
-final _showAccountProvider = StateProvider<bool>((ref) => false);
+import 'package:emotion_tracker/screens/settings/account/change-password/variant1.dart';
+import 'package:emotion_tracker/screens/settings/account/enable-2fa/2fa_status_screen.dart';
 
 class AccountSettingsScreenV1 extends ConsumerWidget {
   const AccountSettingsScreenV1({Key? key}) : super(key: key);
@@ -113,8 +113,11 @@ class AccountSettingsScreenV1 extends ConsumerWidget {
                 onTap: () async {
                   final authenticated = await _authenticate(context, reason: 'Please authenticate to change your password');
                   if (authenticated) {
-                    final container = ProviderScope.containerOf(context);
-                    container.read(_showAccountProvider.notifier).state = true;
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const ChangePasswordScreenV1(),
+                      ),
+                    );
                   }
                 },
               ),
@@ -127,11 +130,14 @@ class AccountSettingsScreenV1 extends ConsumerWidget {
                     context,
                     reason: 'Please authenticate to enable 2FA',
                     allowSkip: true,
-                    onSkip: null, // Optionally handle skip event
+                    onSkip: null,
                   );
                   if (authenticated) {
-                    final container = ProviderScope.containerOf(context);
-                    container.read(_showAccountProvider.notifier).state = true;
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const TwoFAStatusScreen(),
+                      ),
+                    );
                   }
                 },
               ),

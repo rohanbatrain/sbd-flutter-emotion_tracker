@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:emotion_tracker/providers/theme_provider.dart';
 import 'package:emotion_tracker/providers/secure_storage_provider.dart';
 import 'package:emotion_tracker/providers/app_providers.dart';
-import 'package:emotion_tracker/widgets/custom_avatar.dart';
+import 'package:emotion_tracker/avatars/custom_avatar.dart';
 
 class ProfileScreenV1 extends ConsumerStatefulWidget {
   const ProfileScreenV1({Key? key}) : super(key: key);

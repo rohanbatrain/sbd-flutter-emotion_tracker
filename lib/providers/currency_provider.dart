@@ -156,12 +156,12 @@ class CurrencyData {
   double get goalProgress => nextGoal > 0 ? (currentBalance / nextGoal).clamp(0.0, 1.0) : 0.0;
 
   // --- COOLDOWN HELPERS FOR UI ---
-  // Returns true if cooldown is active (less than 5 minutes since last ad watched)
+  // Returns true if cooldown is active (less than 15 seconds since last ad watched)
   bool get isCooldownActive {
     if (lastAdWatched == null) return false;
     final now = DateTime.now();
     final cooldown = now.difference(lastAdWatched!);
-    return cooldown.inMinutes < 5;
+    return cooldown.inSeconds < 15;
   }
 
   // Returns the remaining cooldown duration (Duration.zero if not active)
@@ -169,7 +169,7 @@ class CurrencyData {
     if (lastAdWatched == null) return Duration.zero;
     final now = DateTime.now();
     final cooldown = now.difference(lastAdWatched!);
-    final remaining = Duration(minutes: 5) - cooldown;
+    final remaining = Duration(seconds: 15) - cooldown;
     return remaining.isNegative ? Duration.zero : remaining;
   }
 

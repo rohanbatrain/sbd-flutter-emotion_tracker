@@ -54,9 +54,9 @@ class _CurrencyScreenV1State extends ConsumerState<CurrencyScreenV1>
     final currencyData = ref.read(currencyProvider);
     final now = DateTime.now();
     final lastAdWatched = currencyData.lastAdWatched;
-    final cooldown = lastAdWatched != null ? now.difference(lastAdWatched) : Duration(minutes: 5);
-    if (cooldown.inMinutes < 5) {
-      _cooldownRemaining = Duration(minutes: 5) - cooldown;
+    final cooldown = lastAdWatched != null ? now.difference(lastAdWatched) : Duration(seconds: 15);
+    if (cooldown.inSeconds < 15) {
+      _cooldownRemaining = Duration(seconds: 15) - cooldown;
       _cooldownTimer?.cancel();
       _cooldownTimer = Timer.periodic(Duration(seconds: 1), (timer) {
         setState(() {
@@ -179,11 +179,13 @@ class _CurrencyScreenV1State extends ConsumerState<CurrencyScreenV1>
   Widget build(BuildContext context) {
     final theme = ref.watch(currentThemeProvider);
     final currencyData = ref.watch(currencyProvider);
+    final adState = ref.watch(adProvider); // <-- watch ad state reactively
+    final isRewardedAdReady = ref.watch(rewardedAdReadyProvider);
     final now = DateTime.now();
     final lastAdWatched = currencyData.lastAdWatched;
-    final cooldown = lastAdWatched != null ? now.difference(lastAdWatched) : Duration(minutes: 5);
-    final isCooldownActive = cooldown.inMinutes < 5 || _cooldownRemaining > Duration.zero;
-    final displayCooldown = _cooldownRemaining > Duration.zero ? _cooldownRemaining : (Duration(minutes: 5) - cooldown);
+    final cooldown = lastAdWatched != null ? now.difference(lastAdWatched) : Duration(seconds: 15);
+    final isCooldownActive = cooldown.inSeconds < 15 || _cooldownRemaining > Duration.zero;
+    final displayCooldown = _cooldownRemaining > Duration.zero ? _cooldownRemaining : (Duration(seconds: 15) - cooldown);
     
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -293,7 +295,7 @@ class _CurrencyScreenV1State extends ConsumerState<CurrencyScreenV1>
                       Container(
                         width: double.infinity,
                         child: ElevatedButton(
-                          onPressed: isCooldownActive ? null : _watchAd,
+                          onPressed: isCooldownActive || !isRewardedAdReady ? null : _watchAd,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: theme.primaryColor,
                             foregroundColor: theme.colorScheme.onPrimary,
@@ -310,13 +312,21 @@ class _CurrencyScreenV1State extends ConsumerState<CurrencyScreenV1>
                                     fontWeight: FontWeight.bold,
                                   ),
                                 )
-                              : Text(
-                                  'Watch Ad to Earn +50 SBD',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
+                              : !isRewardedAdReady
+                                  ? Text(
+                                      'Loading Ad...',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    )
+                                  : Text(
+                                      'Watch Ad to Earn +50 SBD',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
                         ),
                       ),
                       SizedBox(height: 24),
@@ -485,9 +495,9 @@ class _CurrencyScreenV1State extends ConsumerState<CurrencyScreenV1>
   Widget _buildRewardOverlay(ThemeData theme, CurrencyData currencyData) {
     final now = DateTime.now();
     final lastAdWatched = currencyData.lastAdWatched;
-    final cooldown = lastAdWatched != null ? now.difference(lastAdWatched) : Duration(minutes: 5);
-    final isCooldownActive = cooldown.inMinutes < 5 || _cooldownRemaining > Duration.zero;
-    final displayCooldown = _cooldownRemaining > Duration.zero ? _cooldownRemaining : (Duration(minutes: 5) - cooldown);
+    final cooldown = lastAdWatched != null ? now.difference(lastAdWatched) : Duration(seconds: 15);
+    final isCooldownActive = cooldown.inSeconds < 15 || _cooldownRemaining > Duration.zero;
+    final displayCooldown = _cooldownRemaining > Duration.zero ? _cooldownRemaining : (Duration(seconds: 15) - cooldown);
     return Container(
       color: Colors.black.withOpacity(0.5),
       child: Center(
