@@ -8,6 +8,7 @@ import 'package:emotion_tracker/widgets/app_scaffold.dart';
 import 'package:emotion_tracker/screens/shop/variant1.dart';
 import 'package:emotion_tracker/screens/settings/account/change-password/variant1.dart';
 import 'package:emotion_tracker/screens/settings/account/enable-2fa/2fa_status_screen.dart';
+import 'package:emotion_tracker/screens/settings/account/trusted-ip/trusted_ip_status_screen.dart';
 
 class AccountSettingsScreenV1 extends ConsumerWidget {
   const AccountSettingsScreenV1({Key? key}) : super(key: key);
@@ -141,6 +142,20 @@ class AccountSettingsScreenV1 extends ConsumerWidget {
                   }
                 },
               ),
+              SizedBox(height: 14),
+              ListTile(
+                leading: Icon(Icons.shield, color: theme.primaryColor),
+                title: Text('Trusted IP Lockdown'),
+                onTap: () async {
+                  // No authentication required for viewing status
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const TrustedIpStatusScreen(),
+                    ),
+                  );
+                },
+              ),
+              SizedBox(height: 14),
             ],
           ),
         ),

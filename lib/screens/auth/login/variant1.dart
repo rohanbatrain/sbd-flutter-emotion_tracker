@@ -648,6 +648,15 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
             arguments: {'finalScreen': '/home/v1'},
           );
           return;
+        } else if (errorMsg.contains('Login failed: 403') && errorMsg.contains('Trusted IP Lockdown is enabled')) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Login not allowed from this IP. Trusted IP Lockdown is enabled.'),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 5),
+            ),
+          );
+          return;
         } else if (errorMsg.contains('Login failed: 403')) {
           displayMessage = 'Access denied. Please check your credentials.';
         } else if (errorMsg.contains('Login failed: 429')) {

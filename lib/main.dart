@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:flutter/foundation.dart';
 import 'package:emotion_tracker/providers/theme_provider.dart';
 import 'package:emotion_tracker/providers/app_providers.dart';
 import 'package:emotion_tracker/providers/transition_provider.dart';
@@ -27,15 +28,17 @@ void main() async {
 
 // Initialize AdMob in background without blocking app startup
 void _initializeAdMobInBackground() {
-  // This will run asynchronously and not block the app startup
-  Future.microtask(() async {
-    try {
-      await MobileAds.instance.initialize();
-    } catch (e) {
-      // AdMob initialization failed, but don't block the app
-      print('Background AdMob initialization failed: $e');
-    }
-  });
+  // Only initialize AdMob if not running on Linux
+  if (defaultTargetPlatform != TargetPlatform.linux) {
+    Future.microtask(() async {
+      try {
+        await MobileAds.instance.initialize();
+      } catch (e) {
+        // AdMob initialization failed, but don't block the app
+        print('Background AdMob initialization failed: $e');
+      }
+    });
+  }
 }
 
 class MyApp extends ConsumerWidget {

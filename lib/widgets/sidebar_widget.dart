@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:flutter/foundation.dart';
 import 'package:emotion_tracker/providers/theme_provider.dart';
 import 'package:emotion_tracker/providers/app_providers.dart';
 import 'package:emotion_tracker/providers/ad_provider.dart';
@@ -26,9 +27,9 @@ class _SidebarWidgetState extends ConsumerState<SidebarWidget> {
   @override
   void initState() {
     super.initState();
-    // Load banner ad using the ad provider
+    // Only load ads if not running on Linux
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
+      if (mounted && defaultTargetPlatform != TargetPlatform.linux) {
         _adNotifier = ref.read(adProvider.notifier);
         _adNotifier?.loadBannerAd(sidebarBannerAdId);
       }
@@ -37,8 +38,10 @@ class _SidebarWidgetState extends ConsumerState<SidebarWidget> {
 
   @override
   void dispose() {
-    // Dispose the banner ad using stored reference
-    _adNotifier?.disposeBannerAd(sidebarBannerAdId);
+    // Only dispose ads if not running on Linux
+    if (defaultTargetPlatform != TargetPlatform.linux) {
+      _adNotifier?.disposeBannerAd(sidebarBannerAdId);
+    }
     super.dispose();
   }
 

@@ -68,6 +68,8 @@ class AdNotifier extends StateNotifier<AdState> {
   }
 
   Future<void> _initializeAdMob() async {
+    // Only initialize AdMob if not running on Linux
+    if (defaultTargetPlatform == TargetPlatform.linux) return;
     try {
       // Initialize AdMob in the background without blocking
       MobileAds.instance.initialize().then((_) {
