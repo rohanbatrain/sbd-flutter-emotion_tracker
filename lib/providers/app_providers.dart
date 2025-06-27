@@ -339,6 +339,24 @@ class AuthState {
   }
 }
 
+/// Function to call backend /auth/logout endpoint
+Future<void> logoutFromBackend(WidgetRef ref, String? accessToken) async {
+  if (accessToken == null || accessToken.isEmpty) return;
+  final baseUrl = ref.read(apiBaseUrlProvider);
+  final url = Uri.parse('$baseUrl/auth/logout');
+  try {
+    final headers = await _ApiHeaders.getCommonHeaders();
+    headers['Authorization'] = 'Bearer $accessToken';
+    final response = await HttpUtil.post(
+      url,
+      headers: headers,
+    );
+    // Accept 200 or 204 as success, ignore errors (token may be expired)
+  } catch (e) {
+    // Ignore errors during logout, proceed to clear local state
+  }
+}
+
 class AuthNotifier extends StateNotifier<AuthState> {
   final FlutterSecureStorage _secureStorage;
   late final SharedPreferences _prefs;
@@ -453,9 +471,43 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> logout() async {
+    // Call backend logout endpoint before clearing local authentication data
+    try {
+      final accessToken = await _secureStorage.read(key: 'access_token');
+      if (accessToken != null && accessToken.isNotEmpty) {
+        // Always use provider for base URL if possible
+        String? apiBaseUrl;
+        try {
+          // Try to get from provider (if ref is available)
+          apiBaseUrl = _prefs.getString('api_base_url');
+          if (apiBaseUrl == null || apiBaseUrl.isEmpty) {
+            // Try to reconstruct from protocol/domain
+            final protocol = _prefs.getString('server_protocol') ?? 'https';
+            final domain = _prefs.getString('server_domain');
+            if (domain != null && domain.isNotEmpty) {
+              apiBaseUrl = '$protocol://$domain';
+            }
+          }
+        } catch (_) {}
+        if (apiBaseUrl != null && apiBaseUrl.isNotEmpty) {
+          try {
+            final url = Uri.parse('$apiBaseUrl/auth/logout');
+            final headers = await _ApiHeaders.getCommonHeaders();
+            headers['Authorization'] = 'Bearer $accessToken';
+            await HttpUtil.post(
+              url,
+              headers: headers,
+            );
+          } catch (e) {
+            // Optionally log error
+          }
+        }
+      }
+    } catch (e) {
+      // Ignore errors from reading token or making logout call
+    }
     // Clear all stored authentication data
     await _clearStoredAuth();
-    
     // Reset state
     state = const AuthState(isInitialized: true);
   }
