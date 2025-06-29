@@ -6,7 +6,7 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 class AdUnitIds {
   static const String bannerAdUnitId = 'ca-app-pub-3940256099942544/6300978111';
   static const String interstitialAdUnitId = 'ca-app-pub-3940256099942544/1033173712';
-  static const String rewardedAdUnitId = 'ca-app-pub-3940256099942544/5224354917';
+  static const String rewardedAdUnitId = 'ca-app-pub-2845453539708646/2553416618'; // Updated to production ID
   static const String adaptiveBannerAdUnitId = 'ca-app-pub-3940256099942544/9214589741';
   static const String appOpenAdUnitId = 'ca-app-pub-3940256099942544/9257395921';
   static const String nativeAdUnitId = 'ca-app-pub-3940256099942544/2247696110';
