@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:emotion_tracker/providers/theme_provider.dart';
 import 'package:emotion_tracker/providers/currency_provider.dart';
 import 'package:emotion_tracker/providers/ad_provider.dart';
+import 'package:emotion_tracker/widgets/custom_app_bar.dart';
 import 'dart:async';
 
 class CurrencyScreenV1 extends ConsumerStatefulWidget {
@@ -189,36 +190,15 @@ class _CurrencyScreenV1State extends ConsumerState<CurrencyScreenV1>
     
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
+      appBar: const CustomAppBar(
+        title: 'Earn SBD Tokens',
+        showCurrency: false,
+        showHamburger: false,
+      ),
       body: Stack(
         children: [
           Column(
             children: [
-              // Custom App Bar
-              SafeArea(
-                child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  child: Row(
-                    children: [
-                      IconButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        icon: Icon(Icons.close, color: theme.primaryColor),
-                      ),
-                      Expanded(
-                        child: Text(
-                          'Earn SBD Tokens',
-                          style: theme.textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: theme.primaryColor,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                      SizedBox(width: 48),
-                    ],
-                  ),
-                ),
-              ),
-
               Expanded(
                 child: SingleChildScrollView(
                   padding: EdgeInsets.all(16),

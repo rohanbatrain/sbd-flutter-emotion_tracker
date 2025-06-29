@@ -13,52 +13,128 @@ import 'package:emotion_tracker/themes/crimson_red_theme.dart';
 import 'package:emotion_tracker/themes/forest_green_theme.dart';
 import 'package:emotion_tracker/themes/golden_yellow_theme.dart';
 import 'package:emotion_tracker/themes/deep_purple_theme.dart';
+import 'package:emotion_tracker/themes/blush_rose_theme_dark.dart';
+import 'package:emotion_tracker/themes/cloud_gray_theme_dark.dart';
+import 'package:emotion_tracker/themes/crimson_red_theme_dark.dart';
+import 'package:emotion_tracker/themes/deep_purple_theme_dark.dart';
+import 'package:emotion_tracker/themes/forest_green_theme_dark.dart';
+import 'package:emotion_tracker/themes/golden_yellow_theme_dark.dart';
+import 'package:emotion_tracker/themes/midnight_lavender_theme_light.dart';
+import 'package:emotion_tracker/themes/pacific_blue_theme_dark.dart';
+import 'package:emotion_tracker/themes/serenity_green_theme_dark.dart';
+import 'package:emotion_tracker/themes/sunset_peach_theme_dark.dart';
+import 'package:emotion_tracker/themes/royal_orange_theme.dart';
+import 'package:emotion_tracker/themes/royal_orange_theme_dark.dart';
 
 class AppThemes {
   static final Map<String, ThemeData> allThemes = {
     'lightTheme': LightTheme.theme,
     'darkTheme': DarkTheme.theme,
     'serenityGreen': SerenityGreenTheme.theme,
+    'serenityGreenDark': SerenityGreenDarkTheme.theme,
     'pacificBlue': PacificBlueTheme.theme,
+    'pacificBlueDark': PacificBlueDarkTheme.theme,
     'blushRose': BlushRoseTheme.theme,
+    'blushRoseDark': BlushRoseDarkTheme.theme,
     'cloudGray': CloudGrayTheme.theme,
+    'cloudGrayDark': CloudGrayDarkTheme.theme,
     'sunsetPeach': SunsetPeachTheme.theme,
+    'sunsetPeachDark': SunsetPeachDarkTheme.theme,
     'midnightLavender': MidnightLavenderTheme.theme,
+    'midnightLavenderLight': MidnightLavenderLightTheme.theme,
     'crimsonRed': CrimsonRedTheme.theme,
+    'crimsonRedDark': CrimsonRedDarkTheme.theme,
     'forestGreen': ForestGreenTheme.theme,
+    'forestGreenDark': ForestGreenDarkTheme.theme,
     'goldenYellow': GoldenYellowTheme.theme,
+    'goldenYellowDark': GoldenYellowDarkTheme.theme,
     'deepPurple': DeepPurpleTheme.theme,
+    'deepPurpleDark': DeepPurpleDarkTheme.theme,
+    'royalOrange': RoyalOrangeTheme.theme,
+    'royalOrangeDark': RoyalOrangeDarkTheme.theme,
   };
 
   static final Map<String, String> themeNames = {
     'lightTheme': 'Light Theme',
     'darkTheme': 'Dark Theme',
     'serenityGreen': 'Serenity Green',
+    'serenityGreenDark': 'Serenity Green Dark',
     'pacificBlue': 'Pacific Blue',
+    'pacificBlueDark': 'Pacific Blue Dark',
     'blushRose': 'Blush Rose',
+    'blushRoseDark': 'Blush Rose Dark',
     'cloudGray': 'Cloud Gray',
+    'cloudGrayDark': 'Cloud Gray Dark',
     'sunsetPeach': 'Sunset Peach',
-    'midnightLavender': 'Midnight Lavender',
+    'sunsetPeachDark': 'Sunset Peach Dark',
+    'midnightLavender': 'Midnight Lavender (Dark)',
+    'midnightLavenderLight': 'Midnight Lavender (Light)',
     'crimsonRed': 'Crimson Red',
+    'crimsonRedDark': 'Crimson Red Dark',
     'forestGreen': 'Forest Green',
+    'forestGreenDark': 'Forest Green Dark',
     'goldenYellow': 'Golden Yellow',
+    'goldenYellowDark': 'Golden Yellow Dark',
     'deepPurple': 'Deep Purple',
+    'deepPurpleDark': 'Deep Purple Dark',
+    'royalOrange': 'Royal Orange',
+    'royalOrangeDark': 'Royal Orange Dark',
   };
 
   static final Map<String, int> themePrices = {
     'lightTheme': 0,
     'darkTheme': 0,
     'serenityGreen': 100,
+    'serenityGreenDark': 100,
     'pacificBlue': 100,
+    'pacificBlueDark': 100,
     'blushRose': 150,
+    'blushRoseDark': 150,
     'cloudGray': 150,
+    'cloudGrayDark': 150,
     'sunsetPeach': 200,
+    'sunsetPeachDark': 200,
     'midnightLavender': 200,
+    'midnightLavenderLight': 200,
     'crimsonRed': 250,
+    'crimsonRedDark': 250,
     'forestGreen': 250,
+    'forestGreenDark': 250,
     'goldenYellow': 300,
+    'goldenYellowDark': 300,
     'deepPurple': 300,
+    'deepPurpleDark': 300,
+    'royalOrange': 350,
+    'royalOrangeDark': 350,
   };
+
+  static final List<String> lightThemeKeys = [
+    'lightTheme',
+    'serenityGreen',
+    'pacificBlue',
+    'blushRose',
+    'cloudGray',
+    'sunsetPeach',
+    'goldenYellow',
+    'forestGreen',
+    'midnightLavenderLight',
+    'royalOrange',
+  ];
+
+  static final List<String> darkThemeKeys = [
+    'darkTheme',
+    'serenityGreenDark',
+    'pacificBlueDark',
+    'blushRoseDark',
+    'cloudGrayDark',
+    'sunsetPeachDark',
+    'goldenYellowDark',
+    'forestGreenDark',
+    'midnightLavender',
+    'crimsonRedDark',
+    'deepPurpleDark',
+    'royalOrangeDark',
+  ];
 }
 
 // Storage provider
