@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:emotion_tracker/providers/secure_storage_provider.dart';
+import 'package:emotion_tracker/providers/shared_prefs_provider.dart';
 
 // Ad Unit IDs (Test IDs for development)
 class AdUnitIds {
@@ -198,27 +200,73 @@ class AdNotifier extends StateNotifier<AdState> {
   }
 
   // Load rewarded ad
-  Future<void> loadRewardedAd() async {
+  Future<void> loadRewardedAd({required WidgetRef ref}) async {
     await _ensureAdMobInitialized();
 
-    if (state.rewardedAdState == AdLoadingState.loading) return;
+    // Fetch username from secure storage
+    final storage = ref.read(secureStorageProvider);
+    final username = await storage.read(key: 'user_username');
+    if (username == null || username.isEmpty) {
+      // Username not set, do not load ad
+      state = state.copyWith(rewardedAdState: AdLoadingState.notLoaded);
+      return;
+    }
 
     state = state.copyWith(rewardedAdState: AdLoadingState.loading);
-
     await RewardedAd.load(
       adUnitId: AdUnitIds.rewardedAdUnitId,
       request: const AdRequest(),
       rewardedAdLoadCallback: RewardedAdLoadCallback(
         onAdLoaded: (ad) {
+          ad.setServerSideOptions(ServerSideVerificationOptions(userId: username));
+          ad.setImmersiveMode(true);
           state = state.copyWith(
             rewardedAd: ad,
             rewardedAdState: AdLoadingState.loaded,
           );
-
-          ad.setImmersiveMode(true);
         },
         onAdFailedToLoad: (error) {
           state = state.copyWith(rewardedAdState: AdLoadingState.failed);
+        },
+      ),
+    );
+  }
+
+  // Load rewarded interstitial ad
+  Future<void> loadRewardedInterstitialAd({required WidgetRef ref}) async {
+    await _ensureAdMobInitialized();
+
+    // Fetch username from secure storage
+    final storage = ref.read(secureStorageProvider);
+    final username = await storage.read(key: 'user_username');
+    if (username == null || username.isEmpty) {
+      // Username not set, do not load ad
+      return;
+    }
+
+    await RewardedInterstitialAd.load(
+      adUnitId: AdUnitIds.rewardedAdUnitId,
+      request: const AdRequest(),
+      rewardedInterstitialAdLoadCallback: RewardedInterstitialAdLoadCallback(
+        onAdLoaded: (ad) {
+          ad.setServerSideOptions(ServerSideVerificationOptions(userId: username));
+          ad.fullScreenContentCallback = FullScreenContentCallback(
+            onAdShowedFullScreenContent: (ad) {},
+            onAdImpression: (ad) {},
+            onAdFailedToShowFullScreenContent: (ad, err) {
+              ad.dispose();
+            },
+            onAdDismissedFullScreenContent: (ad) {
+              ad.dispose();
+            },
+            onAdClicked: (ad) {},
+          );
+          // Store reference if needed: state = state.copyWith(...)
+        },
+        onAdFailedToLoad: (error) {
+          if (kDebugMode) {
+            print('RewardedInterstitialAd failed to load: $error');
+          }
         },
       ),
     );
@@ -228,22 +276,29 @@ class AdNotifier extends StateNotifier<AdState> {
   Future<void> showRewardedAd({
     required Function(RewardItem reward) onUserEarnedReward,
     VoidCallback? onAdClosed,
+    void Function(String username)? onRewardCallback, // Now passes username
+    required WidgetRef ref, // Add ref to access providers
   }) async {
     if (state.rewardedAd == null) {
       return;
     }
 
+    // Fetch username from secure storage
+    String? username;
+    final storage = ref.read(secureStorageProvider);
+    username = await storage.read(key: 'user_username');
+
     state.rewardedAd!.fullScreenContentCallback = FullScreenContentCallback(
-      onAdShowedFullScreenContent: (ad) {
-      },
-      onAdDismissedFullScreenContent: (ad) {
+      onAdShowedFullScreenContent: (ad) {},
+      onAdDismissedFullScreenContent: (ad) async {
         ad.dispose();
         state = state.copyWith(
           rewardedAd: null,
           rewardedAdState: AdLoadingState.notLoaded,
         );
         onAdClosed?.call();
-        loadRewardedAd(); // Preload next ad
+        // Reload with SSV options
+        await loadRewardedAd(ref: ref);
       },
       onAdFailedToShowFullScreenContent: (ad, error) {
         ad.dispose();
@@ -256,6 +311,9 @@ class AdNotifier extends StateNotifier<AdState> {
 
     await state.rewardedAd!.show(
       onUserEarnedReward: (Ad ad, RewardItem reward) {
+        if (onRewardCallback != null && username != null && username.isNotEmpty) {
+          onRewardCallback(username);
+        }
         onUserEarnedReward(reward);
       },
     );

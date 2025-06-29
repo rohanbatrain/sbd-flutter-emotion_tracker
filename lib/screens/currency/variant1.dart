@@ -5,6 +5,9 @@ import 'package:emotion_tracker/providers/theme_provider.dart';
 import 'package:emotion_tracker/providers/currency_provider.dart';
 import 'package:emotion_tracker/providers/ad_provider.dart';
 import 'package:emotion_tracker/widgets/custom_app_bar.dart';
+import 'package:emotion_tracker/providers/secure_storage_provider.dart';
+import 'package:qr_flutter/qr_flutter.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 import 'dart:async';
 
 class CurrencyScreenV1 extends ConsumerStatefulWidget {
@@ -23,6 +26,9 @@ class _CurrencyScreenV1State extends ConsumerState<CurrencyScreenV1>
   AdNotifier? _adNotifier;
   Timer? _cooldownTimer;
   Duration _cooldownRemaining = Duration.zero;
+  String _walletUsername = '';
+  bool _isLoadingUsername = true;
+  final TextEditingController _recipientController = TextEditingController();
 
   @override
   void initState() {
@@ -43,11 +49,26 @@ class _CurrencyScreenV1State extends ConsumerState<CurrencyScreenV1>
       curve: Curves.elasticOut,
     ));
 
-    // Initialize ad provider and load rewarded ad
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    // Initialize ad provider and load rewarded ad with SSV
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       _adNotifier = ref.read(adProvider.notifier);
-      _adNotifier?.loadRewardedAd();
+      await _adNotifier?.loadRewardedAd(ref: ref); // Pass ref to ensure username is loaded from secure storage
       _startCooldownTimerIfNeeded();
+      setState(() {
+        _isLoadingUsername = true;
+      });
+      await _loadWalletUsername();
+      setState(() {
+        _isLoadingUsername = false;
+      });
+    });
+  }
+
+  Future<void> _loadWalletUsername() async {
+    final storage = ref.read(secureStorageProvider);
+    final storedUsername = await storage.read(key: 'user_username');
+    setState(() {
+      _walletUsername = storedUsername ?? '';
     });
   }
 
@@ -84,10 +105,13 @@ class _CurrencyScreenV1State extends ConsumerState<CurrencyScreenV1>
 
   void _watchAd() async {
     final currencyNotifier = ref.read(currencyProvider.notifier);
-    
+
     if (!currencyNotifier.canEarnMore) {
-      _showDailyLimitDialog();
-      return;
+      if (!kDebugMode) {
+        _showDailyLimitDialog();
+        return;
+      }
+      // In debug mode, allow infinite earning
     }
 
     // Check if rewarded ad is ready
@@ -98,14 +122,15 @@ class _CurrencyScreenV1State extends ConsumerState<CurrencyScreenV1>
 
     // Show rewarded ad
     await _adNotifier?.showRewardedAd(
-      onUserEarnedReward: (reward) {
-        // User earned reward, add coins
+      onUserEarnedReward: (_) {}, // No-op, SSV handles reward
+      onAdClosed: () async {
+        await _adNotifier?.loadRewardedAd(ref: ref); // Pass ref to reload with username
+      },
+      onRewardCallback: (username) async {
+        // User earned reward, add coins (SSV callback)
         _handleAdReward();
       },
-      onAdClosed: () {
-        // Ad was closed, preload next ad
-        _adNotifier?.loadRewardedAd();
-      },
+      ref: ref,
     );
   }
 
@@ -143,10 +168,10 @@ class _CurrencyScreenV1State extends ConsumerState<CurrencyScreenV1>
         ),
         actions: [
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.of(context).pop();
               // Try to load the ad again
-              _adNotifier?.loadRewardedAd();
+              await _adNotifier?.loadRewardedAd(ref: ref); // Pass ref to reload with username
             },
             child: Text('OK', style: TextStyle(color: theme.primaryColor)),
           ),
@@ -176,296 +201,455 @@ class _CurrencyScreenV1State extends ConsumerState<CurrencyScreenV1>
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final theme = ref.watch(currentThemeProvider);
-    final currencyData = ref.watch(currencyProvider);
-    final adState = ref.watch(adProvider); // <-- watch ad state reactively
-    final isRewardedAdReady = ref.watch(rewardedAdReadyProvider);
-    final now = DateTime.now();
-    final lastAdWatched = currencyData.lastAdWatched;
-    final cooldown = lastAdWatched != null ? now.difference(lastAdWatched) : Duration(seconds: 15);
-    final isCooldownActive = cooldown.inSeconds < 15 || _cooldownRemaining > Duration.zero;
-    final displayCooldown = _cooldownRemaining > Duration.zero ? _cooldownRemaining : (Duration(seconds: 15) - cooldown);
-    
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: const CustomAppBar(
-        title: 'Earn SBD Tokens',
-        showCurrency: false,
-        showHamburger: false,
-      ),
-      body: Stack(
-        children: [
-          Column(
+  void _showQrCodeDialog(String username) {
+    final theme = ref.read(currentThemeProvider);
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: theme.cardColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
+              Text(
+                'Wallet QR Code',
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: theme.primaryColor,
+                ),
+              ),
+              const SizedBox(height: 20),
+              Container(
+                decoration: BoxDecoration(
+                  color: theme.scaffoldBackgroundColor,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: theme.shadowColor.withOpacity(0.08),
+                      blurRadius: 12,
+                      offset: Offset(0, 4),
+                    ),
+                  ],
+                ),
+                padding: const EdgeInsets.all(16),
+                child: QrImageView(
+                  data: username,
+                  version: QrVersions.auto,
+                  size: 200,
+                  backgroundColor: Colors.white,
+                  foregroundColor: Colors.black, // Use black for best compatibility
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                username,
+                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Scan this QR to receive tokens to your wallet username.',
+                style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: theme.primaryColor,
+                    foregroundColor: theme.colorScheme.onPrimary,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: Text('Close'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showQrScanDialog() {
+    final theme = ref.read(currentThemeProvider);
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: theme.cardColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: SizedBox(
+          width: 320,
+          height: 420,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Text(
+                  'Scan Wallet QR',
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: theme.primaryColor,
+                  ),
+                ),
+              ),
               Expanded(
-                child: SingleChildScrollView(
-                  padding: EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Header
-                      Text(
-                        'Earn More SBD Tokens',
-                        style: theme.textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: theme.primaryColor,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      SizedBox(height: 24),
-
-                      // Current Balance Card
-                      Container(
-                        padding: EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: theme.cardColor,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.1),
-                              blurRadius: 10,
-                              offset: Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              padding: EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: theme.primaryColor.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Icon(
-                                Icons.psychology,
-                                color: theme.primaryColor,
-                                size: 24,
-                              ),
-                            ),
-                            SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Current Balance',
-                                    style: theme.textTheme.bodyMedium?.copyWith(
-                                      color: theme.textTheme.bodySmall?.color,
-                                    ),
-                                  ),
-                                  SizedBox(height: 4),
-                                  Text(
-                                    currencyData.formattedBalanceWithSymbol,
-                                    style: theme.textTheme.headlineSmall?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                      color: theme.primaryColor,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      SizedBox(height: 16),
-
-                      // Watch Ad Button
-                      Container(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: isCooldownActive || !isRewardedAdReady ? null : _watchAd,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: theme.primaryColor,
-                            foregroundColor: theme.colorScheme.onPrimary,
-                            padding: EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          child: isCooldownActive
-                              ? Text(
-                                  'Wait ${displayCooldown.inMinutes}:${(displayCooldown.inSeconds % 60).toString().padLeft(2, '0')} to watch again',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                )
-                              : !isRewardedAdReady
-                                  ? Text(
-                                      'Loading Ad...',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    )
-                                  : Text(
-                                      'Watch Ad to Earn +50 SBD',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                        ),
-                      ),
-                      SizedBox(height: 24),
-
-                      // Daily Progress
-                      Container(
-                        padding: EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: theme.cardColor,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.1),
-                              blurRadius: 10,
-                              offset: Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Daily Earnings',
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            SizedBox(height: 12),
-                            LinearProgressIndicator(
-                              value: currencyData.todayEarned / currencyData.dailyLimit,
-                              backgroundColor: theme.primaryColor.withOpacity(0.2),
-                              valueColor: AlwaysStoppedAnimation<Color>(theme.primaryColor),
-                            ),
-                            SizedBox(height: 8),
-                            Text(
-                              'You\'ve earned ${currencyData.todayEarned} / ${currencyData.dailyLimit} SBD tokens today',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.textTheme.bodySmall?.color,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      SizedBox(height: 24),
-
-                      // Stats Cards
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildStatCard(
-                              theme,
-                              'Lifetime Earned',
-                              currencyData.formattedLifetimeWithSymbol,
-                              Icons.trending_up,
-                            ),
-                          ),
-                          SizedBox(width: 12),
-                          Expanded(
-                            child: _buildStatCard(
-                              theme,
-                              'Avg. Daily Earnings',
-                              '${currencyData.averageDailyEarnings.toStringAsFixed(1)} SBD',
-                              Icons.show_chart,
-                            ),
-                          ),
-                        ],
-                      ),
-                      SizedBox(height: 16),
-
-                      // Why ads info
-                      Center(
-                        child: TextButton(
-                          onPressed: () => _showWhyAdsDialog(theme),
-                          child: Text(
-                            'Why ads?',
-                            style: TextStyle(
-                              color: theme.primaryColor,
-                              decoration: TextDecoration.underline,
-                            ),
-                          ),
-                        ),
-                      ),
-                      
-                      // Debug/Testing Reset Counter (only in debug mode)
-                      /*
-                      if (kDebugMode) ...[
-                        SizedBox(height: 16),
-                        Container(
-                          width: double.infinity,
-                          padding: EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.orange.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: Colors.orange.withOpacity(0.3),
-                              width: 1,
-                            ),
-                          ),
-                          child: Column(
-                            children: [
-                              Row(
-                                children: [
-                                  Icon(
-                                    Icons.bug_report,
-                                    color: Colors.orange,
-                                    size: 20,
-                                  ),
-                                  SizedBox(width: 8),
-                                  Text(
-                                    'Debug Mode - Testing Tools',
-                                    style: theme.textTheme.bodyMedium?.copyWith(
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.orange,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              SizedBox(height: 12),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: OutlinedButton(
-                                      onPressed: _resetDailyCounter,
-                                      style: OutlinedButton.styleFrom(
-                                        side: BorderSide(color: Colors.orange),
-                                      ),
-                                      child: Text(
-                                        'Reset Daily Counter',
-                                        style: TextStyle(color: Colors.orange),
-                                      ),
-                                    ),
-                                  SizedBox(width: 12),
-                                  Expanded(
-                                    child: OutlinedButton(
-                                      onPressed: _reloadAds,
-                                      style: OutlinedButton.styleFrom(
-                                        side: BorderSide(color: Colors.orange),
-                                      ),
-                                      child: Text(
-                                        'Reload Ads',
-                                        style: TextStyle(color: Colors.orange),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                      */
-                    ],
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: MobileScanner(
+                    controller: MobileScannerController(formats: [BarcodeFormat.qrCode]),
+                    fit: BoxFit.cover,
+                    onDetect: (capture) {
+                      final barcode = capture.barcodes.first;
+                      final String? code = barcode.rawValue;
+                      if (code != null && code.length <= 50 && RegExp(r'^[a-zA-Z0-9._-]{1,50} **$').hasMatch(code)) {
+                        Navigator.of(context).pop();
+                        _recipientController.text = code;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Username scanned: ' + code)),
+                        );
+                      }
+                    },
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: theme.primaryColor,
+                      foregroundColor: theme.colorScheme.onPrimary,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: Text('Cancel'),
                   ),
                 ),
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
 
-          // Reward Success Overlay
+  @override
+  Widget build(BuildContext context) {
+    final theme = ref.watch(currentThemeProvider);
+    final currencyData = ref.watch(currencyProvider);
+    final isRewardedAdReady = ref.watch(rewardedAdReadyProvider);
+    final now = DateTime.now();
+    final lastAdWatched = currencyData.lastAdWatched;
+    final cooldown = lastAdWatched != null ? now.difference(lastAdWatched) : Duration(seconds: 15);
+    final isCooldownActive = kDebugMode ? false : (cooldown.inSeconds < 15 || _cooldownRemaining > Duration.zero);
+    final displayCooldown = _cooldownRemaining > Duration.zero ? _cooldownRemaining : (Duration(seconds: 15) - cooldown);
+    final bool hasValidUserId = (currencyData.userId != 'default_user' && currencyData.userId.isNotEmpty);
+    final String username = hasValidUserId
+        ? currencyData.userId
+        : (_walletUsername.isNotEmpty ? _walletUsername : 'user123');
+
+    return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
+      appBar: const CustomAppBar(
+        title: 'SBD Wallet',
+        showCurrency: false,
+        showHamburger: false,
+      ),
+      body: Stack(
+        children: [
+          SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Wallet Card
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.transparent,
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          flex: 2,
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(16),
+                                child: Container(
+                                  height: 120,
+                                  decoration: const BoxDecoration(
+                                    image: DecorationImage(
+                                      image: AssetImage('assets/wallet_card_bg.jpg'),
+                                      fit: BoxFit.cover,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: theme.primaryColor.withOpacity(0.15),
+                                  shape: BoxShape.circle,
+                                ),
+                                padding: const EdgeInsets.all(18),
+                                child: Icon(
+                                  Icons.account_balance_wallet_rounded,
+                                  color: theme.primaryColor,
+                                  size: 40,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 20),
+                        Expanded(
+                          flex: 3,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Total Balance', style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor)),
+                              const SizedBox(height: 6),
+                              Text(
+                                currencyData.formattedBalanceWithSymbol,
+                                style: theme.textTheme.headlineSmall?.copyWith(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold),
+                              ),
+                              const SizedBox(height: 12),
+                              Text('Available Balance', style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  // Send Tokens
+                  Text('Send Tokens', style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          maxLength: 50,
+                          controller: _recipientController, // Use controller for recipient
+                          decoration: InputDecoration(
+                            hintText: 'Recipient Username',
+                            filled: true,
+                            fillColor: theme.cardColor,
+                            hintStyle: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
+                            contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide.none,
+                            ),
+                            prefixIcon: Icon(Icons.person_outline, color: theme.hintColor),
+                            counterText: '',
+                          ),
+                          style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurface),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextField(
+                          decoration: InputDecoration(
+                            hintText: 'Amount',
+                            filled: true,
+                            fillColor: theme.cardColor,
+                            hintStyle: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
+                            contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide.none,
+                            ),
+                            prefixIcon: Icon(Icons.monetization_on_outlined, color: theme.hintColor),
+                          ),
+                          style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurface),
+                          keyboardType: TextInputType.number,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () {},
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            backgroundColor: theme.primaryColor,
+                            foregroundColor: theme.colorScheme.onPrimary,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          child: Text('Send', style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onPrimary)),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: _showQrScanDialog,
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            backgroundColor: theme.cardColor,
+                            foregroundColor: theme.colorScheme.onSurface,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          child: Text('Scan QR', style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onSurface)),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 36),
+                  // Receive Tokens
+                  Text('Receive Tokens', style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: theme.cardColor,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          margin: const EdgeInsets.only(right: 12),
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: theme.primaryColor.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(Icons.person, color: theme.colorScheme.onSurface, size: 32),
+                        ),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (_isLoadingUsername && !hasValidUserId)
+                                SizedBox(
+                                  height: 18,
+                                  width: 80,
+                                  child: Container(
+                                    color: theme.dividerColor.withOpacity(0.2),
+                                  ),
+                                )
+                              else
+                                Text(username, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 2),
+                              Text('Your Wallet Username', style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor)),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            _showQrCodeDialog(username);
+                          },
+                          icon: Icon(Icons.qr_code, color: theme.colorScheme.onPrimary),
+                          label: Text('My QR', style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onPrimary)),
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                            backgroundColor: theme.primaryColor,
+                            foregroundColor: theme.colorScheme.onPrimary,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 36),
+                  // Earn Section
+                  Text('Earn', style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: theme.cardColor,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          flex: 2,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Watch Ad to Earn +10 SBD',
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  color: theme.colorScheme.onSurface,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Earn rewards by watching short ads',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.hintColor,
+                                  fontSize: 12,
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              SizedBox(
+                                width: 120,
+                                child: ElevatedButton.icon(
+                                  onPressed: isCooldownActive || !isRewardedAdReady ? null : _watchAd,
+                                  icon: Icon(Icons.play_arrow, color: theme.colorScheme.onPrimary, size: 18),
+                                  label: isCooldownActive
+                                      ? Text(
+                                          kDebugMode
+                                              ? 'Watch Ad'
+                                              : 'Wait ${displayCooldown.inMinutes}:${(displayCooldown.inSeconds % 60).toString().padLeft(2, '0')} to watch again',
+                                          style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onPrimary, fontSize: 12),
+                                        )
+                                      : !isRewardedAdReady
+                                          ? Text('Loading Ad...', style: theme.textTheme.labelMedium?.copyWith(color: theme.colorScheme.onPrimary, fontSize: 12))
+                                          : Text('Watch Ad', style: theme.textTheme.labelMedium?.copyWith(color: theme.colorScheme.onPrimary, fontSize: 12)),
+                                  style: ElevatedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
+                                    backgroundColor: theme.primaryColor,
+                                    foregroundColor: theme.colorScheme.onPrimary,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                    minimumSize: const Size(0, 32),
+                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 20),
+                        Expanded(
+                          flex: 2,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(14),
+                            child: Container(
+                              height: 120,
+                              decoration: const BoxDecoration(
+                                image: DecorationImage(
+                                  image: AssetImage('assets/earn_section_bg.jpg'),
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 40),
+                ],
+              ),
+            ),
+          ),
           if (_showRewardSuccess) _buildRewardOverlay(theme, currencyData),
         ],
       ),
@@ -476,7 +660,7 @@ class _CurrencyScreenV1State extends ConsumerState<CurrencyScreenV1>
     final now = DateTime.now();
     final lastAdWatched = currencyData.lastAdWatched;
     final cooldown = lastAdWatched != null ? now.difference(lastAdWatched) : Duration(seconds: 15);
-    final isCooldownActive = cooldown.inSeconds < 15 || _cooldownRemaining > Duration.zero;
+    final isCooldownActive = kDebugMode ? false : (cooldown.inSeconds < 15 || _cooldownRemaining > Duration.zero);
     final displayCooldown = _cooldownRemaining > Duration.zero ? _cooldownRemaining : (Duration(seconds: 15) - cooldown);
     return Container(
       color: Colors.black.withOpacity(0.5),
@@ -543,7 +727,9 @@ class _CurrencyScreenV1State extends ConsumerState<CurrencyScreenV1>
                       ),
                       child: isCooldownActive
                           ? Text(
-                              'Wait ${displayCooldown.inMinutes}:${(displayCooldown.inSeconds % 60).toString().padLeft(2, '0')} to watch again',
+                              kDebugMode
+                                  ? 'Watch Another'
+                                  : 'Wait ${displayCooldown.inMinutes}:${(displayCooldown.inSeconds % 60).toString().padLeft(2, '0')} to watch again',
                               style: TextStyle(color: theme.primaryColor),
                             )
                           : Text(
@@ -574,93 +760,5 @@ class _CurrencyScreenV1State extends ConsumerState<CurrencyScreenV1>
         ),
       ),
     );
-  }
-
-  Widget _buildStatCard(ThemeData theme, String title, String value, IconData icon) {
-    return Container(
-      padding: EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 8,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: theme.primaryColor, size: 24),
-          SizedBox(height: 8),
-          Text(
-            value,
-            style: theme.textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: theme.primaryColor,
-            ),
-          ),
-          SizedBox(height: 4),
-          Text(
-            title,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.textTheme.bodySmall?.color,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showWhyAdsDialog(ThemeData theme) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: theme.cardColor,
-        title: Text('Why Ads?', style: theme.textTheme.titleLarge),
-        content: Text(
-          'Ads help us keep the app free and support ongoing development. Your engagement helps us continue improving your experience!',
-          style: theme.textTheme.bodyMedium,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text('Got it!', style: TextStyle(color: theme.primaryColor)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Debug helper methods (only available in debug mode)
-  void _resetDailyCounter() async {
-    final currencyNotifier = ref.read(currencyProvider.notifier);
-    await currencyNotifier.resetDailyEarnings();
-    
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Daily counter reset! You can now earn ads again.'),
-          backgroundColor: Colors.green,
-          duration: Duration(seconds: 2),
-        ),
-      );
-    }
-  }
-
-  void _reloadAds() {
-    _adNotifier?.loadRewardedAd();
-    
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Ads reloaded! Rewarded ad should be ready soon.'),
-          backgroundColor: Colors.blue,
-          duration: Duration(seconds: 2),
-        ),
-      );
-    }
   }
 }

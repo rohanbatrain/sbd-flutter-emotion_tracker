@@ -431,6 +431,50 @@ class _DeveloperOptionsScreenV1State extends ConsumerState<DeveloperOptionsScree
                     icon: Icon(Icons.copy, size: 20),
                     onPressed: () => _copyToClipboard(value, key),
                   ),
+                  IconButton(
+                    icon: Icon(Icons.edit, size: 20),
+                    onPressed: () async {
+                      final newValue = await showDialog<String>(
+                        context: context,
+                        builder: (context) {
+                          final controller = TextEditingController(text: value);
+                          return AlertDialog(
+                            title: Text('Edit $key'),
+                            content: TextField(
+                              controller: controller,
+                              maxLines: 3,
+                              decoration: InputDecoration(labelText: 'Value'),
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context),
+                                child: Text('Cancel'),
+                              ),
+                              ElevatedButton(
+                                onPressed: () => Navigator.pop(context, controller.text),
+                                child: Text('Save'),
+                              ),
+                            ],
+                          );
+                        },
+                      );
+                      if (newValue != null && newValue != value) {
+                        if (isSecure) {
+                          final secureStorage = ref.read(secureStorageProvider);
+                          await secureStorage.write(key: key, value: newValue);
+                        } else {
+                          final prefs = await SharedPreferences.getInstance();
+                          await prefs.setString(key, newValue);
+                        }
+                        await _loadData();
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('$key updated successfully')),
+                          );
+                        }
+                      }
+                    },
+                  ),
                 ],
               ),
             ],

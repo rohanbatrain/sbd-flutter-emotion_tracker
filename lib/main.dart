@@ -13,7 +13,6 @@ import 'package:emotion_tracker/screens/auth/verify-email/variant1.dart';
 import 'package:emotion_tracker/screens/auth/client-side-encryption/variant1.dart';
 import 'package:emotion_tracker/screens/auth/forgot-password/variant1.dart';
 import 'package:emotion_tracker/screens/auth/login-with-token/variant1.dart';
-
 const String registrationAppId = 'emotion_tracker';
 
 void main() async {
