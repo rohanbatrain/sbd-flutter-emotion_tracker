@@ -119,6 +119,8 @@ class AppThemes {
     'forestGreen',
     'midnightLavenderLight',
     'royalOrange',
+    'crimsonRed',
+    'deepPurple',
   ];
 
   static final List<String> darkThemeKeys = [

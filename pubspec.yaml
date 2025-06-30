@@ -51,6 +51,7 @@ dependencies:
   dio: ^5.8.0+1
   mobile_scanner: ^7.0.1
   qr_flutter: ^4.1.0
+  timezone: ^0.10.1
 
 dev_dependencies:
   flutter_test:

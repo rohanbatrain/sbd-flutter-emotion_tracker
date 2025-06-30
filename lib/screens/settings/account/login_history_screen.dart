@@ -6,6 +6,7 @@ import 'package:emotion_tracker/providers/shared_prefs_provider.dart';
 import 'package:emotion_tracker/providers/theme_provider.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:timezone/timezone.dart' as tz;
 
 final loginHistoryProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final storage = ref.read(secureStorageProvider);
@@ -28,17 +29,90 @@ final loginHistoryProvider = FutureProvider<List<Map<String, dynamic>>>((ref) as
   }
 });
 
-class LoginHistoryScreen extends ConsumerWidget {
+const _tzAbbreviationMap = {
+  'IST': 'Asia/Kolkata',
+  'UTC': 'UTC',
+  'GMT': 'Europe/London',
+  'PST': 'America/Los_Angeles',
+  'EST': 'America/New_York',
+  'CST': 'America/Chicago',
+  'MST': 'America/Denver',
+  'JST': 'Asia/Tokyo',
+  'CET': 'Europe/Paris',
+  'EET': 'Europe/Bucharest',
+  // Add more as needed
+};
+
+String _mapAbbreviationToIana(String abbr) {
+  return _tzAbbreviationMap[abbr.toUpperCase()] ?? abbr;
+}
+
+class LoginHistoryScreen extends ConsumerStatefulWidget {
   const LoginHistoryScreen({super.key});
+
+  @override
+  ConsumerState<LoginHistoryScreen> createState() => _LoginHistoryScreenState();
+}
+
+class _LoginHistoryScreenState extends ConsumerState<LoginHistoryScreen> with RouteAware {
+  RouteObserver<PageRoute>? _routeObserver;
+  PageRoute? _pageRoute;
+
+  @override
+  void initState() {
+    super.initState();
+    // Always refresh on first load
+    Future.microtask(() => ref.invalidate(loginHistoryProvider));
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Subscribe to route changes
+    _routeObserver = ModalRoute.of(context)?.navigator?.widget.observers
+        .whereType<RouteObserver<PageRoute>>()
+        .firstOrNull;
+    _pageRoute = ModalRoute.of(context) as PageRoute?;
+    _routeObserver?.subscribe(this, _pageRoute!);
+  }
+
+  @override
+  void dispose() {
+    // Unsubscribe from route observer
+    _routeObserver?.unsubscribe(this);
+    super.dispose();
+  }
+
+  @override
+  void didPopNext() {
+    // Called when coming back to this screen
+    ref.invalidate(loginHistoryProvider);
+    super.didPopNext();
+  }
 
   Color _statusColor(String outcome) =>
       outcome == 'success' ? Colors.green : Colors.red;
 
-  String _formatTimestamp(String ts) {
-    final dt = DateTime.tryParse(ts)?.toLocal();
-    return dt == null
-        ? ts
-        : DateFormat('dd MMM yyyy • hh mm a').format(dt); // 27 Jun 2025 • 08 16 PM
+  String _formatTimestamp(String ts, String userTz) {
+    try {
+      // Ensure the timestamp is parsed as UTC if no offset is present
+      String safeTs = ts;
+      if (!ts.endsWith('Z') && !RegExp(r'[+-]\d{2}:?\d{2}').hasMatch(ts)) {
+        safeTs = ts + 'Z';
+      }
+      final utc = DateTime.parse(safeTs).toUtc();
+      String tzName = _mapAbbreviationToIana(userTz);
+      if (tzName.isNotEmpty) {
+        final location = tz.getLocation(tzName);
+        final local = tz.TZDateTime.from(utc, location);
+        return DateFormat('dd MMM yyyy • hh:mm a').format(local);
+      } else {
+        final local = utc.toLocal();
+        return DateFormat('dd MMM yyyy • hh:mm a').format(local);
+      }
+    } catch (_) {
+      return ts;
+    }
   }
 
   String _shortUserAgent(String ua) {
@@ -74,8 +148,9 @@ class LoginHistoryScreen extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final asyncLogins = ref.watch(loginHistoryProvider);
+    final userTz = ref.watch(timezoneProvider);
     final theme = ref.watch(currentThemeProvider);
     final textTheme = theme.textTheme;
     final colorScheme = theme.colorScheme;
@@ -100,10 +175,38 @@ class LoginHistoryScreen extends ConsumerWidget {
 
           // Show only the 10 most recent successful logins
           final recentItems = items.take(10).toList();
+          final mostRecent = recentItems.first;
 
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Details card above nav
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                child: Card(
+                  elevation: 3,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  color: colorScheme.surfaceVariant,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Most Recent Login', style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 8),
+                        ...mostRecent.entries
+                          .where((e) => e.value != null && e.value.toString().trim().isNotEmpty)
+                          .map((e) => Row(
+                                children: [
+                                  Text('${e.key}: ', style: const TextStyle(fontWeight: FontWeight.w600)),
+                                  Expanded(child: Text(e.value?.toString() ?? '')),
+                                ],
+                              )),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
@@ -140,7 +243,7 @@ class LoginHistoryScreen extends ConsumerWidget {
                   itemBuilder: (ctx, i) {
                     final l = recentItems[i];
                     final color = _statusColor(l['outcome']);
-                    final formattedDate = _formatTimestamp(l['timestamp'] ?? '');
+                    final formattedDate = _formatTimestamp(l['timestamp'] ?? '', userTz);
                     final device = _shortUserAgent(l['user_agent'] ?? '');
                     final ip = l['ip_address'] ?? '';
                     final mfa = (l['mfa_status'] ?? false) as bool;

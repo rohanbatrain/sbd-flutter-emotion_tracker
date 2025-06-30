@@ -15,6 +15,17 @@ class ThemeSelectionScreenV1 extends ConsumerStatefulWidget {
 class _ThemeSelectionScreenV1State extends ConsumerState<ThemeSelectionScreenV1> {
   int toggleState = 0; // 0 = Light, 1 = Dark
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final currentThemeKey = ref.read(themeProvider);
+    if (AppThemes.darkThemeKeys.contains(currentThemeKey)) {
+      if (toggleState != 1) setState(() => toggleState = 1);
+    } else if (AppThemes.lightThemeKeys.contains(currentThemeKey)) {
+      if (toggleState != 0) setState(() => toggleState = 0);
+    }
+  }
+
   void _onItemSelected(BuildContext context, String item) {
     Navigator.of(context).pop();
     if (item == 'dashboard') {
@@ -53,36 +64,49 @@ class _ThemeSelectionScreenV1State extends ConsumerState<ThemeSelectionScreenV1>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             SizedBox(height: 16),
-            // Toggle for Light/Dark
-            Center(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: theme.cardColor,
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black12,
-                      blurRadius: 4,
-                      offset: Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _ThemeToggleButton(
-                      label: 'Light',
-                      selected: isLight,
-                      onTap: () => setState(() => toggleState = 0),
-                      icon: Icons.wb_sunny_outlined,
-                    ),
-                    _ThemeToggleButton(
-                      label: 'Dark',
-                      selected: !isLight,
-                      onTap: () => setState(() => toggleState = 1),
-                      icon: Icons.nightlight_round,
-                    ),
-                  ],
+            // Toggle for Light/Dark with swipe support
+            GestureDetector(
+              onHorizontalDragEnd: (details) {
+                if (details.primaryVelocity != null) {
+                  if (details.primaryVelocity! < 0 && toggleState == 0) {
+                    // Swipe left: Light -> Dark
+                    setState(() => toggleState = 1);
+                  } else if (details.primaryVelocity! > 0 && toggleState == 1) {
+                    // Swipe right: Dark -> Light
+                    setState(() => toggleState = 0);
+                  }
+                }
+              },
+              child: Center(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: theme.cardColor,
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black12,
+                        blurRadius: 4,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _ThemeToggleButton(
+                        label: 'Light',
+                        selected: isLight,
+                        onTap: () => setState(() => toggleState = 0),
+                        icon: Icons.wb_sunny_outlined,
+                      ),
+                      _ThemeToggleButton(
+                        label: 'Dark',
+                        selected: !isLight,
+                        onTap: () => setState(() => toggleState = 1),
+                        icon: Icons.nightlight_round,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -92,75 +116,87 @@ class _ThemeSelectionScreenV1State extends ConsumerState<ThemeSelectionScreenV1>
               style: theme.textTheme.bodyLarge,
             ),
             SizedBox(height: 16),
+            // Swipe support for theme grid as well
             Expanded(
-              child: GridView.builder(
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                  childAspectRatio: 2.5,
-                ),
-                itemCount: themeKeys.length,
-                itemBuilder: (context, index) {
-                  final themeKey = themeKeys[index];
-                  final themeName = AppThemes.themeNames[themeKey]!;
-                  final themeData = AppThemes.allThemes[themeKey]!;
-                  final isSelected = currentThemeKey == themeKey;
-                  return GestureDetector(
-                    onTap: () {
-                      ref.read(themeProvider.notifier).setTheme(themeKey);
-                    },
-                    child: Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: isSelected ? themeData.primaryColor : Colors.grey.withOpacity(0.3),
-                          width: isSelected ? 3 : 1,
-                        ),
-                        color: themeData.primaryColor.withOpacity(0.1),
-                      ),
-                      child: Stack(
-                        children: [
-                          Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Container(
-                                  width: 40,
-                                  height: 20,
-                                  decoration: BoxDecoration(
-                                    color: themeData.primaryColor,
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                ),
-                                SizedBox(height: 8),
-                                Text(
-                                  themeName,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                    color: themeData.primaryColor,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                              ],
-                            ),
+              child: GestureDetector(
+                onHorizontalDragEnd: (details) {
+                  if (details.primaryVelocity != null) {
+                    if (details.primaryVelocity! < 0 && toggleState == 0) {
+                      setState(() => toggleState = 1);
+                    } else if (details.primaryVelocity! > 0 && toggleState == 1) {
+                      setState(() => toggleState = 0);
+                    }
+                  }
+                },
+                child: GridView.builder(
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                    childAspectRatio: 2.5,
+                  ),
+                  itemCount: themeKeys.length,
+                  itemBuilder: (context, index) {
+                    final themeKey = themeKeys[index];
+                    final themeName = AppThemes.themeNames[themeKey]!;
+                    final themeData = AppThemes.allThemes[themeKey]!;
+                    final isSelected = currentThemeKey == themeKey;
+                    return GestureDetector(
+                      onTap: () {
+                        ref.read(themeProvider.notifier).setTheme(themeKey);
+                      },
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: isSelected ? themeData.primaryColor : Colors.grey.withOpacity(0.3),
+                            width: isSelected ? 3 : 1,
                           ),
-                          if (isSelected)
-                            Positioned(
-                              top: 8,
-                              right: 8,
-                              child: Icon(
-                                Icons.check_circle,
-                                color: themeData.primaryColor,
-                                size: 20,
+                          color: themeData.primaryColor.withOpacity(0.1),
+                        ),
+                        child: Stack(
+                          children: [
+                            Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Container(
+                                    width: 40,
+                                    height: 20,
+                                    decoration: BoxDecoration(
+                                      color: themeData.primaryColor,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                  ),
+                                  SizedBox(height: 8),
+                                  Text(
+                                    themeName,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                      color: themeData.primaryColor,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ],
                               ),
                             ),
-                        ],
+                            if (isSelected)
+                              Positioned(
+                                top: 8,
+                                right: 8,
+                                child: Icon(
+                                  Icons.check_circle,
+                                  color: themeData.primaryColor,
+                                  size: 20,
+                                ),
+                              ),
+                          ],
+                        ),
                       ),
-                    ),
-                  );
-                },
+                    );
+                  },
+                ),
               ),
             ),
           ],

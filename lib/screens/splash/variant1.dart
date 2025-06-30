@@ -28,8 +28,15 @@ class _SplashScreenV1State extends ConsumerState<SplashScreenV1>
   @override
   void initState() {
     super.initState();
+    _storeTimezoneWithProvider();
     _initializeAnimations();
     _checkAuthAndNavigate();
+  }
+
+  void _storeTimezoneWithProvider() {
+    final timezone = DateTime.now().timeZoneName;
+    final timezoneNotifier = ref.read(timezoneProvider.notifier);
+    timezoneNotifier.setTimezone(timezone);
   }
 
   void _initializeAnimations() {

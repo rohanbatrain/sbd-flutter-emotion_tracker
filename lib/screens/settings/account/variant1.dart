@@ -138,12 +138,17 @@ class AccountSettingsScreenV1 extends ConsumerWidget {
               leading: Icon(Icons.shield, color: theme.primaryColor),
               title: Text('Trusted IP Lockdown'),
               onTap: () async {
-                // No authentication required for viewing status
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const TrustedIpStatusScreen(),
-                  ),
+                final authenticated = await _authenticate(
+                  context,
+                  reason: 'Please authenticate to view Trusted IP Lockdown',
                 );
+                if (authenticated) {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const TrustedIpStatusScreen(),
+                    ),
+                  );
+                }
               },
             ),
             SizedBox(height: 14),

@@ -21,6 +21,14 @@ final serverProtocolProvider = StateNotifierProvider<ServerProtocolNotifier, Str
   );
 });
 
+final timezoneProvider = StateNotifierProvider<TimezoneNotifier, String>((ref) {
+  final prefsAsync = ref.watch(sharedPrefsProvider);
+  return prefsAsync.maybeWhen(
+    data: (prefs) => TimezoneNotifier(prefs),
+    orElse: () => TimezoneNotifier(null),
+  );
+});
+
 class ServerDomainNotifier extends StateNotifier<String> {
   final SharedPreferences? prefs;
   static const String _key = 'server_domain';
@@ -63,6 +71,34 @@ class ServerProtocolNotifier extends StateNotifier<String> {
     state = protocol;
     if (prefs != null) {
       await prefs!.setString(_key, protocol);
+    }
+  }
+}
+
+class TimezoneNotifier extends StateNotifier<String> {
+  final SharedPreferences? prefs;
+  static const String _key = 'user_timezone';
+
+  TimezoneNotifier(this.prefs) : super('') {
+    // Do not call _load or set state here to avoid build errors
+  }
+
+  // Optionally, provide a method to load the timezone manually if needed
+  Future<void> load() async {
+    if (prefs != null) {
+      final tz = prefs!.getString(_key);
+      if (tz != null && tz.isNotEmpty) {
+        if (state != tz) state = tz;
+      }
+    }
+  }
+
+  Future<void> setTimezone(String timezone) async {
+    if (state != timezone) {
+      Future.microtask(() => state = timezone);
+    }
+    if (prefs != null) {
+      await prefs!.setString(_key, timezone);
     }
   }
 }
