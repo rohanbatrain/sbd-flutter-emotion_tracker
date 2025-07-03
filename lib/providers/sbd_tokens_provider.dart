@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:emotion_tracker/providers/secure_storage_provider.dart';
 import 'package:emotion_tracker/providers/shared_prefs_provider.dart';
+import 'package:emotion_tracker/utils/http_util.dart';
 
 class SbdTokensState {
   final int? balance;
@@ -79,7 +80,8 @@ class SbdTokensNotifier extends StateNotifier<SbdTokensState> {
       if (token == null) throw Exception('Not authenticated');
       final baseUrl = _getBaseUrl();
       final url = Uri.parse('$baseUrl/sbd_tokens/send');
-      final res = await http.post(url,
+      final res = await HttpUtil.post(
+        url,
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
@@ -98,31 +100,85 @@ class SbdTokensNotifier extends StateNotifier<SbdTokensState> {
         state = state.copyWith(isLoading: false, error: err['detail']?.toString() ?? 'Failed to send tokens');
         return false;
       }
+    } on CloudflareTunnelException catch (e) {
+      state = state.copyWith(isLoading: false, error: e.message);
+      return false;
+    } on NetworkException catch (e) {
+      state = state.copyWith(isLoading: false, error: e.message);
+      return false;
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
       return false;
     }
   }
 
-  Future<void> fetchTransactions({String? username, int skip = 0, int limit = 50}) async {
+  Future<void> fetchTransactions({String? username, int skip = 0, int limit = 5}) async {
+    // Delay provider modification to after build phase
+    await Future(() async {
+      state = state.copyWith(isLoading: true, error: null);
+      try {
+        final token = await _getToken();
+        if (token == null) throw Exception('Not authenticated');
+        final baseUrl = _getBaseUrl();
+        final userPath = username != null && username.isNotEmpty ? '/$username' : '';
+        final url = Uri.parse('$baseUrl/sbd_tokens/transactions$userPath?skip=$skip&limit=$limit');
+        final res = await http.get(url, headers: {
+          'Authorization': 'Bearer $token',
+        });
+        if (res.statusCode == 200) {
+          final data = jsonDecode(res.body);
+          state = state.copyWith(transactions: data['transactions'], isLoading: false, error: null);
+        } else if (res.statusCode == 404) {
+          state = state.copyWith(transactions: [], isLoading: false, error: null);
+        } else {
+          String errorMsg = 'Failed to fetch transactions';
+          try {
+            final errJson = jsonDecode(res.body);
+            errorMsg = errJson['detail']?.toString() ?? errorMsg;
+          } catch (_) {
+            if (res.statusCode == 502) errorMsg = 'Server unavailable (502)';
+          }
+          state = state.copyWith(isLoading: false, error: errorMsg);
+        }
+      } catch (e) {
+        state = state.copyWith(isLoading: false, error: e.toString());
+      }
+    });
+  }
+
+  Future<bool> updateTransactionNote({required String transactionId, required String note}) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
       final token = await _getToken();
       if (token == null) throw Exception('Not authenticated');
       final baseUrl = _getBaseUrl();
-      final userPath = username != null && username.isNotEmpty ? '/$username' : '';
-      final url = Uri.parse('$baseUrl/sbd_tokens/transactions$userPath?skip=$skip&limit=$limit');
-      final res = await http.get(url, headers: {
-        'Authorization': 'Bearer $token',
-      });
+      final url = Uri.parse('$baseUrl/sbd_tokens/transaction/note');
+      final res = await http.patch(
+        url,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'transaction_id': transactionId,
+          'note': note,
+        }),
+      );
       if (res.statusCode == 200) {
-        final data = jsonDecode(res.body);
-        state = state.copyWith(transactions: data['transactions'], isLoading: false, error: null);
+        state = state.copyWith(isLoading: false, error: null);
+        return true;
       } else {
-        state = state.copyWith(isLoading: false, error: jsonDecode(res.body)['detail']?.toString() ?? 'Failed to fetch transactions');
+        String errorMsg = 'Failed to update note';
+        try {
+          final errJson = jsonDecode(res.body);
+          errorMsg = errJson['detail']?.toString() ?? errorMsg;
+        } catch (_) {}
+        state = state.copyWith(isLoading: false, error: errorMsg);
+        return false;
       }
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
+      return false;
     }
   }
 }
