@@ -518,6 +518,12 @@ class _CurrencyScreenV1State extends ConsumerState<CurrencyScreenV1>
                                       );
                                       return;
                                     }
+                                    if (sbdState.balance != null && amount > (sbdState.balance ?? 0)) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text('You cannot send more than your available balance.')),
+                                      );
+                                      return;
+                                    }
                                     final didAuth = await _authenticateForSend();
                                     if (!didAuth) {
                                       ScaffoldMessenger.of(context).showSnackBar(
