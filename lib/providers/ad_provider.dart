@@ -69,9 +69,10 @@ class AdNotifier extends StateNotifier<AdState> {
     _initializeAdMob();
   }
 
+  bool get _isLinux => defaultTargetPlatform == TargetPlatform.linux;
+
   Future<void> _initializeAdMob() async {
-    // Only initialize AdMob if not running on Linux
-    if (defaultTargetPlatform == TargetPlatform.linux) return;
+    if (_isLinux) return;
     try {
       // Initialize AdMob in the background without blocking
       MobileAds.instance.initialize().then((_) {
@@ -94,6 +95,7 @@ class AdNotifier extends StateNotifier<AdState> {
 
   // Helper to ensure AdMob is initialized before any ad operation
   Future<void> _ensureAdMobInitialized() async {
+    if (_isLinux) return;
     if (!state.isAdMobInitialized) {
       await _initializeAdMob();
     }
@@ -101,6 +103,7 @@ class AdNotifier extends StateNotifier<AdState> {
 
   // Load banner ad with specific ID
   Future<void> loadBannerAd(String adId, {AdSize size = AdSize.banner}) async {
+    if (_isLinux) return;
     await _ensureAdMobInitialized();
 
     // Dispose existing ad if any
@@ -143,6 +146,7 @@ class AdNotifier extends StateNotifier<AdState> {
 
   // Load interstitial ad
   Future<void> loadInterstitialAd() async {
+    if (_isLinux) return;
     await _ensureAdMobInitialized();
 
     if (state.interstitialAdState == AdLoadingState.loading) return;
@@ -170,6 +174,7 @@ class AdNotifier extends StateNotifier<AdState> {
 
   // Show interstitial ad
   Future<void> showInterstitialAd({VoidCallback? onAdClosed}) async {
+    if (_isLinux) return;
     if (state.interstitialAd == null) {
       return;
     }
@@ -201,6 +206,7 @@ class AdNotifier extends StateNotifier<AdState> {
 
   // Load rewarded ad
   Future<void> loadRewardedAd({required WidgetRef ref}) async {
+    if (_isLinux) return;
     await _ensureAdMobInitialized();
 
     // Fetch username from secure storage
@@ -234,6 +240,7 @@ class AdNotifier extends StateNotifier<AdState> {
 
   // Load rewarded interstitial ad
   Future<void> loadRewardedInterstitialAd({required WidgetRef ref}) async {
+    if (_isLinux) return;
     await _ensureAdMobInitialized();
 
     // Fetch username from secure storage
@@ -279,6 +286,7 @@ class AdNotifier extends StateNotifier<AdState> {
     void Function(String username)? onRewardCallback, // Now passes username
     required WidgetRef ref, // Add ref to access providers
   }) async {
+    if (_isLinux) return;
     if (state.rewardedAd == null) {
       return;
     }

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:emotion_tracker/providers/theme_provider.dart';
-import 'package:emotion_tracker/providers/currency_provider.dart';
+import 'package:emotion_tracker/providers/sbd_tokens_provider.dart';
 import 'package:emotion_tracker/screens/currency/variant1.dart';
 
 class CustomAppBar extends ConsumerWidget implements PreferredSizeWidget {
@@ -25,7 +25,7 @@ class CustomAppBar extends ConsumerWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = ref.watch(currentThemeProvider);
-    final currencyData = ref.watch(currencyProvider);
+    final sbdState = ref.watch(sbdTokensProvider);
     
     return AppBar(
       title: Text(title),
@@ -67,14 +67,23 @@ class CustomAppBar extends ConsumerWidget implements PreferredSizeWidget {
                     size: 18,
                   ),
                   SizedBox(width: 4),
-                  Text(
-                    currencyData.formattedBalance,
-                    style: TextStyle(
-                      color: theme.colorScheme.onPrimary,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
+                  if (sbdState.isLoading)
+                    SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: theme.colorScheme.onPrimary),
+                    )
+                  else if (sbdState.error != null)
+                    Icon(Icons.error, color: Colors.red, size: 18)
+                  else
+                    Text(
+                      sbdState.balance?.toString() ?? '--',
+                      style: TextStyle(
+                        color: theme.colorScheme.onPrimary,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
                     ),
-                  ),
                 ],
               ),
             ),
