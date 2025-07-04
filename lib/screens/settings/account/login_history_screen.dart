@@ -7,6 +7,7 @@ import 'package:emotion_tracker/providers/theme_provider.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:timezone/timezone.dart' as tz;
+import 'package:flutter/services.dart';
 
 final loginHistoryProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final storage = ref.read(secureStorageProvider);
@@ -163,170 +164,194 @@ class _LoginHistoryScreenState extends ConsumerState<LoginHistoryScreen> with Ro
         elevation: 1,
       ),
       backgroundColor: colorScheme.background,
-      body: asyncLogins.when(
-        loading: () => Center(child: CircularProgressIndicator(color: colorScheme.primary)),
-        error: (err, _) =>
-            Center(child: Text('⚠️  Something went wrong\n$err', style: textTheme.bodyLarge?.copyWith(color: colorScheme.error))),
-        data: (logins) {
-          final items = logins.where((e) => e['outcome'] == 'success').toList();
-          if (items.isEmpty) {
-            return Center(child: Text('No recent logins found.', style: textTheme.bodyLarge));
-          }
+      body: RefreshIndicator(
+        onRefresh: () async => ref.invalidate(loginHistoryProvider),
+        child: asyncLogins.when(
+          loading: () => Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CircularProgressIndicator(color: colorScheme.primary),
+                const SizedBox(height: 16),
+                Text('Loading recent logins...', style: textTheme.bodyLarge),
+              ],
+            ),
+          ),
+          error: (err, _) => Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.error_outline, color: colorScheme.error, size: 40),
+                const SizedBox(height: 12),
+                Text('Something went wrong', style: textTheme.titleMedium?.copyWith(color: colorScheme.error)),
+                const SizedBox(height: 8),
+                Text('$err', style: textTheme.bodyMedium, textAlign: TextAlign.center),
+                const SizedBox(height: 16),
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Retry'),
+                  onPressed: () => ref.invalidate(loginHistoryProvider),
+                  style: ElevatedButton.styleFrom(backgroundColor: colorScheme.primary),
+                ),
+              ],
+            ),
+          ),
+          data: (logins) {
+            final items = logins.where((e) => e['outcome'] == 'success').toList();
+            if (items.isEmpty) {
+              return Center(child: Text('No recent logins found.', style: textTheme.bodyLarge));
+            }
 
-          // Show only the 10 most recent successful logins
-          final recentItems = items.take(10).toList();
-          final mostRecent = recentItems.first;
+            // Show only the 10 most recent successful logins
+            final recentItems = items.take(10).toList();
 
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Details card above nav
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-                child: Card(
-                  elevation: 3,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  color: colorScheme.surfaceVariant,
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Most Recent Login', style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 8),
-                        ...mostRecent.entries
-                          .where((e) => e.value != null && e.value.toString().trim().isNotEmpty)
-                          .map((e) => Row(
-                                children: [
-                                  Text('${e.key}: ', style: const TextStyle(fontWeight: FontWeight.w600)),
-                                  Expanded(child: Text(e.value?.toString() ?? '')),
-                                ],
-                              )),
-                      ],
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
+                  decoration: BoxDecoration(
+                    color: colorScheme.primary.withOpacity(0.08),
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(18),
+                      topRight: Radius.circular(18),
                     ),
                   ),
-                ),
-              ),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
-                decoration: BoxDecoration(
-                  color: colorScheme.primary.withOpacity(0.08),
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(18),
-                    topRight: Radius.circular(18),
-                  ),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(Icons.lock_clock, color: colorScheme.primary, size: 26),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Text(
-                        '10 most recent logins for your Second Brain Database account',
-                        style: textTheme.titleMedium?.copyWith(
-                          color: colorScheme.onSurface,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0.1,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.lock_clock, color: colorScheme.primary, size: 26),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Text(
+                          '10 most recent logins for your Second Brain Database account',
+                          style: textTheme.titleMedium?.copyWith(
+                            color: colorScheme.onSurface,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.1,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              Expanded(
-                child: ListView.separated(
-                  padding: const EdgeInsets.all(16),
-                  separatorBuilder: (_, __) => const SizedBox(height: 12),
-                  itemCount: recentItems.length,
-                  itemBuilder: (ctx, i) {
-                    final l = recentItems[i];
-                    final color = _statusColor(l['outcome']);
-                    final formattedDate = _formatTimestamp(l['timestamp'] ?? '', userTz);
-                    final device = _shortUserAgent(l['user_agent'] ?? '');
-                    final ip = l['ip_address'] ?? '';
-                    final mfa = (l['mfa_status'] ?? false) as bool;
+                Expanded(
+                  child: ListView.separated(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.all(16),
+                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    itemCount: recentItems.length,
+                    itemBuilder: (ctx, i) {
+                      final l = recentItems[i];
+                      final color = _statusColor(l['outcome']);
+                      final formattedDate = _formatTimestamp(l['timestamp'] ?? '', userTz);
+                      final device = _shortUserAgent(l['user_agent'] ?? '');
+                      final ip = l['ip_address'] ?? '';
+                      final mfa = (l['mfa_status'] ?? false) as bool;
 
-                    return Card(
-                      elevation: 2,
-                      color: colorScheme.surface,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                      child: ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: color,
-                          child: _buildPlatformIcon(l['user_agent'] ?? '', color),
-                        ),
-                        title: Text(
-                          formattedDate,
-                          style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-                        ),
-                        subtitle: Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: Wrap(
-                            spacing: 8,
-                            runSpacing: -8,
-                            children: [
-                              Chip(
-                                label: Text(device, style: textTheme.labelMedium),
-                                avatar: const Icon(Icons.devices_other, size: 16),
-                                backgroundColor: colorScheme.primary.withOpacity(0.08),
-                                shape: StadiumBorder(),
-                              ),
-                              Chip(
-                                label: Text(_platformFromUserAgent(l['user_agent'] ?? ''), style: textTheme.labelMedium),
-                                avatar: const Icon(Icons.computer, size: 16),
-                                backgroundColor: colorScheme.secondary.withOpacity(0.08),
-                                shape: StadiumBorder(),
-                              ),
-                              Chip(
-                                label: Text(ip, style: textTheme.labelMedium),
-                                avatar: const Icon(Icons.public, size: 16),
-                                backgroundColor: colorScheme.tertiaryContainer.withOpacity(0.08),
-                                shape: StadiumBorder(),
-                              ),
-                              if (mfa)
+                      return Card(
+                        elevation: 2,
+                        color: colorScheme.surface,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                        child: ListTile(
+                          leading: Tooltip(
+                            message: _platformFromUserAgent(l['user_agent'] ?? ''),
+                            child: CircleAvatar(
+                              backgroundColor: color,
+                              child: _buildPlatformIcon(l['user_agent'] ?? '', color),
+                            ),
+                          ),
+                          title: Text(
+                            formattedDate,
+                            style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                          ),
+                          subtitle: Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Wrap(
+                              spacing: 8,
+                              runSpacing: -8,
+                              children: [
+                                Tooltip(
+                                  message: l['user_agent'] ?? '',
+                                  child: Chip(
+                                    label: Text(device, style: textTheme.labelMedium),
+                                    avatar: const Icon(Icons.devices_other, size: 16),
+                                    backgroundColor: colorScheme.primary.withOpacity(0.08),
+                                    shape: StadiumBorder(),
+                                  ),
+                                ),
                                 Chip(
-                                  label: const Text('MFA'),
-                                  avatar: const Icon(Icons.security, size: 16),
-                                  backgroundColor: colorScheme.error.withOpacity(0.08),
+                                  label: Text(_platformFromUserAgent(l['user_agent'] ?? ''), style: textTheme.labelMedium),
+                                  avatar: const Icon(Icons.computer, size: 16),
+                                  backgroundColor: colorScheme.secondary.withOpacity(0.08),
                                   shape: StadiumBorder(),
                                 ),
-                            ],
-                          ),
-                        ),
-                        trailing: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: color.withOpacity(.12),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            l['outcome'],
-                            style: textTheme.labelLarge?.copyWith(
-                              color: color, fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                        onTap: () {
-                          // Optional: show a bottom sheet with full details
-                          showModalBottomSheet(
-                            context: context,
-                            builder: (_) => _LoginDetailsSheet(login: l),
-                            backgroundColor: colorScheme.surface,
-                            shape: const RoundedRectangleBorder(
-                              borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+                                Tooltip(
+                                  message: 'Copy IP',
+                                  child: InkWell(
+                                    borderRadius: BorderRadius.circular(20),
+                                    onTap: () async {
+                                      await Clipboard.setData(ClipboardData(text: ip));
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            content: Text('IP address copied!'),
+                                            duration: const Duration(seconds: 2),
+                                          ),
+                                        );
+                                      }
+                                    },
+                                    child: Chip(
+                                      label: Text(ip, style: textTheme.labelMedium),
+                                      avatar: const Icon(Icons.public, size: 16),
+                                      backgroundColor: colorScheme.tertiaryContainer.withOpacity(0.08),
+                                      shape: StadiumBorder(),
+                                    ),
+                                  ),
+                                ),
+                                if (mfa)
+                                  Chip(
+                                    label: const Text('MFA'),
+                                    avatar: const Icon(Icons.security, size: 16),
+                                    backgroundColor: colorScheme.error.withOpacity(0.08),
+                                    shape: StadiumBorder(),
+                                  ),
+                              ],
                             ),
-                          );
-                        },
-                      ),
-                    );
-                  },
+                          ),
+                          trailing: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: color.withOpacity(.12),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              l['outcome'],
+                              style: textTheme.labelLarge?.copyWith(
+                                color: color, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                          onTap: () {
+                            showModalBottomSheet(
+                              context: context,
+                              builder: (_) => _LoginDetailsSheet(login: l),
+                              backgroundColor: colorScheme.surface,
+                              shape: const RoundedRectangleBorder(
+                                borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+                              ),
+                            );
+                          },
+                        ),
+                      );
+                    },
+                  ),
                 ),
-              ),
-            ],
-          );
-        },
+              ],
+            );
+          },
+        ),
       ),
     );
   }

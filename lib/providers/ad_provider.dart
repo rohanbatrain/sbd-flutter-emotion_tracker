@@ -279,6 +279,32 @@ class AdNotifier extends StateNotifier<AdState> {
     );
   }
 
+  // Load rewarded ad with custom adUnitId and userId
+  Future<void> loadRewardedAdWithCustomId({required String adUnitId, required String userId}) async {
+    if (_isLinux) return;
+    await _ensureAdMobInitialized();
+    state = state.copyWith(rewardedAdState: AdLoadingState.loading);
+    await RewardedAd.load(
+      adUnitId: adUnitId,
+      request: const AdRequest(),
+      rewardedAdLoadCallback: RewardedAdLoadCallback(
+        onAdLoaded: (ad) {
+          print('[AdProvider] Loaded rewarded ad with adUnitId: $adUnitId for user: $userId');
+          ad.setServerSideOptions(ServerSideVerificationOptions(userId: userId));
+          ad.setImmersiveMode(true);
+          state = state.copyWith(
+            rewardedAd: ad,
+            rewardedAdState: AdLoadingState.loaded,
+          );
+        },
+        onAdFailedToLoad: (error) {
+          print('[AdProvider] Failed to load rewarded ad with adUnitId: $adUnitId for user: $userId, error: $error');
+          state = state.copyWith(rewardedAdState: AdLoadingState.failed);
+        },
+      ),
+    );
+  }
+
   // Show rewarded ad
   Future<void> showRewardedAd({
     required Function(RewardItem reward) onUserEarnedReward,
@@ -319,7 +345,9 @@ class AdNotifier extends StateNotifier<AdState> {
 
     await state.rewardedAd!.show(
       onUserEarnedReward: (Ad ad, RewardItem reward) {
+        print('[AdProvider] showRewardedAd: onUserEarnedReward called. Username: $username, Reward: ${reward.amount} ${reward.type}');
         if (onRewardCallback != null && username != null && username.isNotEmpty) {
+          print('[AdProvider] showRewardedAd: onRewardCallback triggered for username: $username');
           onRewardCallback(username);
         }
         onUserEarnedReward(reward);
