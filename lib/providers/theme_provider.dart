@@ -108,6 +108,31 @@ class AppThemes {
     'royalOrangeDark': 100,
   };
 
+  static final Map<String, String> themeAdUnitIds = {
+    'serenityGreen': 'ca-app-pub-2845453539708646/3160625543',
+    'serenityGreenDark': 'ca-app-pub-2845453539708646/5649141791',
+    'pacificBlue': 'ca-app-pub-2845453539708646/5004459756',
+    'pacificBlueDark': 'ca-app-pub-2845453539708646/3326230785',
+    'blushRose': 'ca-app-pub-2845453539708646/3086557633',
+    'blushRoseDark': 'ca-app-pub-2845453539708646/8558090752',
+    'cloudGray': 'ca-app-pub-2845453539708646/7245009088',
+    'cloudGrayDark': 'ca-app-pub-2845453539708646/9221555291',
+    'sunsetPeach': 'ca-app-pub-2845453539708646/4618845740',
+    'sunsetPeachDark': 'ca-app-pub-2845453539708646/4447740765',
+    'midnightLavender': 'ca-app-pub-2845453539708646/3134659097',
+    'midnightLavenderLight': 'ca-app-pub-2845453539708646/1518325094',
+    'crimsonRed': 'ca-app-pub-2845453539708646/8814361181',
+    'crimsonRedDark': 'ca-app-pub-2845453539708646/5282310282',
+    'forestGreen': 'ca-app-pub-2845453539708646/4427274050',
+    'forestGreenDark': 'ca-app-pub-2845453539708646/6065425839',
+    'goldenYellow': 'ca-app-pub-2845453539708646/4416499916',
+    'goldenYellowDark': 'ca-app-pub-2845453539708646/8195414088',
+    'deepPurple': 'ca-app-pub-2845453539708646/3439262492',
+    'deepPurpleDark': 'ca-app-pub-2845453539708646/5314099872',
+    'royalOrange': 'ca-app-pub-2845453539708646/4256169075',
+    'royalOrangeDark': '',
+  };
+
   static final List<String> lightThemeKeys = [
     'lightTheme',
     'serenityGreen',
