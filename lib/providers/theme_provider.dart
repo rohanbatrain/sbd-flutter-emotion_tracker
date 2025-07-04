@@ -14,8 +14,6 @@ import 'package:emotion_tracker/themes/forest_green_theme.dart';
 import 'package:emotion_tracker/themes/golden_yellow_theme.dart';
 import 'package:emotion_tracker/themes/deep_purple_theme.dart';
 import 'package:emotion_tracker/themes/blush_rose_theme_dark.dart';
-import 'package:emotion_tracker/themes/cloud_gray_theme_dark.dart';
-import 'package:emotion_tracker/themes/crimson_red_theme_dark.dart';
 import 'package:emotion_tracker/themes/deep_purple_theme_dark.dart';
 import 'package:emotion_tracker/themes/forest_green_theme_dark.dart';
 import 'package:emotion_tracker/themes/golden_yellow_theme_dark.dart';
@@ -25,6 +23,8 @@ import 'package:emotion_tracker/themes/serenity_green_theme_dark.dart';
 import 'package:emotion_tracker/themes/sunset_peach_theme_dark.dart';
 import 'package:emotion_tracker/themes/royal_orange_theme.dart';
 import 'package:emotion_tracker/themes/royal_orange_theme_dark.dart';
+import 'package:emotion_tracker/themes/cloud_gray_theme_dark.dart';
+import 'package:emotion_tracker/themes/crimson_red_theme_dark.dart';
 
 class AppThemes {
   static final Map<String, ThemeData> allThemes = {
@@ -88,24 +88,24 @@ class AppThemes {
     'serenityGreenDark': 100,
     'pacificBlue': 100,
     'pacificBlueDark': 100,
-    'blushRose': 150,
-    'blushRoseDark': 150,
-    'cloudGray': 150,
-    'cloudGrayDark': 150,
-    'sunsetPeach': 200,
-    'sunsetPeachDark': 200,
-    'midnightLavender': 200,
-    'midnightLavenderLight': 200,
-    'crimsonRed': 250,
-    'crimsonRedDark': 250,
-    'forestGreen': 250,
-    'forestGreenDark': 250,
-    'goldenYellow': 300,
-    'goldenYellowDark': 300,
-    'deepPurple': 300,
-    'deepPurpleDark': 300,
-    'royalOrange': 350,
-    'royalOrangeDark': 350,
+    'blushRose': 100,
+    'blushRoseDark': 100,
+    'cloudGray': 100,
+    'cloudGrayDark': 100,
+    'sunsetPeach': 100,
+    'sunsetPeachDark': 100,
+    'midnightLavender': 100,
+    'midnightLavenderLight': 100,
+    'crimsonRed': 100,
+    'crimsonRedDark': 100,
+    'forestGreen': 100,
+    'forestGreenDark': 100,
+    'goldenYellow': 100,
+    'goldenYellowDark': 100,
+    'deepPurple': 100,
+    'deepPurpleDark': 100,
+    'royalOrange': 100,
+    'royalOrangeDark': 100,
   };
 
   static final List<String> lightThemeKeys = [
@@ -178,3 +178,5 @@ final currentThemeProvider = Provider<ThemeData>((ref) {
   final currentThemeKey = ref.watch(themeProvider);
   return AppThemes.allThemes[currentThemeKey] ?? AppThemes.allThemes['lightTheme']!;
 });
+
+
