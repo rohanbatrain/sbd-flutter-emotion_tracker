@@ -8,6 +8,7 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:emotion_tracker/providers/user_agent_util.dart';
+import 'package:emotion_tracker/providers/theme_unlock_provider.dart';
 
 class ThemeSelectionScreenV1 extends ConsumerStatefulWidget {
   const ThemeSelectionScreenV1({Key? key}) : super(key: key);
@@ -154,7 +155,6 @@ class _ThemeSelectionScreenV1State extends ConsumerState<ThemeSelectionScreenV1>
     showDialog(context: context, barrierDismissible: false, builder: (_) => const Center(child: CircularProgressIndicator()));
     await Future.delayed(const Duration(milliseconds: 400));
     if (!mounted) return;
-    Navigator.of(context).pop();
 
     bool rewardGiven = false;
     try {
@@ -163,6 +163,10 @@ class _ThemeSelectionScreenV1State extends ConsumerState<ThemeSelectionScreenV1>
         request: const AdRequest(),
         rewardedAdLoadCallback: RewardedAdLoadCallback(
           onAdLoaded: (ad) async {
+            // Hide loading spinner just before showing the ad
+            if (Navigator.of(context).canPop()) {
+              Navigator.of(context).pop();
+            }
             // Pass username for SSV
             ad.setServerSideOptions(ServerSideVerificationOptions(userId: username));
             ad.fullScreenContentCallback = FullScreenContentCallback(
@@ -202,11 +206,18 @@ class _ThemeSelectionScreenV1State extends ConsumerState<ThemeSelectionScreenV1>
             );
           },
           onAdFailedToLoad: (err) {
+            // Hide loading spinner if ad fails to load
+            if (Navigator.of(context).canPop()) {
+              Navigator.of(context).pop();
+            }
             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to load ad.')));
           },
         ),
       );
     } catch (e) {
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ad error: $e')));
     }
   }
@@ -233,11 +244,18 @@ class _ThemeSelectionScreenV1State extends ConsumerState<ThemeSelectionScreenV1>
       appBar: CustomAppBar(
         title: 'Theme Selection',
         showHamburger: false,
-        showCurrency: true,
+        showCurrency: false,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).pop(),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Refresh themes',
+            onPressed: () => setState(() {}),
+          ),
+        ],
       ),
       body: Padding(
         padding: EdgeInsets.all(16),
@@ -312,6 +330,27 @@ class _ThemeSelectionScreenV1State extends ConsumerState<ThemeSelectionScreenV1>
                 child: FutureBuilder<Set<String>>(
                   future: _getMergedUnlockedThemes(),
                   builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return Center(child: CircularProgressIndicator());
+                    }
+                    if (snapshot.hasError) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.error_outline, color: Colors.red, size: 32),
+                            SizedBox(height: 12),
+                            Text('Failed to load theme unlocks.', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                            SizedBox(height: 8),
+                            ElevatedButton.icon(
+                              icon: Icon(Icons.refresh),
+                              label: Text('Retry'),
+                              onPressed: () => setState(() {}),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
                     final unlockedThemes = snapshot.data ?? {};
                     return GridView.builder(
                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -340,10 +379,11 @@ class _ThemeSelectionScreenV1State extends ConsumerState<ThemeSelectionScreenV1>
                         return GestureDetector(
                           onTap: () async {
                             if (!isUnlocked) {
-                              // Use new AdMob flow for locked themes with robust SSV and reward type logic
-                              await showThemeUnlockAd(themeKey);
-                              // Optionally: refresh unlockedThemes after unlock
-                              setState(() {});
+                              // Use provider's ad unlock logic with callback to refresh UI only after ad is finished
+                              final themeUnlockService = ref.read(themeUnlockProvider);
+                              await themeUnlockService.showThemeUnlockAd(context, themeKey, onThemeUnlocked: () {
+                                setState(() {});
+                              });
                               return;
                             }
                             ref.read(themeProvider.notifier).setTheme(themeKey);
