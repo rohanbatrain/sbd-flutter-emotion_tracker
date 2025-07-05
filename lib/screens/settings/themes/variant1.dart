@@ -3,7 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:emotion_tracker/providers/theme_provider.dart';
 import 'package:emotion_tracker/widgets/custom_app_bar.dart';
 import 'package:emotion_tracker/providers/secure_storage_provider.dart';
+import 'package:emotion_tracker/providers/shared_prefs_provider.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:emotion_tracker/providers/user_agent_util.dart';
 
 class ThemeSelectionScreenV1 extends ConsumerStatefulWidget {
   const ThemeSelectionScreenV1({Key? key}) : super(key: key);
@@ -15,13 +19,112 @@ class ThemeSelectionScreenV1 extends ConsumerStatefulWidget {
 class _ThemeSelectionScreenV1State extends ConsumerState<ThemeSelectionScreenV1> {
   int toggleState = 0; // 0 = Light, 1 = Dark
 
-  /// Unlocks the theme for the user by updating secure storage.
+  /// Unlocks the theme for the user by updating secure storage with a 1-hour expiry.
   Future<void> _unlockTheme(String themeKey) async {
     final storage = ref.read(secureStorageProvider);
-    final unlocked = (await storage.read(key: 'unlocked_themes')) ?? '';
-    final unlockedSet = unlocked.split(',').where((e) => e.isNotEmpty).toSet();
-    unlockedSet.add(themeKey);
-    await storage.write(key: 'unlocked_themes', value: unlockedSet.join(','));
+    final unlockedJson = (await storage.read(key: 'unlocked_themes')) ?? '{}';
+    Map<String, dynamic> unlockedMap;
+    try {
+      unlockedMap = Map<String, dynamic>.from(jsonDecode(unlockedJson));
+    } catch (_) {
+      unlockedMap = {};
+    }
+    // Set unlock time to now (ms since epoch)
+    unlockedMap[themeKey] = DateTime.now().millisecondsSinceEpoch;
+    await storage.write(key: 'unlocked_themes', value: jsonEncode(unlockedMap));
+  }
+
+  /// Helper to fetch and merge server and local unlocks. Server always wins if locked.
+  Future<Set<String>> _getMergedUnlockedThemes() async {
+    final storage = ref.read(secureStorageProvider);
+    final accessToken = await storage.read(key: 'access_token');
+    final protocol = ref.read(serverProtocolProvider);
+    final domain = ref.read(serverDomainProvider);
+    final apiUrl = Uri.parse('$protocol://$domain/themes/rented');
+    final now = DateTime.now().toUtc();
+    Map<String, DateTime> serverUnlocks = {};
+
+    // Fetch server unlocks
+    if (accessToken != null && accessToken.isNotEmpty) {
+      try {
+        final userAgent = await getUserAgent();
+        final response = await http.get(
+          apiUrl,
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'User-Agent': userAgent,
+          },
+        );
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          final List<dynamic> rented = data['themes_rented'] ?? [];
+          // Group by theme_id, take latest valid_till in the future
+          final Map<String, List<DateTime>> grouped = {};
+          for (final entry in rented) {
+            final themeId = entry['theme_id'] as String?;
+            final validTillStr = entry['valid_till'] as String?;
+            if (themeId != null && validTillStr != null) {
+              final validTill = DateTime.parse(validTillStr).toUtc();
+              if (validTill.isAfter(now)) {
+                grouped.putIfAbsent(themeId, () => []).add(validTill);
+              }
+            }
+          }
+          for (final themeId in grouped.keys) {
+            // Use the latest valid_till for each theme
+            final latest = grouped[themeId]!.reduce((a, b) => a.isAfter(b) ? a : b);
+            serverUnlocks[themeId] = latest;
+          }
+        }
+      } catch (e) {
+        // On error, treat as all locked except local unlocks
+      }
+    }
+
+    // Get valid local unlocks (current logic: one per theme)
+    final unlockedJson = (await storage.read(key: 'unlocked_themes')) ?? '{}';
+    Map<String, dynamic> unlockedMap;
+    try {
+      unlockedMap = Map<String, dynamic>.from(jsonDecode(unlockedJson));
+    } catch (_) {
+      unlockedMap = {};
+    }
+    final hourMs = 60 * 60 * 1000;
+    final validLocal = <String, DateTime>{};
+    final expired = <String>[];
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    unlockedMap.forEach((key, value) {
+      if (value is int && nowMs - value < hourMs) {
+        validLocal[key] = DateTime.fromMillisecondsSinceEpoch(value).toUtc().add(Duration(hours: 1));
+      } else if (value is int && nowMs - value >= hourMs) {
+        expired.add(key);
+      }
+    });
+    for (final key in expired) {
+      unlockedMap.remove(key);
+    }
+    if (expired.isNotEmpty) {
+      await storage.write(key: 'unlocked_themes', value: jsonEncode(unlockedMap));
+    }
+
+    // Merge: only themes present in serverUnlocks are considered unlocked (except always-free themes)
+    final unlocked = <String>{};
+    for (final themeKey in AppThemes.allThemes.keys) {
+      if (themeKey == 'lightTheme' || themeKey == 'darkTheme') {
+        unlocked.add(themeKey);
+        continue;
+      }
+      // Server wins: must be present and valid in serverUnlocks
+      // Fix: match by stripping prefix
+      final serverKey = 'emotion_tracker-$themeKey';
+      final serverValid = serverUnlocks[serverKey];
+      if (serverValid != null && serverValid.isAfter(now)) {
+        unlocked.add(themeKey);
+        continue;
+      }
+      // If not present in server, treat as locked, regardless of local
+    }
+    return unlocked;
   }
 
   /// Loads and shows a rewarded ad for theme unlock, passing username as SSV custom data.
@@ -60,9 +163,8 @@ class _ThemeSelectionScreenV1State extends ConsumerState<ThemeSelectionScreenV1>
         request: const AdRequest(),
         rewardedAdLoadCallback: RewardedAdLoadCallback(
           onAdLoaded: (ad) async {
-            // SSV: If supported in your plugin version, set SSV options here.
-            // Example (uncomment if available):
-            // await ad.setServerSideVerificationOptions(ServerSideVerificationOptions(userId: username));
+            // Pass username for SSV
+            ad.setServerSideOptions(ServerSideVerificationOptions(userId: username));
             ad.fullScreenContentCallback = FullScreenContentCallback(
               onAdDismissedFullScreenContent: (ad) {
                 ad.dispose();
@@ -207,10 +309,10 @@ class _ThemeSelectionScreenV1State extends ConsumerState<ThemeSelectionScreenV1>
                     }
                   }
                 },
-                child: FutureBuilder<String?>(
-                  future: ref.read(storageProvider).read(key: 'unlocked_themes'),
+                child: FutureBuilder<Set<String>>(
+                  future: _getMergedUnlockedThemes(),
                   builder: (context, snapshot) {
-                    final unlockedThemes = (snapshot.data ?? '').split(',').where((e) => e.isNotEmpty).toSet();
+                    final unlockedThemes = snapshot.data ?? {};
                     return GridView.builder(
                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: 2,
