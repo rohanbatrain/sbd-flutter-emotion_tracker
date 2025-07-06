@@ -133,25 +133,34 @@ class ThemeUnlockService {
     final username = await storage.read(key: 'user_username');
     if (username == null || username.isEmpty) return;
 
+    final theme = ref.read(currentThemeProvider);
     // Confirm with user, with notice about server-side verification delay
     final proceed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Unlock Theme'),
+        title: Text('Unlock Theme', style: TextStyle(color: theme.primaryColor)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('Watch a short ad to unlock this theme for 1 hour of usage. Continue?'),
+            const Text('Watch a short ad to unlock this theme for 1 hour of usage. You can always buy it permanently later from shop.'),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               'Note: It may take a few seconds after watching the ad for the theme to unlock, due to server-side verification.',
-              style: TextStyle(fontSize: 12, color: Colors.orange),
+              style: TextStyle(fontSize: 12, color: theme.primaryColor),
             ),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
-          ElevatedButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Watch Ad')),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+            style: TextButton.styleFrom(foregroundColor: theme.primaryColor),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Watch Ad'),
+            style: ElevatedButton.styleFrom(backgroundColor: theme.primaryColor),
+          ),
         ],
       ),
     );

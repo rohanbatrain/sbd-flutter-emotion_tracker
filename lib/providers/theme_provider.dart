@@ -130,7 +130,7 @@ class AppThemes {
     'deepPurple': 'ca-app-pub-2845453539708646/3439262492',
     'deepPurpleDark': 'ca-app-pub-2845453539708646/5314099872',
     'royalOrange': 'ca-app-pub-2845453539708646/4256169075',
-    'royalOrangeDark': '',
+    'royalOrangeDark': 'ca-app-pub-2845453539708646/8632745390',
   };
 
   static final List<String> lightThemeKeys = [
