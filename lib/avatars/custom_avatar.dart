@@ -8,113 +8,540 @@ class Avatar {
   final String id;
   final String name;
   final AvatarType type;
-  final IconData? icon; // For static
+  final String? imageAsset; // For static
   final String? animationAsset; // For animated
-  final bool isPremium;
   final int price; // SBD Tokens
+  final String? rewardedAdId;
 
   const Avatar({
     required this.id,
     required this.name,
     required this.type,
-    this.icon,
+    this.imageAsset,
     this.animationAsset,
-    this.isPremium = false,
     this.price = 0,
+    this.rewardedAdId,
   }) : assert(
-          (type == AvatarType.static && icon != null) ||
+          (type == AvatarType.static && imageAsset != null) ||
               (type == AvatarType.animated && animationAsset != null),
-          'Static avatars must have an icon, and animated avatars must have an animationAsset.',
+          'Static avatars must have an imageAsset, and animated avatars must have an animationAsset.',
         );
 }
 
 // --- Avatar Data ---
-final List<Avatar> staticAvatars = [
-  const Avatar(id: 'person', name: 'Person', icon: Icons.person, type: AvatarType.static, price: 0),
-  const Avatar(id: 'cat', name: 'Cat', icon: Icons.pets, type: AvatarType.static, price: 50),
-  const Avatar(id: 'robot', name: 'Robot', icon: Icons.android, type: AvatarType.static, price: 50),
-  const Avatar(id: 'dog', name: 'Dog', icon: Icons.pets, type: AvatarType.static, price: 50),
-  const Avatar(id: 'star', name: 'Star', icon: Icons.star, type: AvatarType.static, price: 100),
-  const Avatar(id: 'face', name: 'Smiley', icon: Icons.sentiment_satisfied, type: AvatarType.static, price: 100),
-  const Avatar(id: 'flower', name: 'Flower', icon: Icons.local_florist, type: AvatarType.static, price: 100),
-  const Avatar(id: 'game', name: 'Controller', icon: Icons.gamepad, type: AvatarType.static, price: 150),
-  const Avatar(id: 'headset', name: 'Music', icon: Icons.headset, type: AvatarType.static, price: 150),
-  const Avatar(id: 'cake', name: 'Cake', icon: Icons.cake, type: AvatarType.static, price: 150),
-  const Avatar(id: 'camera', name: 'Camera', icon: Icons.camera_alt, type: AvatarType.static, price: 150),
-  const Avatar(id: 'car', name: 'Car', icon: Icons.directions_car, type: AvatarType.static, price: 150),
-  const Avatar(id: 'book', name: 'Book', icon: Icons.book, type: AvatarType.static, price: 150),
-  const Avatar(id: 'brush', name: 'Brush', icon: Icons.brush, type: AvatarType.static, price: 150),
-  const Avatar(id: 'build', name: 'Build', icon: Icons.build, type: AvatarType.static, price: 150),
-  const Avatar(id: 'cloud', name: 'Cloud', icon: Icons.cloud, type: AvatarType.static, price: 150),
-  const Avatar(id: 'code', name: 'Code', icon: Icons.code, type: AvatarType.static, price: 200),
-  const Avatar(id: 'color', name: 'Palette', icon: Icons.color_lens, type: AvatarType.static, price: 200),
-  const Avatar(id: 'computer', name: 'Computer', icon: Icons.computer, type: AvatarType.static, price: 200),
-  const Avatar(id: 'content_cut', name: 'Scissors', icon: Icons.content_cut, type: AvatarType.static, price: 200),
-  const Avatar(id: 'desktop', name: 'Desktop', icon: Icons.desktop_windows, type: AvatarType.static, price: 200),
-  const Avatar(id: 'moon', name: 'Moon', icon: Icons.dark_mode, type: AvatarType.static, price: 250),
-  const Avatar(id: 'eco', name: 'Leaf', icon: Icons.eco, type: AvatarType.static, price: 250),
-  const Avatar(id: 'explore', name: 'Compass', icon: Icons.explore, type: AvatarType.static, price: 250),
-  const Avatar(id: 'extension', name: 'Puzzle', icon: Icons.extension, type: AvatarType.static, price: 250),
-  const Avatar(id: 'fastfood', name: 'Burger', icon: Icons.fastfood, type: AvatarType.static, price: 250),
-  const Avatar(id: 'flag', name: 'Flag', icon: Icons.flag, type: AvatarType.static, price: 250),
-  const Avatar(id: 'flare', name: 'Sparkle', icon: Icons.flare, type: AvatarType.static, price: 300),
-  const Avatar(id: 'flight', name: 'Plane', icon: Icons.flight, type: AvatarType.static, price: 300),
-  const Avatar(id: 'free_breakfast', name: 'Coffee', icon: Icons.free_breakfast, type: AvatarType.static, price: 300),
-  const Avatar(id: 'gift', name: 'Gift', icon: Icons.card_giftcard, type: AvatarType.static, price: 300),
-  const Avatar(id: 'globe', name: 'Globe', icon: Icons.public, type: AvatarType.static, price: 300),
-  const Avatar(id: 'heart', name: 'Heart', icon: Icons.favorite, type: AvatarType.static, price: 350),
-  const Avatar(id: 'home', name: 'Home', icon: Icons.home, type: AvatarType.static, price: 350),
-  const Avatar(id: 'icecream', name: 'Ice Cream', icon: Icons.icecream, type: AvatarType.static, price: 350),
-  const Avatar(id: 'key', name: 'Key', icon: Icons.vpn_key, type: AvatarType.static, price: 350),
-  const Avatar(id: 'lightbulb', name: 'Idea', icon: Icons.lightbulb, type: AvatarType.static, price: 350),
-  const Avatar(id: 'motorcycle', name: 'Motorcycle', icon: Icons.motorcycle, type: AvatarType.static, price: 400),
-  const Avatar(id: 'movie', name: 'Movie', icon: Icons.movie, type: AvatarType.static, price: 400),
-  const Avatar(id: 'music_note', name: 'Note', icon: Icons.music_note, type: AvatarType.static, price: 400),
-  const Avatar(id: 'palette', name: 'Art', icon: Icons.palette, type: AvatarType.static, price: 400),
-  const Avatar(id: 'pizza', name: 'Pizza', icon: Icons.local_pizza, type: AvatarType.static, price: 400),
-  const Avatar(id: 'school', name: 'School', icon: Icons.school, type: AvatarType.static, price: 450),
-  const Avatar(id: 'science', name: 'Science', icon: Icons.science, type: AvatarType.static, price: 450),
-  const Avatar(id: 'sports_esports', name: 'Esports', icon: Icons.sports_esports, type: AvatarType.static, price: 450),
-  const Avatar(id: 'tree', name: 'Tree', icon: Icons.park, type: AvatarType.static, price: 450),
-  const Avatar(id: 'videogame', name: 'Videogame', icon: Icons.videogame_asset, type: AvatarType.static, price: 450),
-  const Avatar(id: 'watch', name: 'Watch', icon: Icons.watch, type: AvatarType.static, price: 500),
-  const Avatar(id: 'water_drop', name: 'Drop', icon: Icons.water_drop, type: AvatarType.static, price: 500),
-  const Avatar(id: 'whatshot', name: 'Fire', icon: Icons.whatshot, type: AvatarType.static, price: 500),
-  const Avatar(id: 'joystick', name: 'Joystick', icon: Icons.gamepad_outlined, type: AvatarType.static, isPremium: true, price: 1000),
-  const Avatar(id: 'sunglasses', name: 'Cool', icon: Icons.sentiment_very_satisfied, type: AvatarType.static, isPremium: true, price: 1000),
+final List<Avatar> catAvatars = [
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-cat-1',
+    name: 'Cat 1',
+    type: AvatarType.static,
+    imageAsset: 'assets/cats/cat-1.png',
+    price: 50,
+    rewardedAdId: 'ca-app-pub-2845453539708646/2123748182',
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-cat-2',
+    name: 'Cat 2',
+    type: AvatarType.static,
+    imageAsset: 'assets/cats/cat-2.png',
+    price: 50,
+    rewardedAdId: 'ca-app-pub-2845453539708646/1576953272',
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-cat-3',
+    name: 'Cat 3',
+    type: AvatarType.static,
+    imageAsset: 'assets/cats/cat-3.png',
+    price: 50,
+    rewardedAdId: 'ca-app-pub-2845453539708646/4369286503',
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-cat-4',
+    name: 'Cat 4',
+    type: AvatarType.static,
+    imageAsset: 'assets/cats/cat-4.png',
+    price: 50,
+    rewardedAdId: 'ca-app-pub-2845453539708646/3495188531',
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-cat-5',
+    name: 'Cat 5',
+    type: AvatarType.static,
+    imageAsset: 'assets/cats/cat-5.png',
+    price: 50,
+    rewardedAdId: 'ca-app-pub-2845453539708646/7198344419',
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-cat-6',
+    name: 'Cat 6',
+    type: AvatarType.static,
+    imageAsset: 'assets/cats/cat-6.png',
+    price: 50,
+    rewardedAdId: 'ca-app-pub-2845453539708646/5027762054',
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-cat-7',
+    name: 'Cat 7',
+    type: AvatarType.static,
+    imageAsset: 'assets/cats/cat-7.png',
+    price: 50,
+    rewardedAdId: 'ca-app-pub-2845453539708646/6637708269',
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-cat-8',
+    name: 'Cat 8',
+    type: AvatarType.static,
+    imageAsset: 'assets/cats/cat-8.png',
+    price: 50,
+    rewardedAdId: 'ca-app-pub-2845453539708646/5324626590',
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-cat-9',
+    name: 'Cat 9',
+    type: AvatarType.static,
+    imageAsset: 'assets/cats/cat-9.png',
+    price: 50,
+    rewardedAdId: 'ca-app-pub-2845453539708646/1743123168',
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-cat-10',
+    name: 'Cat 10',
+    type: AvatarType.static,
+    imageAsset: 'assets/cats/cat-10.png',
+    price: 50,
+    rewardedAdId: 'ca-app-pub-2845453539708646/2698463259',
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-cat-11',
+    name: 'Cat 11',
+    type: AvatarType.static,
+    imageAsset: 'assets/cats/cat-11.png',
+    price: 50,
+    rewardedAdId: 'ca-app-pub-2845453539708646/2401598712',
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-cat-12',
+    name: 'Cat 12',
+    type: AvatarType.static,
+    imageAsset: 'assets/cats/cat-12.png',
+    price: 50,
+    rewardedAdId: 'ca-app-pub-2845453539708646/9430041494',
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-cat-13',
+    name: 'Cat 13',
+    type: AvatarType.static,
+    imageAsset: 'assets/cats/cat-13.png',
+    price: 50,
+    rewardedAdId: 'ca-app-pub-2845453539708646/3395116186',
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-cat-14',
+    name: 'Cat 14',
+    type: AvatarType.static,
+    imageAsset: 'assets/cats/cat-14.png',
+    price: 50,
+    rewardedAdId: 'ca-app-pub-2845453539708646/5885262744',
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-cat-15',
+    name: 'Cat 15',
+    type: AvatarType.static,
+    imageAsset: 'assets/cats/cat-15.png',
+    price: 50,
+    rewardedAdId: 'ca-app-pub-2845453539708646/4516626162',
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-cat-16',
+    name: 'Cat 16',
+    type: AvatarType.static,
+    imageAsset: 'assets/cats/cat-16.png',
+    price: 50,
+    rewardedAdId: 'ca-app-pub-2845453539708646/3203544498',
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-cat-17',
+    name: 'Cat 17',
+    type: AvatarType.static,
+    imageAsset: 'assets/cats/cat-17.png',
+    price: 50,
+    rewardedAdId: 'ca-app-pub-2845453539708646/4728379153',
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-cat-18',
+    name: 'Cat 18',
+    type: AvatarType.static,
+    imageAsset: 'assets/cats/cat-18.png',
+    price: 50,
+    rewardedAdId: 'ca-app-pub-2845453539708646/3750339404',
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-cat-19',
+    name: 'Cat 19',
+    type: AvatarType.static,
+    imageAsset: 'assets/cats/cat-19.png',
+    price: 50,
+    rewardedAdId: 'ca-app-pub-2845453539708646/5793763409',
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-cat-20',
+    name: 'Cat 20',
+    type: AvatarType.static,
+    imageAsset: 'assets/cats/cat-20.png',
+    price: 50,
+    rewardedAdId: 'ca-app-pub-2845453539708646/3962092397',
+  ),
 ];
+
+final List<String> catsCategoryKeys = catAvatars.map((e) => e.id).toList();
+
+final List<Avatar> dogAvatars = [
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-dog-1',
+    name: 'Dog 1',
+    type: AvatarType.static,
+    imageAsset: 'assets/dogs/dog-1.png',
+    price: 50,
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-dog-2',
+    name: 'Dog 2',
+    type: AvatarType.static,
+    imageAsset: 'assets/dogs/dog-2.png',
+    price: 50,
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-dog-3',
+    name: 'Dog 3',
+    type: AvatarType.static,
+    imageAsset: 'assets/dogs/dog-3.png',
+    price: 50,
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-dog-4',
+    name: 'Dog 4',
+    type: AvatarType.static,
+    imageAsset: 'assets/dogs/dog-4.png',
+    price: 50,
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-dog-5',
+    name: 'Dog 5',
+    type: AvatarType.static,
+    imageAsset: 'assets/dogs/dog-5.png',
+    price: 50,
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-dog-6',
+    name: 'Dog 6',
+    type: AvatarType.static,
+    imageAsset: 'assets/dogs/dog-6.png',
+    price: 50,
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-dog-7',
+    name: 'Dog 7',
+    type: AvatarType.static,
+    imageAsset: 'assets/dogs/dog-7.png',
+    price: 50,
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-dog-8',
+    name: 'Dog 8',
+    type: AvatarType.static,
+    imageAsset: 'assets/dogs/dog-8.png',
+    price: 50,
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-dog-9',
+    name: 'Dog 9',
+    type: AvatarType.static,
+    imageAsset: 'assets/dogs/dog-9.png',
+    price: 50,
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-dog-10',
+    name: 'Dog 10',
+    type: AvatarType.static,
+    imageAsset: 'assets/dogs/dog-10.png',
+    price: 50,
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-dog-11',
+    name: 'Dog 11',
+    type: AvatarType.static,
+    imageAsset: 'assets/dogs/dog-11.png',
+    price: 50,
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-dog-12',
+    name: 'Dog 12',
+    type: AvatarType.static,
+    imageAsset: 'assets/dogs/dog-12.png',
+    price: 50,
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-dog-13',
+    name: 'Dog 13',
+    type: AvatarType.static,
+    imageAsset: 'assets/dogs/dog-13.png',
+    price: 50,
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-dog-14',
+    name: 'Dog 14',
+    type: AvatarType.static,
+    imageAsset: 'assets/dogs/dog-14.png',
+    price: 50,
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-dog-15',
+    name: 'Dog 15',
+    type: AvatarType.static,
+    imageAsset: 'assets/dogs/dog-15.png',
+    price: 50,
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-dog-16',
+    name: 'Dog 16',
+    type: AvatarType.static,
+    imageAsset: 'assets/dogs/dog-16.png',
+    price: 50,
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-dog-17',
+    name: 'Dog 17',
+    type: AvatarType.static,
+    imageAsset: 'assets/dogs/dog-17.png',
+    price: 50,
+  ),
+];
+
+final List<Avatar> pandaAvatars = [
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-panda-1',
+    name: 'Panda 1',
+    type: AvatarType.static,
+    imageAsset: 'assets/pandas/panda-1.png',
+    price: 50,
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-panda-2',
+    name: 'Panda 2',
+    type: AvatarType.static,
+    imageAsset: 'assets/pandas/panda-2.png',
+    price: 50,
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-panda-3',
+    name: 'Panda 3',
+    type: AvatarType.static,
+    imageAsset: 'assets/pandas/panda-3.png',
+    price: 50,
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-panda-4',
+    name: 'Panda 4',
+    type: AvatarType.static,
+    imageAsset: 'assets/pandas/panda-4.png',
+    price: 50,
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-panda-5',
+    name: 'Panda 5',
+    type: AvatarType.static,
+    imageAsset: 'assets/pandas/panda-5.png',
+    price: 50,
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-panda-6',
+    name: 'Panda 6',
+    type: AvatarType.static,
+    imageAsset: 'assets/pandas/panda-6.png',
+    price: 50,
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-panda-7',
+    name: 'Panda 7',
+    type: AvatarType.static,
+    imageAsset: 'assets/pandas/panda-7.png',
+    price: 50,
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-panda-8',
+    name: 'Panda 8',
+    type: AvatarType.static,
+    imageAsset: 'assets/pandas/panda-8.png',
+    price: 50,
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-panda-9',
+    name: 'Panda 9',
+    type: AvatarType.static,
+    imageAsset: 'assets/pandas/panda-9.png',
+    price: 50,
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-panda-10',
+    name: 'Panda 10',
+    type: AvatarType.static,
+    imageAsset: 'assets/pandas/panda-10.png',
+    price: 50,
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-panda-11',
+    name: 'Panda 11',
+    type: AvatarType.static,
+    imageAsset: 'assets/pandas/panda-11.png',
+    price: 50,
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-panda-12',
+    name: 'Panda 12',
+    type: AvatarType.static,
+    imageAsset: 'assets/pandas/panda-12.png',
+    price: 50,
+  ),
+];
+final List<Avatar> peopleAvatars = [
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-person-1',
+    name: 'Person 1',
+    type: AvatarType.static,
+    imageAsset: 'assets/people/person-1.png',
+    price: 50,
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-person-2',
+    name: 'Person 2',
+    type: AvatarType.static,
+    imageAsset: 'assets/people/person-2.png',
+    price: 50,
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-person-3',
+    name: 'Person 3',
+    type: AvatarType.static,
+    imageAsset: 'assets/people/person-3.png',
+    price: 50,
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-person-4',
+    name: 'Person 4',
+    type: AvatarType.static,
+    imageAsset: 'assets/people/person-4.png',
+    price: 50,
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-person-5',
+    name: 'Person 5',
+    type: AvatarType.static,
+    imageAsset: 'assets/people/person-5.png',
+    price: 50,
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-person-6',
+    name: 'Person 6',
+    type: AvatarType.static,
+    imageAsset: 'assets/people/person-6.png',
+    price: 50,
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-person-7',
+    name: 'Person 7',
+    type: AvatarType.static,
+    imageAsset: 'assets/people/person-7.png',
+    price: 50,
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-person-8',
+    name: 'Person 8',
+    type: AvatarType.static,
+    imageAsset: 'assets/people/person-8.png',
+    price: 50,
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-person-9',
+    name: 'Person 9',
+    type: AvatarType.static,
+    imageAsset: 'assets/people/person-9.png',
+    price: 50,
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-person-10',
+    name: 'Person 10',
+    type: AvatarType.static,
+    imageAsset: 'assets/people/person-10.png',
+    price: 50,
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-person-11',
+    name: 'Person 11',
+    type: AvatarType.static,
+    imageAsset: 'assets/people/person-11.png',
+    price: 50,
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-person-12',
+    name: 'Person 12',
+    type: AvatarType.static,
+    imageAsset: 'assets/people/person-12.png',
+    price: 50,
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-person-13',
+    name: 'Person 13',
+    type: AvatarType.static,
+    imageAsset: 'assets/people/person-13.png',
+    price: 50,
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-person-14',
+    name: 'Person 14',
+    type: AvatarType.static,
+    imageAsset: 'assets/people/person-14.png',
+    price: 50,
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-person-15',
+    name: 'Person 15',
+    type: AvatarType.static,
+    imageAsset: 'assets/people/person-15.png',
+    price: 50,
+  ),
+  const Avatar(
+    id: 'emotion_tracker-static-avatar-person-16',
+    name: 'Person 16',
+    type: AvatarType.static,
+    imageAsset: 'assets/people/person-16.png',
+    price: 50,
+  ),
+];
+
+final List<String> dogsCategoryKeys = dogAvatars.map((e) => e.id).toList();
+final List<String> pandasCategoryKeys = pandaAvatars.map((e) => e.id).toList();
+final List<String> peopleCategoryKeys = peopleAvatars.map((e) => e.id).toList();
 
 final List<Avatar> animatedAvatars = [
-    const Avatar(
-      id: 'animated_diamond',
-      name: 'Diamond',
-      type: AvatarType.animated,
-      animationAsset: 'assets/Animation - 1749057870664.json',
-      isPremium: true,
-      price: 2500,
-    ),
-    const Avatar(
-      id: 'animated_crown',
-      name: 'Crown',
-      type: AvatarType.animated,
-      animationAsset: 'assets/Animation - 1749905705545.json',
-      isPremium: true,
-      price: 5000,
-    ),
-    const Avatar(
-      id: 'animated_rocket',
-      name: 'Rocket',
-      type: AvatarType.animated,
-      animationAsset: 'assets/Animation - 1750273841544.json',
-      isPremium: true,
-      price: 7500,
-    ),
+  const Avatar(
+    id: 'playful_eye',
+    name: 'Playful Eye',
+    type: AvatarType.animated,
+    animationAsset: 'assets/Animation - 1749057870664.json',
+    price: 2500,
+  ),
+  const Avatar(
+    id: 'floating_brain',
+    name: 'Floating Brain',
+    type: AvatarType.animated,
+    animationAsset: 'assets/Animation - 1749905705545.json',
+    price: 5000,
+  ),
 ];
 
-final List<Avatar> allAvatars = [...staticAvatars, ...animatedAvatars];
+final List<Avatar> allAvatars = [...catAvatars, ...dogAvatars, ...pandaAvatars, ...peopleAvatars, ...animatedAvatars];
 
 Avatar getAvatarById(String id) {
-  return allAvatars.firstWhere((avatar) => avatar.id == id, orElse: () => staticAvatars.first);
+  return allAvatars.firstWhere((avatar) => avatar.id == id, orElse: () => catAvatars.first);
 }
 
 // --- UI Widgets ---
@@ -135,8 +562,6 @@ class AvatarDisplay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    
     if (avatar.type == AvatarType.animated) {
       return Lottie.asset(
         avatar.animationAsset!,
@@ -144,14 +569,13 @@ class AvatarDisplay extends StatelessWidget {
         height: size,
         fit: BoxFit.contain,
       );
-    } else {
-      Color color;
-      if (staticIconColor != null) {
-        color = staticIconColor!;
-      } else {
-        color = isSelected ? theme.primaryColor : theme.colorScheme.onSurface;
-      }
-      return Icon(avatar.icon, size: size, color: color);
+    } else { // Static
+      return Image.asset(
+        avatar.imageAsset!,
+        width: size,
+        height: size,
+        fit: BoxFit.contain,
+      );
     }
   }
 }
@@ -166,7 +590,10 @@ class AvatarSelectionDialog extends StatelessWidget {
     final theme = Theme.of(context);
     
     final Map<String, List<Avatar>> avatarCategories = {
-      'Static': staticAvatars,
+      'Cats 🐱': catAvatars,
+      'Dogs 🐶': dogAvatars,
+      'Pandas 🐼': pandaAvatars,
+      'People 👤': peopleAvatars,
       'Animated ✨': animatedAvatars,
     };
 
