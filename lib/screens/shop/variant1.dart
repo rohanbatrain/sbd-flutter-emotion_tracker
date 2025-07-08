@@ -627,12 +627,17 @@ class AvatarDetailDialog extends ConsumerWidget {
                     final unlockTime = info?.unlockTime;
                     final now = DateTime.now().toUtc();
                     Duration? timeLeft;
+                    Duration? timeSinceUnlock;
                     if (isUnlocked && unlockTime != null) {
                       final expiry = unlockTime.add(const Duration(hours: 1));
                       timeLeft = expiry.difference(now);
                       if (timeLeft.isNegative) timeLeft = Duration.zero;
+                      timeSinceUnlock = now.difference(unlockTime);
+                      if (timeSinceUnlock.isNegative) timeSinceUnlock = Duration.zero;
                     }
-                    if (isUnlocked && timeLeft != null) {
+                    final canShowRentButton = !isUnlocked || (timeSinceUnlock != null && timeSinceUnlock.inMinutes >= 55);
+                    // Only show time left if rent button is NOT visible
+                    if (isUnlocked && timeLeft != null && !canShowRentButton) {
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 12.0),
                         child: Card(

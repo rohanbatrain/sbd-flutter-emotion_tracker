@@ -4,6 +4,7 @@ import 'package:emotion_tracker/providers/theme_provider.dart';
 import 'package:emotion_tracker/providers/secure_storage_provider.dart';
 import 'package:emotion_tracker/providers/app_providers.dart';
 import 'package:emotion_tracker/avatars/custom_avatar.dart';
+import 'package:emotion_tracker/providers/avatar_unlock_provider.dart';
 
 class ProfileScreenV1 extends ConsumerStatefulWidget {
   const ProfileScreenV1({Key? key}) : super(key: key);
@@ -115,10 +116,38 @@ class _ProfileScreenV1State extends ConsumerState<ProfileScreenV1> {
   }
 
   Future<void> _showAvatarSelectionDialog() async {
+    // Show preloader above everything
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black.withOpacity(0.2),
+      transitionDuration: Duration.zero,
+      pageBuilder: (context, _, __) => const Center(child: CircularProgressIndicator()),
+    );
+
+    // Wait a frame to ensure preloader is visible before dialog
+    await Future.delayed(const Duration(milliseconds: 50));
+
+    // Await unlock info before showing dialog
+    final avatarUnlockService = ref.read(avatarUnlockProvider);
+    Set<String> unlockedAvatars;
+    try {
+      unlockedAvatars = await avatarUnlockService.getMergedUnlockedAvatars();
+    } catch (_) {
+      unlockedAvatars = {'person'};
+    }
+
+    // Show dialog with unlocked avatars
     final newAvatarId = await showDialog<String>(
       context: context,
-      builder: (context) => AvatarSelectionDialog(currentAvatarId: selectedAvatarId),
+      builder: (context) => AvatarSelectionDialog(
+        currentAvatarId: selectedAvatarId,
+        unlockedAvatars: unlockedAvatars,
+      ),
     );
+
+    // Close preloader
+    if (Navigator.of(context).canPop()) Navigator.of(context).pop();
 
     if (newAvatarId != null && newAvatarId != selectedAvatarId) {
       final secureStorage = ref.read(secureStorageProvider);
