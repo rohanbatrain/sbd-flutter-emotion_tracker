@@ -5,6 +5,7 @@ import 'package:emotion_tracker/providers/secure_storage_provider.dart';
 import 'package:emotion_tracker/providers/app_providers.dart';
 import 'package:emotion_tracker/providers/custom_avatar.dart';
 import 'package:emotion_tracker/providers/avatar_unlock_provider.dart';
+import 'package:emotion_tracker/providers/custom_banner.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:emotion_tracker/providers/user_agent_util.dart';
@@ -22,6 +23,7 @@ class _ProfileScreenV1State extends ConsumerState<ProfileScreenV1> {
   String username = '';
   String userEmail = '';
   String selectedAvatarId = 'person'; // Default avatar
+  String selectedBannerId = 'default-dark'; // Default banner FOR DARK THEMES
   bool isLoading = true;
 
   final TextEditingController firstNameController = TextEditingController();
@@ -54,12 +56,15 @@ class _ProfileScreenV1State extends ConsumerState<ProfileScreenV1> {
       final usernameData = await secureStorage.read(key: 'user_username') ?? '';
       // Try to get current avatar from backend
       String avatarId = await _getCurrentAvatar() ?? await secureStorage.read(key: 'user_avatar_id') ?? 'person';
+      // Try to get current banner from backend
+      String bannerId = await _getCurrentBanner() ?? await secureStorage.read(key: 'user_banner_id') ?? 'default-dark';
       setState(() {
         userEmail = email;
         firstName = firstNameData;
         lastName = lastNameData;
         username = usernameData;
         selectedAvatarId = avatarId;
+        selectedBannerId = bannerId;
         // Set controller values
         firstNameController.text = firstNameData;
         lastNameController.text = lastNameData;
@@ -84,6 +89,7 @@ class _ProfileScreenV1State extends ConsumerState<ProfileScreenV1> {
       await secureStorage.write(key: 'user_username', value: usernameController.text);
       await secureStorage.write(key: 'user_email', value: emailController.text);
       await secureStorage.write(key: 'user_avatar_id', value: selectedAvatarId);
+      await secureStorage.write(key: 'user_banner_id', value: selectedBannerId);
       
       // Update local state
       setState(() {
@@ -157,6 +163,26 @@ class _ProfileScreenV1State extends ConsumerState<ProfileScreenV1> {
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       return data['avatar_id'] as String?;
+    }
+    return null;
+  }
+
+  Future<String?> _getCurrentBanner() async {
+    final token = await _getAuthToken();
+    if (token == null) return null;
+    final userAgent = await getUserAgent();
+    final baseUrl = ref.read(apiBaseUrlProvider);
+    final url = Uri.parse('$baseUrl/banners/current');
+    final response = await http.get(
+      url,
+      headers: {
+        'Authorization': 'Bearer $token',
+        'User-Agent': userAgent,
+      },
+    );
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return data['banner_id'] as String?;
     }
     return null;
   }
@@ -343,6 +369,19 @@ class _ProfileScreenV1State extends ConsumerState<ProfileScreenV1> {
     );
   }
 
+  ProfileBanner _getThemeBanner(ThemeData theme) {
+    // If user has not selected a custom banner, use theme-based default
+    if (selectedBannerId == 'default-dark' || selectedBannerId == 'default-light') {
+      if (theme.brightness == Brightness.dark) {
+        return getBannerById('default-dark');
+      } else {
+        return getBannerById('default-light');
+      }
+    }
+    // If user has selected a custom banner, use it
+    return getBannerById(selectedBannerId);
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = ref.watch(currentThemeProvider);
@@ -370,10 +409,20 @@ class _ProfileScreenV1State extends ConsumerState<ProfileScreenV1> {
       body: Stack(
         children: [
           // Banner at the top
-          Container(
+          ProfileBannerDisplay(
+            banner: _getThemeBanner(theme),
             height: 160,
-            width: double.infinity,
-            color: Colors.black,
+          ),
+          // Divider below banner
+          Positioned(
+            top: 160 - 1, // Just below the banner
+            left: 0,
+            right: 0,
+            child: Divider(
+              height: 2,
+              thickness: 2,
+              color: theme.dividerColor,
+            ),
           ),
           // Main content with overlap
           SingleChildScrollView(
