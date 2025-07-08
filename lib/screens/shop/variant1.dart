@@ -892,10 +892,13 @@ class _AvatarDetailDialogState extends ConsumerState<AvatarDetailDialog> {
                           ] else ...[
                             Padding(
                               padding: const EdgeInsets.only(top: 28.0),
-                              child: SizedBox(
-                                width: bannerAd.size.width.toDouble(),
-                                height: bannerAd.size.height.toDouble(),
-                                child: AdWidget(ad: bannerAd),
+                              child: FittedBox(
+                                fit: BoxFit.contain,
+                                child: SizedBox(
+                                  width: bannerAd.size.width.toDouble(),
+                                  height: bannerAd.size.height.toDouble(),
+                                  child: AdWidget(ad: bannerAd),
+                                ),
                               ),
                             ),
                           ]
@@ -983,12 +986,8 @@ class _BannerDetailDialogState extends ConsumerState<BannerDetailDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = ref.watch(currentThemeProvider);
-    final bannerAd = (defaultTargetPlatform != TargetPlatform.linux)
-        ? ref.watch(bannerAdProvider(widget.adId))
-        : null;
-    final isBannerAdReady = (defaultTargetPlatform != TargetPlatform.linux)
-        ? ref.watch(adProvider.notifier).isBannerAdReady(widget.adId)
-        : false;
+    final bannerAd = ref.watch(bannerAdProvider(widget.adId));
+    final isBannerAdReady = ref.watch(adProvider.notifier).isBannerAdReady(widget.adId);
 
     const double bannerSize = 120;
     const double dialogCornerRadius = 20;
@@ -1134,26 +1133,25 @@ class _BannerDetailDialogState extends ConsumerState<BannerDetailDialog> {
                         ),
                       ],
                     ),
-                    if (bannerAd != null) ...[
-                      if (!isBannerAdReady) ...[
-                        Padding(
-                          padding: const EdgeInsets.only(top: 28.0),
-                          child: SizedBox(
-                            width: bannerAd.size.width.toDouble(),
-                            height: bannerAd.size.height.toDouble(),
-                            child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                          ),
-                        ),
-                      ] else ...[
-                        Padding(
-                          padding: const EdgeInsets.only(top: 28.0),
+                    if (bannerAd != null && isBannerAdReady) ...[
+                      Padding(
+                        padding: const EdgeInsets.only(top: 28.0),
+                        child: FittedBox(
+                          fit: BoxFit.contain,
                           child: SizedBox(
                             width: bannerAd.size.width.toDouble(),
                             height: bannerAd.size.height.toDouble(),
                             child: AdWidget(ad: bannerAd),
                           ),
                         ),
-                      ]
+                      ),
+                    ] else if (bannerAd == null || !isBannerAdReady) ...[
+                      Padding(
+                        padding: const EdgeInsets.only(top: 28.0),
+                        child: Center(
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      ),
                     ],
                   ],
                 ),
