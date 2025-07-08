@@ -174,6 +174,7 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
                 controller: _tabController,
                 children: [
                   _buildAvatarsGrid(theme),
+                  _buildBannersGrid(theme),
                   _buildThemesGrid(theme),
                   _buildCurrencyShop(theme),
                 ],
@@ -290,6 +291,107 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
           ],
         );
       },
+    );
+  }
+
+  Widget _buildBannersGrid(ThemeData theme) {
+    final earthBanners = allProfileBanners.where((b) => b.price > 0 && b.id.contains('earth')).toList();
+
+    return ListView(
+      padding: const EdgeInsets.all(16.0),
+      children: [
+        if (earthBanners.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8.0),
+            child: Text(
+              'Earth',
+              style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+            ),
+          ),
+          const SizedBox(height: 12),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2, // Match avatar grid
+              crossAxisSpacing: 16,
+              mainAxisSpacing: 16,
+              childAspectRatio: 0.7, // Match avatar grid
+            ),
+            itemCount: earthBanners.length,
+            itemBuilder: (context, index) {
+              final banner = earthBanners[index];
+              return Card(
+                elevation: 2,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
+                  onTap: () {
+                    showDialog(
+                      context: context,
+                      barrierColor: Colors.black.withOpacity(0.5),
+                      builder: (context) => BannerDetailDialog(
+                        banner: banner,
+                        adId: 'banner_detail_banner_ad',
+                      ),
+                    );
+                  },
+                  child: Container(
+                    width: double.infinity,
+                    height: 210, // Increased height to prevent overflow
+                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        SizedBox(
+                          height: 70, // Increased image size
+                          width: 110,
+                          child: ProfileBannerDisplay(
+                            banner: banner,
+                            height: 70,
+                            fit: BoxFit.contain,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          banner.name ?? '',
+                          style: theme.textTheme.bodyMedium,
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          '${banner.price} SBD',
+                          style: theme.textTheme.bodySmall,
+                        ),
+                        const SizedBox(height: 6),
+                        IconButton(
+                          icon: const Icon(Icons.add_shopping_cart_outlined),
+                          iconSize: 22,
+                          color: theme.colorScheme.secondary,
+                          tooltip: 'Add to Cart',
+                          onPressed: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Added to cart (feature coming soon!)'),
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 16),
+        ],
+      ],
     );
   }
 
@@ -770,17 +872,34 @@ class _AvatarDetailDialogState extends ConsumerState<AvatarDetailDialog> {
                             ),
                           ),
                         // Banner ad only when rented (not when rent button is visible)
-                        if (!canShowRentButton && isBannerAdReady && bannerAd != null)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 28.0),
-                            child: FittedBox(
-                              child: Container(
+                        if (!canShowRentButton && bannerAd != null) ...[
+                          if (!isBannerAdReady) ...[
+                            FutureBuilder<void>(
+                              future: Future(() async {
+                                if (bannerAd.responseInfo == null) await bannerAd.load();
+                              }),
+                              builder: (context, snapshot) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(top: 28.0),
+                                  child: SizedBox(
+                                    width: bannerAd.size.width.toDouble(),
+                                    height: bannerAd.size.height.toDouble(),
+                                    child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                                  ),
+                                );
+                              },
+                            ),
+                          ] else ...[
+                            Padding(
+                              padding: const EdgeInsets.only(top: 28.0),
+                              child: SizedBox(
                                 width: bannerAd.size.width.toDouble(),
                                 height: bannerAd.size.height.toDouble(),
                                 child: AdWidget(ad: bannerAd),
                               ),
                             ),
-                          ),
+                          ]
+                        ],
                       ],
                     );
                   },
@@ -811,6 +930,264 @@ class _AvatarDetailDialogState extends ConsumerState<AvatarDetailDialog> {
           // Close button
           Positioned(
             top: (avatarSize / 2) + 5,
+            right: 5,
+            child: Material(
+              color: Colors.transparent,
+              child: IconButton(
+                icon: Icon(Icons.close, color: theme.colorScheme.onSurface.withOpacity(0.6)),
+                onPressed: () => Navigator.of(context).pop(),
+                splashRadius: 20,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class BannerDetailDialog extends ConsumerStatefulWidget {
+  final ProfileBanner banner;
+  final String adId;
+
+  const BannerDetailDialog({
+    Key? key,
+    required this.banner,
+    required this.adId,
+  }) : super(key: key);
+
+  @override
+  _BannerDetailDialogState createState() => _BannerDetailDialogState();
+}
+
+class _BannerDetailDialogState extends ConsumerState<BannerDetailDialog> {
+  late Future<BannerUnlockInfo> _unlockInfoFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _unlockInfoFuture = ref.read(bannerUnlockProvider).getBannerUnlockInfo(widget.banner.id);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && defaultTargetPlatform != TargetPlatform.linux) {
+        ref.read(adProvider.notifier).loadBannerAd(widget.adId);
+      }
+    });
+  }
+
+  void _refreshUnlockInfo() {
+    setState(() {
+      _unlockInfoFuture = ref.read(bannerUnlockProvider).getBannerUnlockInfo(widget.banner.id);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = ref.watch(currentThemeProvider);
+    final bannerAd = (defaultTargetPlatform != TargetPlatform.linux)
+        ? ref.watch(bannerAdProvider(widget.adId))
+        : null;
+    final isBannerAdReady = (defaultTargetPlatform != TargetPlatform.linux)
+        ? ref.watch(adProvider.notifier).isBannerAdReady(widget.adId)
+        : false;
+
+    const double bannerSize = 120;
+    const double dialogCornerRadius = 20;
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      child: Stack(
+        alignment: Alignment.topCenter,
+        clipBehavior: Clip.none,
+        children: [
+          // Dialog content card
+          Container(
+            margin: const EdgeInsets.only(top: bannerSize / 2),
+            padding: const EdgeInsets.only(
+              top: bannerSize / 2 + 16,
+              left: 24,
+              right: 24,
+              bottom: 16,
+            ),
+            decoration: BoxDecoration(
+              color: theme.cardColor,
+              borderRadius: BorderRadius.circular(dialogCornerRadius),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 20,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Banner name at the top
+                Text(
+                  widget.banner.name ?? 'Banner',
+                  style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                // Rental Info Section
+                FutureBuilder<BannerUnlockInfo>(
+                  future: _unlockInfoFuture,
+                  builder: (context, snapshot) {
+                    final info = snapshot.data;
+                    final isUnlocked = info?.isUnlocked ?? false;
+                    final unlockTime = info?.unlockTime;
+                    final now = DateTime.now().toUtc();
+                    Duration? timeLeft;
+                    Duration? timeSinceUnlock;
+                    if (isUnlocked && unlockTime != null) {
+                      final expiry = unlockTime.add(const Duration(hours: 1));
+                      timeLeft = expiry.difference(now);
+                      if (timeLeft.isNegative) timeLeft = Duration.zero;
+                      timeSinceUnlock = now.difference(unlockTime);
+                      if (timeSinceUnlock.isNegative) timeSinceUnlock = Duration.zero;
+                    }
+                    final canShowRentButton = !isUnlocked || (timeSinceUnlock != null && timeSinceUnlock.inMinutes >= 55);
+                    // Only show time left if rent button is NOT visible
+                    if (isUnlocked && timeLeft != null && !canShowRentButton) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12.0),
+                        child: Card(
+                          color: Colors.green.withOpacity(0.12),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.verified, color: Colors.green, size: 22),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Rented',
+                                  style: theme.textTheme.bodyLarge?.copyWith(color: Colors.green, fontWeight: FontWeight.bold),
+                                ),
+                                const SizedBox(width: 12),
+                                Text(
+                                  'Time left: '
+                                  '${timeLeft.inMinutes > 0 ? '${timeLeft.inMinutes} min' : '${timeLeft.inSeconds} sec'}',
+                                  style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    }
+                    return const SizedBox.shrink();
+                  },
+                ),
+                const SizedBox(height: 8),
+                // Action buttons and Ad rendering
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        if (widget.banner.rewardedAdId != null && widget.banner.rewardedAdId!.isNotEmpty)
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: () async {
+                                await ref.read(bannerUnlockProvider).showBannerUnlockAd(
+                                  context,
+                                  widget.banner.id,
+                                  onBannerUnlocked: _refreshUnlockInfo,
+                                );
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: theme.colorScheme.secondary.withOpacity(0.1),
+                                foregroundColor: theme.colorScheme.secondary,
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                elevation: 0,
+                              ),
+                              child: const Text('Rent (Ad)'),
+                            ),
+                          ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Buy feature coming soon!')),
+                              );
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: theme.primaryColor,
+                              foregroundColor: theme.colorScheme.onPrimary,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              elevation: 2,
+                            ),
+                            child: Text('Buy (${widget.banner.price} SBD)'),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (bannerAd != null) ...[
+                      if (!isBannerAdReady) ...[
+                        Padding(
+                          padding: const EdgeInsets.only(top: 28.0),
+                          child: SizedBox(
+                            width: bannerAd.size.width.toDouble(),
+                            height: bannerAd.size.height.toDouble(),
+                            child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                          ),
+                        ),
+                      ] else ...[
+                        Padding(
+                          padding: const EdgeInsets.only(top: 28.0),
+                          child: SizedBox(
+                            width: bannerAd.size.width.toDouble(),
+                            height: bannerAd.size.height.toDouble(),
+                            child: AdWidget(ad: bannerAd),
+                          ),
+                        ),
+                      ]
+                    ],
+                  ],
+                ),
+              ],
+            ),
+          ),
+          // Overlapping Banner image
+          Positioned(
+            top: 0,
+            child: Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.2),
+                    blurRadius: 15,
+                    offset: const Offset(0, 5),
+                  )
+                ],
+              ),
+              child: SizedBox(
+                width: bannerSize,
+                height: bannerSize,
+                child: ProfileBannerDisplay(
+                  banner: widget.banner,
+                  height: bannerSize,
+                  fit: BoxFit.contain,
+                ),
+              ),
+            ),
+          ),
+          // Close button
+          Positioned(
+            top: (bannerSize / 2) + 5,
             right: 5,
             child: Material(
               color: Colors.transparent,
