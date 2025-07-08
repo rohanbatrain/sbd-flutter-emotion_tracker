@@ -4,6 +4,74 @@ import 'package:emotion_tracker/providers/theme_provider.dart';
 import 'package:emotion_tracker/widgets/app_scaffold.dart';
 import 'package:emotion_tracker/screens/settings/variant1.dart';
 import 'package:emotion_tracker/avatars/custom_avatar.dart';
+import 'package:emotion_tracker/providers/ad_provider.dart';
+import 'package:flutter/foundation.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
+
+class CurrencyPack {
+  final String name;
+  final String description;
+  final int coins;
+  final int price;
+  final int bonus;
+  final String tag;
+
+  const CurrencyPack({
+    required this.name,
+    required this.description,
+    required this.coins,
+    required this.price,
+    this.bonus = 0,
+    this.tag = '',
+  });
+
+  String get effectiveRate {
+    return (price / (coins + bonus)).toStringAsFixed(3);
+  }
+
+  String get bonusText {
+    return bonus > 0 ? '+${bonus}' : '—';
+  }
+}
+
+final List<CurrencyPack> currencyPacks = [
+  const CurrencyPack(
+    name: 'Nano',
+    description: 'A small token to support our ecosystem of apps.',
+    coins: 200,
+    price: 79,
+  ),
+  const CurrencyPack(
+    name: 'Micro',
+    description: 'Help us improve our apps and add new features.',
+    coins: 500,
+    price: 179,
+    bonus: 50,
+  ),
+  const CurrencyPack(
+    name: 'Standard',
+    description: 'A popular choice for enhancing your experience across our apps.',
+    coins: 1200,
+    price: 399,
+    bonus: 200,
+  ),
+  const CurrencyPack(
+    name: 'Mega',
+    description: 'For those who love our ecosystem and want to see it thrive.',
+    coins: 2500,
+    price: 799,
+    bonus: 500,
+    tag: '🔥 Best Value',
+  ),
+  const CurrencyPack(
+    name: 'Giga',
+    description: 'The ultimate support for our ecosystem of apps.',
+    coins: 6000,
+    price: 1599,
+    bonus: 1500,
+    tag: '💎 Premium',
+  ),
+];
 
 class ShopScreenV1 extends ConsumerStatefulWidget {
   const ShopScreenV1({Key? key}) : super(key: key);
@@ -14,16 +82,25 @@ class ShopScreenV1 extends ConsumerStatefulWidget {
 
 class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  static const String avatarDetailBannerAdId = 'avatar_detail_banner';
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
+    // Preload the ad for the dialog
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && defaultTargetPlatform != TargetPlatform.linux) {
+        ref.read(adProvider.notifier).loadBannerAd(avatarDetailBannerAdId);
+      }
+    });
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    // We are not disposing the ad here anymore to keep it available.
+    // The ad provider will manage its lifecycle.
     super.dispose();
   }
 
@@ -41,6 +118,7 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
   @override
   Widget build(BuildContext context) {
     final theme = ref.watch(currentThemeProvider);
+
     return AppScaffold(
       title: 'Shop',
       selectedItem: 'shop',
@@ -84,6 +162,7 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
               tabs: const [
                 Tab(text: 'Avatars'),
                 Tab(text: 'Themes'),
+                Tab(text: 'Currency'),
               ],
             ),
             Expanded(
@@ -92,6 +171,7 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
                 children: [
                   _buildAvatarsGrid(theme),
                   _buildThemesGrid(theme),
+                  _buildCurrencyShop(theme),
                 ],
               ),
             ),
@@ -137,7 +217,7 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
                 crossAxisCount: 3,
                 crossAxisSpacing: 16,
                 mainAxisSpacing: 16,
-                childAspectRatio: 0.8,
+                childAspectRatio: 0.7,
               ),
               itemCount: avatars.length,
               itemBuilder: (context, index) {
@@ -150,27 +230,53 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
                   clipBehavior: Clip.antiAlias,
                   child: InkWell(
                     onTap: () {
-                      // TODO: Handle avatar tap
-                    },
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        AvatarDisplay(
+                      showDialog(
+                        context: context,
+                        barrierColor: Colors.black.withOpacity(0.5),
+                        builder: (context) => AvatarDetailDialog(
                           avatar: avatar,
-                          size: 60,
+                          adId: avatarDetailBannerAdId,
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          avatar.name,
-                          style: theme.textTheme.bodyMedium,
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '${avatar.price} SBD',
-                          style: theme.textTheme.bodySmall,
-                        ),
-                      ],
+                      );
+                    },
+                    child: FittedBox(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          AvatarDisplay(
+                            avatar: avatar,
+                            size: 50,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            avatar.name,
+                            style: theme.textTheme.bodyMedium,
+                            textAlign: TextAlign.center,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${avatar.price} SBD',
+                            style: theme.textTheme.bodySmall,
+                          ),
+                          const SizedBox(height: 4),
+                          IconButton(
+                            icon: const Icon(Icons.add_shopping_cart_outlined),
+                            iconSize: 22,
+                            color: theme.colorScheme.secondary,
+                            tooltip: 'Add to Cart',
+                            onPressed: () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Added to cart (feature coming soon!)'),
+                                  duration: Duration(seconds: 2),
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 );
@@ -212,7 +318,7 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
               crossAxisCount: 2,
               crossAxisSpacing: 16,
               mainAxisSpacing: 16,
-              childAspectRatio: 1.0,
+              childAspectRatio: 0.85,
             ),
             itemCount: lightThemes.length,
             itemBuilder: (context, index) {
@@ -221,7 +327,7 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
               final themeName = AppThemes.themeNames[themeKey]!;
               final themePrice = AppThemes.themePrices[themeKey]!;
 
-              return _buildThemeCard(theme, appTheme, themeName, themePrice);
+              return _buildThemeCard(theme, appTheme, themeName, themePrice, themeKey);
             },
           ),
           const SizedBox(height: 16),
@@ -244,7 +350,7 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
               crossAxisCount: 2,
               crossAxisSpacing: 16,
               mainAxisSpacing: 16,
-              childAspectRatio: 1.0,
+              childAspectRatio: 0.85,
             ),
             itemCount: darkThemes.length,
             itemBuilder: (context, index) {
@@ -253,7 +359,7 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
               final themeName = AppThemes.themeNames[themeKey]!;
               final themePrice = AppThemes.themePrices[themeKey]!;
 
-              return _buildThemeCard(theme, appTheme, themeName, themePrice);
+              return _buildThemeCard(theme, appTheme, themeName, themePrice, themeKey);
             },
           ),
         ],
@@ -261,7 +367,7 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
     );
   }
 
-  Widget _buildThemeCard(ThemeData theme, ThemeData appTheme, String themeName, int themePrice) {
+  Widget _buildThemeCard(ThemeData theme, ThemeData appTheme, String themeName, int themePrice, String themeKey) {
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(
@@ -270,54 +376,336 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () {
-          // TODO: Handle theme tap
+          // TODO: Handle theme purchase
         },
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 60,
-                height: 60,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                    colors: [
-                      appTheme.primaryColor,
-                      appTheme.colorScheme.secondary,
-                      appTheme.scaffoldBackgroundColor,
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+        child: FittedBox(
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 60,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      colors: [
+                        appTheme.primaryColor,
+                        appTheme.colorScheme.secondary,
+                        appTheme.scaffoldBackgroundColor,
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              Flexible(
-                child: Text(
-                  themeName,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurface,
-                    fontWeight: FontWeight.w500,
+                const SizedBox(height: 12),
+                Flexible(
+                  child: Text(
+                    themeName,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurface,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                themePrice == 0 ? 'Free' : '$themePrice SBD',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  fontWeight: themePrice > 0 ? FontWeight.bold : FontWeight.w600,
-                  color: themePrice > 0 ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant,
+                const SizedBox(height: 4),
+                Text(
+                  themePrice == 0 ? 'Owned' : '$themePrice SBD',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontWeight: themePrice > 0 ? FontWeight.bold : FontWeight.w600,
+                    color: themePrice == 0
+                        ? Colors.green
+                        : (themePrice > 0
+                            ? theme.colorScheme.primary
+                            : theme.colorScheme.onSurfaceVariant),
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 4),
+                if (themePrice > 0)
+                  IconButton(
+                    icon: const Icon(Icons.add_shopping_cart_outlined),
+                    iconSize: 22,
+                    color: theme.colorScheme.secondary,
+                    tooltip: 'Add to Cart',
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Added to cart (feature coming soon!)'),
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    },
+                  ),
+              ],
+            ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildCurrencyShop(ThemeData theme) {
+    return ListView(
+      padding: const EdgeInsets.all(16.0),
+      children: [
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: 16,
+            mainAxisSpacing: 16,
+            childAspectRatio: 0.7, // Adjust as needed
+          ),
+          itemCount: currencyPacks.length,
+          itemBuilder: (context, index) {
+            final pack = currencyPacks[index];
+            return Stack(
+              children: [
+                Card(
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: InkWell(
+                    onTap: () {
+                      // TODO: Handle currency pack purchase
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 24.0, left: 12.0, right: 12.0, bottom: 12.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                pack.name,
+                                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                '${pack.coins} Coins',
+                                style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                pack.description,
+                                style: theme.textTheme.bodySmall,
+                              ),
+                            ],
+                          ),
+                          Text(
+                            '₹${pack.price}',
+                            style: theme.textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: theme.colorScheme.primary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                if (pack.tag.isNotEmpty)
+                  Positioned(
+                    top: 0,
+                    right: 0,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: pack.tag.contains('Best Value') ? theme.colorScheme.secondary : theme.colorScheme.primary,
+                        borderRadius: const BorderRadius.only(
+                          topRight: Radius.circular(12),
+                          bottomLeft: Radius.circular(12),
+                        ),
+                      ),
+                      child: Text(
+                        pack.tag,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: theme.colorScheme.onPrimary,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
+        const SizedBox(height: 16),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8.0),
+          child: Text(
+            'Your purchases support the maintenance of our entire ecosystem of apps, and this currency works across all of them. Thank you for your support! ❤️',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurface.withOpacity(0.7)),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class AvatarDetailDialog extends ConsumerWidget {
+  final Avatar avatar;
+  final String adId;
+
+  const AvatarDetailDialog({
+    Key? key,
+    required this.avatar,
+    required this.adId,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = ref.watch(currentThemeProvider);
+    final bannerAd = (defaultTargetPlatform != TargetPlatform.linux)
+        ? ref.watch(bannerAdProvider(adId))
+        : null;
+    final isBannerAdReady = (defaultTargetPlatform != TargetPlatform.linux)
+        ? ref.watch(adProvider.notifier).isBannerAdReady(adId)
+        : false;
+
+    const double avatarSize = 120;
+    const double dialogCornerRadius = 20;
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      child: Stack(
+        alignment: Alignment.topCenter,
+        clipBehavior: Clip.none,
+        children: [
+          // Dialog content card
+          Container(
+            margin: const EdgeInsets.only(top: avatarSize / 2),
+            padding: const EdgeInsets.only(
+              top: avatarSize / 2 + 16,
+              left: 24,
+              right: 24,
+              bottom: 16,
+            ),
+            decoration: BoxDecoration(
+              color: theme.cardColor,
+              borderRadius: BorderRadius.circular(dialogCornerRadius),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 20,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  avatar.name,
+                  style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Rent feature coming soon!')),
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: theme.colorScheme.secondary.withOpacity(0.1),
+                          foregroundColor: theme.colorScheme.secondary,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: const Text('Rent (Ad)'),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Buy feature coming soon!')),
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: theme.primaryColor,
+                          foregroundColor: theme.colorScheme.onPrimary,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          elevation: 2,
+                        ),
+                        child: Text('Buy (${avatar.price} SBD)'),
+                      ),
+                    ),
+                  ],
+                ),
+                if (isBannerAdReady && bannerAd != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 16.0),
+                    child: FittedBox(
+                      child: Container(
+                        width: bannerAd.size.width.toDouble(),
+                        height: bannerAd.size.height.toDouble(),
+                        child: AdWidget(ad: bannerAd),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          // Overlapping Avatar
+          Positioned(
+            top: 0,
+            child: Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.2),
+                    blurRadius: 15,
+                    offset: const Offset(0, 5),
+                  )
+                ],
+              ),
+              child: AvatarDisplay(
+                avatar: avatar,
+                size: avatarSize,
+              ),
+            ),
+          ),
+          // Close button
+          Positioned(
+            top: (avatarSize / 2) + 5,
+            right: 5,
+            child: Material(
+              color: Colors.transparent,
+              child: IconButton(
+                icon: Icon(Icons.close, color: theme.colorScheme.onSurface.withOpacity(0.6)),
+                onPressed: () => Navigator.of(context).pop(),
+                splashRadius: 20,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

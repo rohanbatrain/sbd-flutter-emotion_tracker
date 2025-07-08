@@ -48,8 +48,11 @@ class _SidebarWidgetState extends ConsumerState<SidebarWidget> {
   @override
   Widget build(BuildContext context) {
     final theme = ref.watch(currentThemeProvider);
-    final bannerAd = ref.watch(bannerAdProvider(sidebarBannerAdId));
-    final isBannerAdReady = ref.watch(adProvider.notifier).isBannerAdReady(sidebarBannerAdId);
+    final isLinux = defaultTargetPlatform == TargetPlatform.linux;
+
+    // Conditionally watch ad-related providers
+    final bannerAd = !isLinux ? ref.watch(bannerAdProvider(sidebarBannerAdId)) : null;
+    final isBannerAdReady = !isLinux ? ref.watch(adProvider.notifier).isBannerAdReady(sidebarBannerAdId) : false;
 
     return SafeArea(
       child: Container(
@@ -133,7 +136,7 @@ class _SidebarWidgetState extends ConsumerState<SidebarWidget> {
               child: Column(
                 children: [
                   // Banner Ad
-                  if (isBannerAdReady && bannerAd != null)
+                  if (!isLinux && isBannerAdReady && bannerAd != null)
                     Container(
                       margin: EdgeInsets.only(bottom: 16),
                       width: 248, // Sidebar width (280) - padding (32)
