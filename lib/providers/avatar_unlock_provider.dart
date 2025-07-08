@@ -17,6 +17,9 @@ class AvatarUnlockService {
   final Ref ref;
   AvatarUnlockService(this.ref);
 
+  // In-memory cache: avatarId -> { unlocked: bool, unlockTime: DateTime? }
+  final Map<String, _AvatarUnlockCache> _unlockCache = {};
+
   /// Unlocks the avatar for the user by updating secure storage with a 1-hour expiry.
   Future<void> unlockAvatar(String avatarId) async {
     final storage = ref.read(secureStorageProvider);
@@ -31,8 +34,31 @@ class AvatarUnlockService {
     await storage.write(key: 'unlocked_avatars', value: jsonEncode(unlockedMap));
   }
 
-  /// Helper to fetch and merge server and local unlocks. Server always wins if locked.
-  Future<Set<String>> getMergedUnlockedAvatars() async {
+  /// Returns unlock status and unlock timestamp for UI logic.
+  /// Always checks server if cache is expired (older than 1 hour), else uses cache.
+  Future<AvatarUnlockInfo> getAvatarUnlockInfo(String avatarId) async {
+    final now = DateTime.now().toUtc();
+    final cache = _unlockCache[avatarId];
+    if (cache != null && now.difference(cache.lastChecked).inMinutes < 60) {
+      // Use cache if less than 1 hour old
+      return AvatarUnlockInfo(
+        isUnlocked: cache.isUnlocked,
+        unlockTime: cache.unlockTime,
+      );
+    }
+    // Fetch from storage/server
+    final unlocks = await _getMergedUnlockedAvatarsWithTimes();
+    final info = unlocks[avatarId] ?? AvatarUnlockInfo(isUnlocked: false, unlockTime: null);
+    _unlockCache[avatarId] = _AvatarUnlockCache(
+      isUnlocked: info.isUnlocked,
+      unlockTime: info.unlockTime,
+      lastChecked: now,
+    );
+    return info;
+  }
+
+  /// Helper: like getMergedUnlockedAvatars, but returns unlock time for each avatar.
+  Future<Map<String, AvatarUnlockInfo>> _getMergedUnlockedAvatarsWithTimes() async {
     final storage = ref.read(secureStorageProvider);
     final accessToken = await storage.read(key: 'access_token');
     final protocol = ref.read(serverProtocolProvider);
@@ -90,7 +116,7 @@ class AvatarUnlockService {
     final nowMs = DateTime.now().millisecondsSinceEpoch;
     unlockedMap.forEach((key, value) {
       if (value is int && nowMs - value < hourMs) {
-        validLocal[key] = DateTime.fromMillisecondsSinceEpoch(value).toUtc().add(Duration(hours: 1));
+        validLocal[key] = DateTime.fromMillisecondsSinceEpoch(value).toUtc();
       } else if (value is int && nowMs - value >= hourMs) {
         expired.add(key);
       }
@@ -103,28 +129,48 @@ class AvatarUnlockService {
     }
 
     // Merge: only avatars present in serverUnlocks are considered unlocked (except always-free/default avatar)
-    final unlocked = <String>{};
+    final result = <String, AvatarUnlockInfo>{};
     for (final avatar in allAvatars) {
       if (avatar.id == 'person') {
-        unlocked.add(avatar.id);
+        result[avatar.id] = AvatarUnlockInfo(isUnlocked: true, unlockTime: null);
         continue;
       }
       final serverValid = serverUnlocks[avatar.id];
       if (serverValid != null && serverValid.isAfter(now)) {
-        unlocked.add(avatar.id);
+        // Use server unlock time (subtract 1 hour to get unlock time)
+        result[avatar.id] = AvatarUnlockInfo(
+          isUnlocked: true,
+          unlockTime: serverValid.subtract(const Duration(hours: 1)),
+        );
         continue;
       }
+      final localValid = validLocal[avatar.id];
+      if (localValid != null && now.isBefore(localValid.add(const Duration(hours: 1)))) {
+        result[avatar.id] = AvatarUnlockInfo(
+          isUnlocked: true,
+          unlockTime: localValid,
+        );
+        continue;
+      }
+      result[avatar.id] = AvatarUnlockInfo(isUnlocked: false, unlockTime: null);
     }
-    return unlocked;
+    return result;
+  }
+
+  /// Helper to fetch and merge server and local unlocks. Server always wins if locked.
+  Future<Set<String>> getMergedUnlockedAvatars() async {
+    final unlocks = await _getMergedUnlockedAvatarsWithTimes();
+    return unlocks.entries.where((entry) => entry.value.isUnlocked).map((entry) => entry.key).toSet();
   }
 
   /// Checks if an avatar is currently unlocked (for global enforcement)
   Future<bool> isAvatarUnlocked(String avatarId) async {
-    final unlocked = await getMergedUnlockedAvatars();
-    return unlocked.contains(avatarId);
+    final info = await getAvatarUnlockInfo(avatarId);
+    return info.isUnlocked;
   }
 
   /// Loads and shows a rewarded ad for avatar unlock, passing username as SSV custom data.
+  /// No confirmation popup, ad loads immediately.
   Future<void> showAvatarUnlockAd(BuildContext context, String avatarId, {VoidCallback? onAvatarUnlocked}) async {
     final avatar = allAvatars.firstWhere((a) => a.id == avatarId, orElse: () => allAvatars.first);
     final adUnitId = avatar.rewardedAdId;
@@ -132,39 +178,6 @@ class AvatarUnlockService {
     final storage = ref.read(secureStorageProvider);
     final username = await storage.read(key: 'user_username');
     if (username == null || username.isEmpty) return;
-
-    final theme = Theme.of(context);
-    // Confirm with user, with notice about server-side verification delay
-    final proceed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Rent Avatar', style: TextStyle(color: theme.primaryColor)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('Watch a short ad to rent this avatar for 1 hour of usage.'),
-            const SizedBox(height: 12),
-            Text(
-              'Note: It may take a few seconds after watching the ad for the avatar to unlock, due to server-side verification.',
-              style: TextStyle(fontSize: 12, color: theme.primaryColor),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-            style: TextButton.styleFrom(foregroundColor: theme.primaryColor),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Watch Ad'),
-            style: ElevatedButton.styleFrom(backgroundColor: theme.primaryColor),
-          ),
-        ],
-      ),
-    );
-    if (proceed != true) return;
 
     // Show loading dialog and keep it until ad is actually shown
     showDialog(
@@ -180,7 +193,6 @@ class AvatarUnlockService {
         request: const AdRequest(),
         rewardedAdLoadCallback: RewardedAdLoadCallback(
           onAdLoaded: (ad) async {
-            // Dismiss the loading dialog right before showing the ad
             if (Navigator.of(context).canPop()) Navigator.of(context).pop();
 
             ad.setServerSideOptions(ServerSideVerificationOptions(userId: username));
@@ -202,6 +214,8 @@ class AvatarUnlockService {
               onUserEarnedReward: (ad, reward) async {
                 rewardGiven = true;
                 await unlockAvatar(avatarId);
+                // Invalidate cache for this avatar
+                _unlockCache.remove(avatarId);
                 if (context.mounted) {
                   await showDialog(
                     context: context,
@@ -211,7 +225,6 @@ class AvatarUnlockService {
                       actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('OK'))],
                     ),
                   );
-                  // Only notify UI after all dialogs are closed
                   if (onAvatarUnlocked != null) onAvatarUnlocked();
                 }
               },
@@ -232,4 +245,17 @@ class AvatarUnlockService {
       }
     }
   }
+}
+
+class AvatarUnlockInfo {
+  final bool isUnlocked;
+  final DateTime? unlockTime;
+  AvatarUnlockInfo({required this.isUnlocked, required this.unlockTime});
+}
+
+class _AvatarUnlockCache {
+  final bool isUnlocked;
+  final DateTime? unlockTime;
+  final DateTime lastChecked;
+  _AvatarUnlockCache({required this.isUnlocked, required this.unlockTime, required this.lastChecked});
 }

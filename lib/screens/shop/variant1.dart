@@ -611,79 +611,153 @@ class AvatarDetailDialog extends ConsumerWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                // Avatar name at the top
                 Text(
                   avatar.name,
                   style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 24),
-                FutureBuilder<bool>(
-                  future: avatarUnlockService.isAvatarUnlocked(avatar.id),
+                const SizedBox(height: 16),
+                // --- Rental Info Section (improved placement) ---
+                FutureBuilder<AvatarUnlockInfo>(
+                  future: avatarUnlockService.getAvatarUnlockInfo(avatar.id),
                   builder: (context, snapshot) {
-                    final isUnlocked = snapshot.data ?? false;
-                    return Row(
-                      children: [
-                        if (!isUnlocked && avatar.rewardedAdId != null && avatar.rewardedAdId!.isNotEmpty)
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed: () async {
-                                await avatarUnlockService.showAvatarUnlockAd(
-                                  context,
-                                  avatar.id,
-                                  onAvatarUnlocked: () {
-                                    // Optionally refresh UI
-                                    (context as Element).markNeedsBuild();
-                                  },
-                                );
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: theme.colorScheme.secondary.withOpacity(0.1),
-                                foregroundColor: theme.colorScheme.secondary,
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
+                    final info = snapshot.data;
+                    final isUnlocked = info?.isUnlocked ?? false;
+                    final unlockTime = info?.unlockTime;
+                    final now = DateTime.now().toUtc();
+                    Duration? timeLeft;
+                    if (isUnlocked && unlockTime != null) {
+                      final expiry = unlockTime.add(const Duration(hours: 1));
+                      timeLeft = expiry.difference(now);
+                      if (timeLeft.isNegative) timeLeft = Duration.zero;
+                    }
+                    if (isUnlocked && timeLeft != null) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12.0),
+                        child: Card(
+                          color: Colors.green.withOpacity(0.12),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.verified, color: Colors.green, size: 22),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Rented',
+                                  style: theme.textTheme.bodyLarge?.copyWith(color: Colors.green, fontWeight: FontWeight.bold),
                                 ),
-                                elevation: 0,
-                              ),
-                              child: const Text('Rent (Ad)'),
+                                const SizedBox(width: 12),
+                                Text(
+                                  'Time left: '
+                                  '${timeLeft.inMinutes > 0 ? '${timeLeft.inMinutes} min' : '${timeLeft.inSeconds} sec'}',
+                                  style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
+                                ),
+                              ],
                             ),
-                          ),
-                        if (!isUnlocked && avatar.rewardedAdId != null && avatar.rewardedAdId!.isNotEmpty)
-                          const SizedBox(width: 16),
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Buy feature coming soon!')),
-                              );
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: theme.primaryColor,
-                              foregroundColor: theme.colorScheme.onPrimary,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              elevation: 2,
-                            ),
-                            child: Text('Buy (${avatar.price} SBD)'),
                           ),
                         ),
+                      );
+                    }
+                    return const SizedBox.shrink();
+                  },
+                ),
+                // --- End Rental Info Section ---
+                const SizedBox(height: 8),
+                // Action buttons
+                FutureBuilder<AvatarUnlockInfo>(
+                  future: avatarUnlockService.getAvatarUnlockInfo(avatar.id),
+                  builder: (context, snapshot) {
+                    final info = snapshot.data;
+                    final isUnlocked = info?.isUnlocked ?? false;
+                    final unlockTime = info?.unlockTime;
+                    final now = DateTime.now().toUtc();
+                    Duration? timeSinceUnlock;
+                    if (isUnlocked && unlockTime != null) {
+                      timeSinceUnlock = now.difference(unlockTime);
+                      if (timeSinceUnlock.isNegative) timeSinceUnlock = Duration.zero;
+                    }
+                    final canShowRentButton = !isUnlocked || (timeSinceUnlock != null && timeSinceUnlock.inMinutes >= 55);
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(
+                          children: [
+                            if (canShowRentButton && avatar.rewardedAdId != null && avatar.rewardedAdId!.isNotEmpty)
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: () async {
+                                    await avatarUnlockService.showAvatarUnlockAd(
+                                      context,
+                                      avatar.id,
+                                      onAvatarUnlocked: () {
+                                        (context as Element).markNeedsBuild();
+                                      },
+                                    );
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: theme.colorScheme.secondary.withOpacity(0.1),
+                                    foregroundColor: theme.colorScheme.secondary,
+                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    elevation: 0,
+                                  ),
+                                  child: const Text('Rent (Ad)'),
+                                ),
+                              ),
+                            if (canShowRentButton && avatar.rewardedAdId != null && avatar.rewardedAdId!.isNotEmpty)
+                              const SizedBox(width: 16),
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: () {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Buy feature coming soon!')),
+                                  );
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: theme.primaryColor,
+                                  foregroundColor: theme.colorScheme.onPrimary,
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  elevation: 2,
+                                ),
+                                child: Text('Buy (${avatar.price} SBD)'),
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (canShowRentButton && avatar.rewardedAdId != null && avatar.rewardedAdId!.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 16.0, left: 4.0, right: 4.0),
+                            child: Text(
+                              'Watch an ad to rent this avatar for 1 hour.',
+                              style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        // Banner ad only when rented (not when rent button is visible)
+                        if (!canShowRentButton && isBannerAdReady && bannerAd != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 28.0),
+                            child: FittedBox(
+                              child: Container(
+                                width: bannerAd.size.width.toDouble(),
+                                height: bannerAd.size.height.toDouble(),
+                                child: AdWidget(ad: bannerAd),
+                              ),
+                            ),
+                          ),
                       ],
                     );
                   },
                 ),
-                if (isBannerAdReady && bannerAd != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 16.0),
-                    child: FittedBox(
-                      child: Container(
-                        width: bannerAd.size.width.toDouble(),
-                        height: bannerAd.size.height.toDouble(),
-                        child: AdWidget(ad: bannerAd),
-                      ),
-                    ),
-                  ),
               ],
             ),
           ),
