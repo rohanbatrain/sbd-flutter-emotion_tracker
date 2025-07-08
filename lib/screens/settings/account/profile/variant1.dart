@@ -6,6 +6,7 @@ import 'package:emotion_tracker/providers/app_providers.dart';
 import 'package:emotion_tracker/providers/custom_avatar.dart';
 import 'package:emotion_tracker/providers/avatar_unlock_provider.dart';
 import 'package:emotion_tracker/providers/custom_banner.dart';
+import 'package:emotion_tracker/providers/banner_unlock_provider.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:emotion_tracker/providers/user_agent_util.dart';
@@ -48,6 +49,7 @@ class _ProfileScreenV1State extends ConsumerState<ProfileScreenV1> {
 
   Future<void> _loadUserData() async {
     try {
+      final theme = ref.read(currentThemeProvider);
       final secureStorage = ref.read(secureStorageProvider);
       // Get user data from secure storage
       final email = await secureStorage.read(key: 'user_email') ?? '';
@@ -57,7 +59,7 @@ class _ProfileScreenV1State extends ConsumerState<ProfileScreenV1> {
       // Try to get current avatar from backend
       String avatarId = await _getCurrentAvatar() ?? await secureStorage.read(key: 'user_avatar_id') ?? 'person';
       // Try to get current banner from backend
-      String bannerId = await _getCurrentBanner() ?? await secureStorage.read(key: 'user_banner_id') ?? 'default-dark';
+      String bannerId = await _getCurrentBanner() ?? await secureStorage.read(key: 'user_banner_id') ?? (theme.brightness == Brightness.dark ? 'default-dark' : 'default-light');
       setState(() {
         userEmail = email;
         firstName = firstNameData;
@@ -146,7 +148,24 @@ class _ProfileScreenV1State extends ConsumerState<ProfileScreenV1> {
     // Optionally handle errors here
   }
 
-  // ignore: unused_element
+  Future<void> _setCurrentBanner(String bannerId) async {
+    final token = await _getAuthToken();
+    if (token == null) return;
+    final userAgent = await getUserAgent();
+    final baseUrl = ref.read(apiBaseUrlProvider);
+    final url = Uri.parse('$baseUrl/banners/current');
+    final response = await http.post(
+      url,
+      headers: {
+        'Authorization': 'Bearer $token',
+        'User-Agent': userAgent,
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({'banner_id': bannerId}),
+    );
+    // Optionally handle errors here
+  }
+
   Future<String?> _getCurrentAvatar() async {
     final token = await _getAuthToken();
     if (token == null) return null;
@@ -247,6 +266,67 @@ class _ProfileScreenV1State extends ConsumerState<ProfileScreenV1> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Avatar updated!'),
+            backgroundColor: Theme.of(context).colorScheme.secondary,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _showBannerSelectionDialog() async {
+    // Show preloader above everything
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black.withOpacity(0.2),
+      transitionDuration: Duration.zero,
+      pageBuilder: (context, _, __) => const Center(child: CircularProgressIndicator()),
+    );
+    await Future.delayed(const Duration(milliseconds: 50));
+    final bannerUnlockService = ref.read(bannerUnlockProvider);
+    Set<String> unlockedBanners;
+    try {
+      unlockedBanners = await bannerUnlockService.getMergedUnlockedBanners();
+    } catch (_) {
+      unlockedBanners = {'default-dark', 'default-light'};
+    }
+
+    // Don't show default banners in selection
+    unlockedBanners.remove('default-dark');
+    unlockedBanners.remove('default-light');
+
+    if (Navigator.of(context).canPop()) Navigator.of(context).pop();
+    if (unlockedBanners.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('You don\'t have any unlocked banners. Please purchase or rent them from the shop.'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+      return;
+    }
+    final newBannerId = await showDialog<String>(
+      context: context,
+      builder: (context) => BannerSelectionDialog(
+        currentBannerId: selectedBannerId,
+        unlockedBanners: unlockedBanners,
+      ),
+    );
+    if (newBannerId != null && newBannerId != selectedBannerId) {
+      final secureStorage = ref.read(secureStorageProvider);
+      await secureStorage.write(key: 'user_banner_id', value: newBannerId);
+      await _setCurrentBanner(newBannerId); // Sync with backend
+      setState(() {
+        selectedBannerId = newBannerId;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Banner updated!'),
             backgroundColor: Theme.of(context).colorScheme.secondary,
             duration: const Duration(seconds: 2),
           ),
@@ -406,133 +486,140 @@ class _ProfileScreenV1State extends ConsumerState<ProfileScreenV1> {
         title: const Text('Profile', style: TextStyle(fontWeight: FontWeight.bold)),
         centerTitle: true,
       ),
-      body: Stack(
+      body: Column(
         children: [
-          // Banner at the top
-          ProfileBannerDisplay(
-            banner: _getThemeBanner(theme),
-            height: 160,
-          ),
-          // Divider below banner
-          Positioned(
-            top: 160 - 1, // Just below the banner
-            left: 0,
-            right: 0,
-            child: Divider(
-              height: 2,
-              thickness: 2,
-              color: theme.dividerColor,
-            ),
-          ),
-          // Main content with overlap
-          SingleChildScrollView(
-            padding: const EdgeInsets.only(top: 0, left: 24, right: 24, bottom: 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                SizedBox(height: 100), // Space for banner and overlap
-                // Overlapping avatar
-                Center(
+          Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.center,
+            children: [
+              // Banner at the top (tappable for change)
+              GestureDetector(
+                onTap: _showBannerSelectionDialog,
+                child: ProfileBannerDisplay(
+                  banner: _getThemeBanner(theme),
+                  height: 160,
+                ),
+              ),
+              // Divider below banner
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: Divider(
+                  height: 2,
+                  thickness: 2,
+                  color: theme.dividerColor,
+                ),
+              ),
+              // Overlapping avatar
+              Positioned(
+                bottom: -65, // Overlap amount - moved further down
+                child: GestureDetector(
+                  onTap: _showAvatarSelectionDialog,
                   child: Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    child: GestureDetector(
-                      onTap: _showAvatarSelectionDialog,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.18),
-                              blurRadius: 16,
-                              offset: const Offset(0, 6),
-                            ),
-                          ],
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: theme.scaffoldBackgroundColor, width: 4),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.18),
+                          blurRadius: 16,
+                          offset: const Offset(0, 6),
                         ),
-                        child: _buildAvatarCircle(theme, size: 60), // Increased size
-                      ),
+                      ],
                     ),
+                    child: _buildAvatarCircle(theme, size: 60),
                   ),
                 ),
-                const SizedBox(height: 12),
-                Container(
-                  width: double.infinity,
-                  child: Text(
-                    displayName,
-                    style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-                    textAlign: TextAlign.center,
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 2,
-                  ),
-                ),
-                const SizedBox(height: 32),
-                // First Name Card
-                Card(
-                  elevation: 2,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  child: ListTile(
-                    leading: Icon(Icons.person, color: theme.primaryColor),
-                    title: Text(
-                      'First Name',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    subtitle: Text(
-                      firstName.isNotEmpty ? firstName : 'Not set',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: firstName.isNotEmpty 
-                            ? theme.textTheme.bodyMedium?.color 
-                            : theme.textTheme.bodyMedium?.color?.withOpacity(0.5),
-                      ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 60), // Space for avatar
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              child: Column(
+                children: [
+                  Container(
+                    width: double.infinity,
+                    child: Text(
+                      displayName,
+                      style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                      textAlign: TextAlign.center,
                       overflow: TextOverflow.ellipsis,
                       maxLines: 2,
                     ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    onTap: () => _showEditDialog(
-                      title: 'First Name',
-                      currentValue: firstName,
-                      controller: firstNameController,
-                      fieldName: 'user_first_name',
-                      maxLength: 50,
-                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                // Last Name Card
-                Card(
-                  elevation: 2,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  child: ListTile(
-                    leading: Icon(Icons.person_outline, color: theme.primaryColor),
-                    title: Text(
-                      'Last Name',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
+                  const SizedBox(height: 24),
+                  // First Name Card
+                  Card(
+                    elevation: 2,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    child: ListTile(
+                      leading: Icon(Icons.person, color: theme.primaryColor),
+                      title: Text(
+                        'First Name',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      subtitle: Text(
+                        firstName.isNotEmpty ? firstName : 'Not set',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: firstName.isNotEmpty
+                              ? theme.textTheme.bodyMedium?.color
+                              : theme.textTheme.bodyMedium?.color?.withOpacity(0.5),
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 2,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      onTap: () => _showEditDialog(
+                        title: 'First Name',
+                        currentValue: firstName,
+                        controller: firstNameController,
+                        fieldName: 'user_first_name',
+                        maxLength: 50,
                       ),
                     ),
-                    subtitle: Text(
-                      lastName.isNotEmpty ? lastName : 'Not set',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: lastName.isNotEmpty 
-                            ? theme.textTheme.bodyMedium?.color 
-                            : theme.textTheme.bodyMedium?.color?.withOpacity(0.5),
+                  ),
+                  const SizedBox(height: 12),
+                  // Last Name Card
+                  Card(
+                    elevation: 2,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    child: ListTile(
+                      leading: Icon(Icons.person_outline, color: theme.primaryColor),
+                      title: Text(
+                        'Last Name',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 2,
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    onTap: () => _showEditDialog(
-                      title: 'Last Name',
-                      currentValue: lastName,
-                      controller: lastNameController,
-                      fieldName: 'user_last_name',
-                      maxLength: 50,
+                      subtitle: Text(
+                        lastName.isNotEmpty ? lastName : 'Not set',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: lastName.isNotEmpty
+                              ? theme.textTheme.bodyMedium?.color
+                              : theme.textTheme.bodyMedium?.color?.withOpacity(0.5),
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 2,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      onTap: () => _showEditDialog(
+                        title: 'Last Name',
+                        currentValue: lastName,
+                        controller: lastNameController,
+                        fieldName: 'user_last_name',
+                        maxLength: 50,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                // Add more profile info here as needed
-              ],
+                  const SizedBox(height: 12),
+                  // Add more profile info here as needed
+                ],
+              ),
             ),
           ),
         ],
@@ -546,7 +633,7 @@ class _ProfileScreenV1State extends ConsumerState<ProfileScreenV1> {
       return CircleAvatar(
         radius: size,
         backgroundColor: theme.primaryColor.withOpacity(0.15),
-        child: Icon(Icons.person, size: size + 10, color: theme.primaryColor),
+        child: Icon(Icons.person, size: size, color: theme.primaryColor),
       );
     } else {
       return CircleAvatar(
@@ -554,7 +641,7 @@ class _ProfileScreenV1State extends ConsumerState<ProfileScreenV1> {
         backgroundColor: theme.primaryColor.withOpacity(0.15),
         child: AvatarDisplay(
           avatar: getAvatarById(selectedAvatarId),
-          size: size + 10,
+          size: size * 1.5,
           staticIconColor: theme.primaryColor,
         ),
       );

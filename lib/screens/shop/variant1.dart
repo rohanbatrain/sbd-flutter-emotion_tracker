@@ -4,6 +4,8 @@ import 'package:emotion_tracker/providers/theme_provider.dart';
 import 'package:emotion_tracker/widgets/app_scaffold.dart';
 import 'package:emotion_tracker/screens/settings/variant1.dart';
 import 'package:emotion_tracker/providers/custom_avatar.dart';
+import 'package:emotion_tracker/providers/custom_banner.dart';
+import 'package:emotion_tracker/providers/banner_unlock_provider.dart';
 import 'package:emotion_tracker/providers/ad_provider.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
@@ -88,7 +90,7 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this); // Updated to 4 tabs
     // Preload the ad for the dialog
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && defaultTargetPlatform != TargetPlatform.linux) {
@@ -162,6 +164,7 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
               ),
               tabs: const [
                 Tab(text: 'Avatars'),
+                Tab(text: 'Banners'),
                 Tab(text: 'Themes'),
                 Tab(text: 'Currency'),
               ],

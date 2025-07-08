@@ -709,7 +709,7 @@ class _CurrencyScreenV1State extends ConsumerState<CurrencyScreenV1>
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Watch Ad to Earn +50 SBD',
+                                  'Watch Ad to Earn +10 SBD',
                                   style: theme.textTheme.titleSmall?.copyWith(
                                     fontWeight: FontWeight.w600,
                                     color: theme.colorScheme.onSurface,
