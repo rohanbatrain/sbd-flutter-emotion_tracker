@@ -6,7 +6,7 @@ import 'package:emotion_tracker/providers/user_agent_util.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
-import 'package:emotion_tracker/avatars/custom_avatar.dart';
+import 'package:emotion_tracker/providers/custom_avatar.dart';
 
 /// Provider for avatar unlock logic (local + server sync, robust enforcement)
 final avatarUnlockProvider = Provider<AvatarUnlockService>((ref) {
@@ -217,14 +217,6 @@ class AvatarUnlockService {
                 // Invalidate cache for this avatar
                 _unlockCache.remove(avatarId);
                 if (context.mounted) {
-                  await showDialog(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      title: const Text('Avatar Rented!'),
-                      content: const Text('You have rented the avatar. You can now use it for 1 hour.'),
-                      actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('OK'))],
-                    ),
-                  );
                   if (onAvatarUnlocked != null) onAvatarUnlocked();
                 }
               },

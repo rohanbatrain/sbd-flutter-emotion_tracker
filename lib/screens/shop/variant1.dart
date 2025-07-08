@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:emotion_tracker/providers/theme_provider.dart';
 import 'package:emotion_tracker/widgets/app_scaffold.dart';
 import 'package:emotion_tracker/screens/settings/variant1.dart';
-import 'package:emotion_tracker/avatars/custom_avatar.dart';
+import 'package:emotion_tracker/providers/custom_avatar.dart';
 import 'package:emotion_tracker/providers/ad_provider.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
@@ -556,7 +556,7 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
   }
 }
 
-class AvatarDetailDialog extends ConsumerWidget {
+class AvatarDetailDialog extends ConsumerStatefulWidget {
   final Avatar avatar;
   final String adId;
 
@@ -567,13 +567,32 @@ class AvatarDetailDialog extends ConsumerWidget {
   }) : super(key: key);
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  _AvatarDetailDialogState createState() => _AvatarDetailDialogState();
+}
+
+class _AvatarDetailDialogState extends ConsumerState<AvatarDetailDialog> {
+  late Future<AvatarUnlockInfo> _unlockInfoFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _unlockInfoFuture = ref.read(avatarUnlockProvider).getAvatarUnlockInfo(widget.avatar.id);
+  }
+
+  void _refreshUnlockInfo() {
+    setState(() {
+      _unlockInfoFuture = ref.read(avatarUnlockProvider).getAvatarUnlockInfo(widget.avatar.id);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final theme = ref.watch(currentThemeProvider);
     final bannerAd = (defaultTargetPlatform != TargetPlatform.linux)
-        ? ref.watch(bannerAdProvider(adId))
+        ? ref.watch(bannerAdProvider(widget.adId))
         : null;
     final isBannerAdReady = (defaultTargetPlatform != TargetPlatform.linux)
-        ? ref.watch(adProvider.notifier).isBannerAdReady(adId)
+        ? ref.watch(adProvider.notifier).isBannerAdReady(widget.adId)
         : false;
     final avatarUnlockService = ref.watch(avatarUnlockProvider);
 
@@ -613,14 +632,14 @@ class AvatarDetailDialog extends ConsumerWidget {
               children: [
                 // Avatar name at the top
                 Text(
-                  avatar.name,
+                  widget.avatar.name,
                   style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 16),
                 // --- Rental Info Section (improved placement) ---
                 FutureBuilder<AvatarUnlockInfo>(
-                  future: avatarUnlockService.getAvatarUnlockInfo(avatar.id),
+                  future: _unlockInfoFuture,
                   builder: (context, snapshot) {
                     final info = snapshot.data;
                     final isUnlocked = info?.isUnlocked ?? false;
@@ -674,7 +693,7 @@ class AvatarDetailDialog extends ConsumerWidget {
                 const SizedBox(height: 8),
                 // Action buttons
                 FutureBuilder<AvatarUnlockInfo>(
-                  future: avatarUnlockService.getAvatarUnlockInfo(avatar.id),
+                  future: _unlockInfoFuture,
                   builder: (context, snapshot) {
                     final info = snapshot.data;
                     final isUnlocked = info?.isUnlocked ?? false;
@@ -691,15 +710,15 @@ class AvatarDetailDialog extends ConsumerWidget {
                       children: [
                         Row(
                           children: [
-                            if (canShowRentButton && avatar.rewardedAdId != null && avatar.rewardedAdId!.isNotEmpty)
+                            if (canShowRentButton && widget.avatar.rewardedAdId != null && widget.avatar.rewardedAdId!.isNotEmpty)
                               Expanded(
                                 child: ElevatedButton(
                                   onPressed: () async {
                                     await avatarUnlockService.showAvatarUnlockAd(
                                       context,
-                                      avatar.id,
+                                      widget.avatar.id,
                                       onAvatarUnlocked: () {
-                                        (context as Element).markNeedsBuild();
+                                        _refreshUnlockInfo();
                                       },
                                     );
                                   },
@@ -715,7 +734,7 @@ class AvatarDetailDialog extends ConsumerWidget {
                                   child: const Text('Rent (Ad)'),
                                 ),
                               ),
-                            if (canShowRentButton && avatar.rewardedAdId != null && avatar.rewardedAdId!.isNotEmpty)
+                            if (canShowRentButton && widget.avatar.rewardedAdId != null && widget.avatar.rewardedAdId!.isNotEmpty)
                               const SizedBox(width: 16),
                             Expanded(
                               child: ElevatedButton(
@@ -733,12 +752,12 @@ class AvatarDetailDialog extends ConsumerWidget {
                                   ),
                                   elevation: 2,
                                 ),
-                                child: Text('Buy (${avatar.price} SBD)'),
+                                child: Text('Buy (${widget.avatar.price} SBD)'),
                               ),
                             ),
                           ],
                         ),
-                        if (canShowRentButton && avatar.rewardedAdId != null && avatar.rewardedAdId!.isNotEmpty)
+                        if (canShowRentButton && widget.avatar.rewardedAdId != null && widget.avatar.rewardedAdId!.isNotEmpty)
                           Padding(
                             padding: const EdgeInsets.only(top: 16.0, left: 4.0, right: 4.0),
                             child: Text(
@@ -781,7 +800,7 @@ class AvatarDetailDialog extends ConsumerWidget {
                 ],
               ),
               child: AvatarDisplay(
-                avatar: avatar,
+                avatar: widget.avatar,
                 size: avatarSize,
               ),
             ),
