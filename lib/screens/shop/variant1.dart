@@ -7,6 +7,7 @@ import 'package:emotion_tracker/avatars/custom_avatar.dart';
 import 'package:emotion_tracker/providers/ad_provider.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:emotion_tracker/providers/avatar_unlock_provider.dart';
 
 class CurrencyPack {
   final String name;
@@ -574,6 +575,7 @@ class AvatarDetailDialog extends ConsumerWidget {
     final isBannerAdReady = (defaultTargetPlatform != TargetPlatform.linux)
         ? ref.watch(adProvider.notifier).isBannerAdReady(adId)
         : false;
+    final avatarUnlockService = ref.watch(avatarUnlockProvider);
 
     const double avatarSize = 120;
     const double dialogCornerRadius = 20;
@@ -615,48 +617,61 @@ class AvatarDetailDialog extends ConsumerWidget {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 24),
-                Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Rent feature coming soon!')),
-                          );
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: theme.colorScheme.secondary.withOpacity(0.1),
-                          foregroundColor: theme.colorScheme.secondary,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                FutureBuilder<bool>(
+                  future: avatarUnlockService.isAvatarUnlocked(avatar.id),
+                  builder: (context, snapshot) {
+                    final isUnlocked = snapshot.data ?? false;
+                    return Row(
+                      children: [
+                        if (!isUnlocked && avatar.rewardedAdId != null && avatar.rewardedAdId!.isNotEmpty)
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: () async {
+                                await avatarUnlockService.showAvatarUnlockAd(
+                                  context,
+                                  avatar.id,
+                                  onAvatarUnlocked: () {
+                                    // Optionally refresh UI
+                                    (context as Element).markNeedsBuild();
+                                  },
+                                );
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: theme.colorScheme.secondary.withOpacity(0.1),
+                                foregroundColor: theme.colorScheme.secondary,
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                elevation: 0,
+                              ),
+                              child: const Text('Rent (Ad)'),
+                            ),
                           ),
-                          elevation: 0,
-                        ),
-                        child: const Text('Rent (Ad)'),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Buy feature coming soon!')),
-                          );
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: theme.primaryColor,
-                          foregroundColor: theme.colorScheme.onPrimary,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                        if (!isUnlocked && avatar.rewardedAdId != null && avatar.rewardedAdId!.isNotEmpty)
+                          const SizedBox(width: 16),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Buy feature coming soon!')),
+                              );
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: theme.primaryColor,
+                              foregroundColor: theme.colorScheme.onPrimary,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              elevation: 2,
+                            ),
+                            child: Text('Buy (${avatar.price} SBD)'),
                           ),
-                          elevation: 2,
                         ),
-                        child: Text('Buy (${avatar.price} SBD)'),
-                      ),
-                    ),
-                  ],
+                      ],
+                    );
+                  },
                 ),
                 if (isBannerAdReady && bannerAd != null)
                   Padding(

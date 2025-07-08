@@ -4,7 +4,6 @@ import 'package:local_auth/local_auth.dart';
 import 'package:flutter/services.dart';
 import 'profile/variant1.dart';
 import '../variant1.dart';
-import 'package:emotion_tracker/screens/shop/variant1.dart';
 import 'package:emotion_tracker/screens/settings/account/change-password/variant1.dart';
 import 'package:emotion_tracker/screens/settings/account/enable-2fa/2fa_status_screen.dart';
 import 'package:emotion_tracker/screens/settings/account/trusted-ip/trusted_ip_status_screen.dart';
