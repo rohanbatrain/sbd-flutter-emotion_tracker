@@ -519,7 +519,7 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
                 crossAxisCount: 2,
                 crossAxisSpacing: 16,
                 mainAxisSpacing: 16,
-                childAspectRatio: 0.7,
+                childAspectRatio: 0.60, // Adjusted aspect ratio to resolve overflow
               ),
               itemCount: categoryBundles.length,
               itemBuilder: (context, index) {
@@ -618,6 +618,24 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
+                          ),
+                        ),
+                        Positioned(
+                          bottom: 8,
+                          right: 8,
+                          child: IconButton(
+                            icon: const Icon(Icons.add_shopping_cart_outlined),
+                            iconSize: 22,
+                            color: theme.colorScheme.secondary,
+                            tooltip: 'Add to Cart',
+                            onPressed: () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Added to cart (feature coming soon!)'),
+                                  duration: Duration(seconds: 2),
+                                ),
+                              );
+                            },
                           ),
                         ),
                       ],
