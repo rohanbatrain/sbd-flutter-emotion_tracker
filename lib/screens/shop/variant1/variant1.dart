@@ -1177,16 +1177,43 @@ class BannerDetailDialog extends ConsumerStatefulWidget {
 
 class _BannerDetailDialogState extends ConsumerState<BannerDetailDialog> {
   late Future<BannerUnlockInfo> _unlockInfoFuture;
+  BannerAd? _bannerAd;
+  bool _isAdLoaded = false;
 
   @override
   void initState() {
     super.initState();
     _unlockInfoFuture = ref.read(bannerUnlockProvider).getBannerUnlockInfo(widget.banner.id);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && defaultTargetPlatform != TargetPlatform.linux) {
-        ref.read(adProvider.notifier).loadBannerAd(widget.adId);
-      }
-    });
+    _loadBannerAd();
+  }
+
+  void _loadBannerAd() {
+    if (kIsWeb || defaultTargetPlatform == TargetPlatform.linux) {
+      return;
+    }
+    _bannerAd = BannerAd(
+      adUnitId: AdUnitIds.bannerAdUnitId,
+      request: const AdRequest(),
+      size: AdSize.banner,
+      listener: BannerAdListener(
+        onAdLoaded: (ad) {
+          if (mounted) {
+            setState(() {
+              _isAdLoaded = true;
+            });
+          }
+        },
+        onAdFailedToLoad: (ad, err) {
+          ad.dispose();
+        },
+      ),
+    )..load();
+  }
+
+  @override
+  void dispose() {
+    _bannerAd?.dispose();
+    super.dispose();
   }
 
   void _refreshUnlockInfo() {
@@ -1198,8 +1225,6 @@ class _BannerDetailDialogState extends ConsumerState<BannerDetailDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = ref.watch(currentThemeProvider);
-    final bannerAd = ref.watch(bannerAdProvider(widget.adId));
-    final isBannerAdReady = ref.watch(adProvider.notifier).isBannerAdReady(widget.adId);
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -1350,7 +1375,7 @@ class _BannerDetailDialogState extends ConsumerState<BannerDetailDialog> {
                   const SizedBox(height: 20),
 
                   // Action Buttons
-                  _buildActionButtons(theme, isBannerAdReady, bannerAd),
+                  _buildActionButtons(theme, _isAdLoaded, _bannerAd),
                 ],
               ),
             ),
@@ -1360,7 +1385,7 @@ class _BannerDetailDialogState extends ConsumerState<BannerDetailDialog> {
     );
   }
 
-  Widget _buildActionButtons(ThemeData theme, bool isBannerAdReady, BannerAd? bannerAd) {
+  Widget _buildActionButtons(ThemeData theme, bool isAdLoaded, BannerAd? bannerAd) {
     final bannerUnlockService = ref.watch(bannerUnlockProvider);
 
     return FutureBuilder<BannerUnlockInfo>(
@@ -1427,7 +1452,7 @@ class _BannerDetailDialogState extends ConsumerState<BannerDetailDialog> {
                 ),
                 child: const Text('Rent by Watching an Ad'),
               ),
-            ] else if (isUnlocked && isBannerAdReady && bannerAd != null) ...[
+            ] else if (isUnlocked && isAdLoaded && bannerAd != null) ...[
               const SizedBox(height: 12),
               SizedBox(
                 height: 50,
