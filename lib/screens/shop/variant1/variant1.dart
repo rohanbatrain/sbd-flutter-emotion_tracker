@@ -10,6 +10,7 @@ import 'package:emotion_tracker/providers/ad_provider.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:emotion_tracker/providers/avatar_unlock_provider.dart';
+import 'package:emotion_tracker/providers/custom_bundle.dart';
 
 extension StringExtension on String {
   String capitalize() {
@@ -97,7 +98,7 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this); // Updated to 4 tabs
+    _tabController = TabController(length: 5, vsync: this); // Updated to 5 tabs
     // Preload the ad for the dialog
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && defaultTargetPlatform != TargetPlatform.linux) {
@@ -173,6 +174,7 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
                 Tab(text: 'Avatars'),
                 Tab(text: 'Banners'),
                 Tab(text: 'Themes'),
+                Tab(text: 'Bundles'),
                 Tab(text: 'Currency'),
               ],
             ),
@@ -183,6 +185,7 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
                   _buildAvatarsGrid(theme),
                   _buildBannersGrid(theme),
                   _buildThemesGrid(theme),
+                  _buildBundlesGrid(theme),
                   _buildCurrencyShop(theme),
                 ],
               ),
@@ -480,6 +483,127 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
     );
   }
 
+  Widget _buildBundlesGrid(ThemeData theme) {
+    final avatarBundles = bundles.where((b) => b.id.contains('avatars')).toList();
+    final themeBundles = bundles.where((b) => b.id.contains('themes')).toList();
+
+    final Map<String, List<Bundle>> bundleCategories = {
+      'Avatar Bundles 📦': avatarBundles,
+      'Theme Bundles 🎨': themeBundles,
+    };
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16.0),
+      itemCount: bundleCategories.length,
+      itemBuilder: (context, index) {
+        final category = bundleCategories.keys.elementAt(index);
+        final categoryBundles = bundleCategories[category]!;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8.0),
+              child: Text(
+                category,
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                crossAxisSpacing: 16,
+                mainAxisSpacing: 16,
+                childAspectRatio: 0.7,
+              ),
+              itemCount: categoryBundles.length,
+              itemBuilder: (context, index) {
+                final bundle = categoryBundles[index];
+                return Card(
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: InkWell(
+                    onTap: () {
+                      showDialog(
+                        context: context,
+                        barrierColor: Colors.black.withOpacity(0.5),
+                        builder: (context) => BundleDetailDialog(
+                          bundle: bundle,
+                        ),
+                      );
+                    },
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.all(8.0),
+                            child: Column(
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Image.asset(
+                                    bundle.image,
+                                    height: 80,
+                                    width: double.infinity,
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  bundle.name,
+                                  style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                                  textAlign: TextAlign.center,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '${bundle.price} SBD',
+                                  style: theme.textTheme.bodySmall?.copyWith(color: theme.primaryColor),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: IconButton(
+                            icon: const Icon(Icons.add_shopping_cart_outlined),
+                            iconSize: 22,
+                            color: theme.colorScheme.secondary,
+                            tooltip: 'Add to Cart',
+                            onPressed: () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Added to cart (feature coming soon!)'),
+                                  duration: Duration(seconds: 2),
+                                ),
+                              );
+                            },
+                          ),
+                        )
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 16),
+          ],
+        );
+      },
+    );
+  }
+
   Widget _buildThemeCard(ThemeData theme, ThemeData appTheme, String themeName, int themePrice, String themeKey) {
     return Card(
       elevation: 2,
@@ -546,13 +670,14 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
                     iconSize: 22,
                     color: theme.colorScheme.secondary,
                     tooltip: 'Add to Cart',
-                    onPressed: () {              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Added to cart (feature coming soon!)'),
-                  duration: Duration(seconds: 2),
-                ),
-              );
-            },
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Added to cart (feature coming soon!)'),
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    },
                   ),
               ],
             ),
@@ -1192,6 +1317,139 @@ class _BannerDetailDialogState extends ConsumerState<BannerDetailDialog> {
           // Close button
           Positioned(
             top: (bannerSize / 2) + 5,
+            right: 5,
+            child: Material(
+              color: Colors.transparent,
+              child: IconButton(
+                icon: Icon(Icons.close, color: theme.colorScheme.onSurface.withOpacity(0.6)),
+                onPressed: () => Navigator.of(context).pop(),
+                splashRadius: 20,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class BundleDetailDialog extends ConsumerWidget {
+  final Bundle bundle;
+
+  const BundleDetailDialog({
+    Key? key,
+    required this.bundle,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = ref.watch(currentThemeProvider);
+    const double imageSize = 120;
+    const double dialogCornerRadius = 20;
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      child: Stack(
+        alignment: Alignment.topCenter,
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            margin: const EdgeInsets.only(top: imageSize / 2),
+            padding: const EdgeInsets.only(
+              top: imageSize / 2 + 16,
+              left: 24,
+              right: 24,
+              bottom: 16,
+            ),
+            decoration: BoxDecoration(
+              color: theme.cardColor,
+              borderRadius: BorderRadius.circular(dialogCornerRadius),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 20,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  bundle.name,
+                  style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  bundle.description,
+                  style: theme.textTheme.bodyMedium,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Included Items:',
+                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  height: 100, // Adjust height as needed
+                  child: ListView.builder(
+                    itemCount: bundle.includedItems.length,
+                    itemBuilder: (context, index) {
+                      return Text('• ${bundle.includedItems[index].split('-').last.capitalize()}');
+                    },
+                  ),
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Buy feature coming soon!')),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: theme.primaryColor,
+                    foregroundColor: theme.colorScheme.onPrimary,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 2,
+                  ),
+                  child: Text('Buy (${bundle.price} SBD)'),
+                ),
+              ],
+            ),
+          ),
+          Positioned(
+            top: 0,
+            child: Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.2),
+                    blurRadius: 15,
+                    offset: const Offset(0, 5),
+                  )
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(imageSize / 2),
+                child: Image.asset(
+                  bundle.image,
+                  width: imageSize,
+                  height: imageSize,
+                  fit: BoxFit.cover,
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            top: (imageSize / 2) + 5,
             right: 5,
             child: Material(
               color: Colors.transparent,

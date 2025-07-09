@@ -7,7 +7,7 @@ class Bundle {
   final String description;
   final int price; // SBD Tokens
   final List<String> includedItems; // IDs of included avatars or banners
-  final String image; // Path to a representative image
+  final String image; // Path to a representative image;
 
   const Bundle({
     required this.id,
