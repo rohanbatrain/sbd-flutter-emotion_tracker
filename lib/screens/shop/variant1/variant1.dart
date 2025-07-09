@@ -1316,27 +1316,20 @@ class _BannerDetailDialogState extends ConsumerState<BannerDetailDialog> {
             Padding(
               padding: const EdgeInsets.all(24.0),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   // Title
                   Text(
                     widget.banner.name ?? 'Banner',
                     style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                    textAlign: TextAlign.center,
                   ),
                   if (widget.banner.description != null && widget.banner.description!.isNotEmpty) ...[
                     const SizedBox(height: 12),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(Icons.description_outlined, size: 18, color: theme.hintColor),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            widget.banner.description!,
-                            style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
-                          ),
-                        ),
-                      ],
+                    Text(
+                      widget.banner.description!,
+                      style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
+                      textAlign: TextAlign.center,
                     ),
                   ],
                   const SizedBox(height: 16),
@@ -1349,19 +1342,7 @@ class _BannerDetailDialogState extends ConsumerState<BannerDetailDialog> {
                       if (isUnlocked) {
                         return const SizedBox.shrink();
                       }
-                      return Column(
-                        children: [
-                          Chip(
-                            avatar: Icon(Icons.psychology, color: theme.colorScheme.secondary),
-                            label: Text(
-                              '${widget.banner.price} SBD',
-                              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                            ),
-                            backgroundColor: theme.colorScheme.secondary.withOpacity(0.1),
-                          ),
-                          const SizedBox(height: 20),
-                        ],
-                      );
+                      return Column(                                           );
                     },
                   ),
 

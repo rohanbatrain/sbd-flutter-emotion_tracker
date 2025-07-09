@@ -55,7 +55,7 @@ final List<ProfileBanner> earthBanners = [
     type: BannerType.static,
     imageAsset: 'assets/banners/earth/earth-1.jpg',
     name: 'Earth 1',
-    description: 'A beautiful view of Earth from space.',
+    description: 'A beautiful view of Earth from space, capturing the vibrant blue oceans and swirling clouds. Perfect for those who appreciate the wonder and fragility of our planet.',
     price: 100,
     rewardedAdId: 'ca-app-pub-2845453539708646/2291871786',
     // Photo by Keith Misner on Unsplash: https://unsplash.com/photos/brown-wooden-board-h0Vxgz5tyXA
