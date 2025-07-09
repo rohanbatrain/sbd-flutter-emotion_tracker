@@ -140,7 +140,7 @@ final List<Bundle> bundles = [
       'emotion_tracker-deepPurpleDark',
       'emotion_tracker-royalOrangeDark',
     ],
-    image: 'assets/banners/default/dark_theme.png',
+    image: 'assets/banners/default/dark.png',
   ),
   const Bundle(
     id: 'emotion_tracker-themes-light',
@@ -160,7 +160,7 @@ final List<Bundle> bundles = [
       'emotion_tracker-crimsonRed',
       'emotion_tracker-deepPurple',
     ],
-    image: 'assets/banners/default/light_theme.png',
+    image: 'assets/banners/default/light.png',
   ),
 ];
 
