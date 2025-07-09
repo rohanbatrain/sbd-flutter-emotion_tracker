@@ -6,7 +6,7 @@ import 'package:emotion_tracker/widgets/app_scaffold.dart';
 import 'themes/variant1.dart';
 import 'account/variant1.dart';
 import 'developer/variant1.dart';
-import 'package:emotion_tracker/screens/shop/variant1.dart';
+import 'package:emotion_tracker/screens/shop/variant1/variant1.dart';
 
 // Provider to check if user has developer role
 final _isDeveloperProvider = FutureProvider<bool>((ref) async {

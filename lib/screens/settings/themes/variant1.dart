@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:emotion_tracker/providers/theme_provider.dart';
 import 'package:emotion_tracker/widgets/custom_app_bar.dart';
 import 'package:emotion_tracker/providers/theme_unlock_provider.dart';
-import 'package:emotion_tracker/screens/shop/variant1.dart';
+import 'package:emotion_tracker/screens/shop/variant1/variant1.dart';
 
 class ThemeSelectionScreenV1 extends ConsumerStatefulWidget {
   const ThemeSelectionScreenV1({Key? key}) : super(key: key);

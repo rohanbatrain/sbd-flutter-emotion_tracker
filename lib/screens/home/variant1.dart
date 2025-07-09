@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:emotion_tracker/screens/settings/variant1.dart';
-import 'package:emotion_tracker/screens/shop/variant1.dart';
+import 'package:emotion_tracker/screens/shop/variant1/variant1.dart';
 import 'package:emotion_tracker/screens/home/dashboard_screen_v1.dart';
 import 'package:emotion_tracker/widgets/app_scaffold.dart';
 
