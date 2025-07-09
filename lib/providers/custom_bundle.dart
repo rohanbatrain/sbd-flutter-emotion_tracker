@@ -7,6 +7,7 @@ class Bundle {
   final String description;
   final int price; // SBD Tokens
   final List<String> includedItems; // IDs of included avatars or banners
+  final String image; // Path to a representative image
 
   const Bundle({
     required this.id,
@@ -14,6 +15,7 @@ class Bundle {
     required this.description,
     required this.price,
     required this.includedItems,
+    required this.image,
   });
 }
 
@@ -46,6 +48,7 @@ final List<Bundle> bundles = [
       'emotion_tracker-static-avatar-cat-19',
       'emotion_tracker-static-avatar-cat-20',
     ],
+    image: 'assets/cats/cat-1.png',
   ),
   const Bundle(
     id: 'emotion_tracker-avatars-dog-bundle',
@@ -71,6 +74,7 @@ final List<Bundle> bundles = [
       'emotion_tracker-static-avatar-dog-16',
       'emotion_tracker-static-avatar-dog-17',
     ],
+    image: 'assets/dogs/dog-1.png',
   ),
   const Bundle(
     id: 'emotion_tracker-avatars-panda-bundle',
@@ -91,6 +95,7 @@ final List<Bundle> bundles = [
       'emotion_tracker-static-avatar-panda-11',
       'emotion_tracker-static-avatar-panda-12',
     ],
+    image: 'assets/pandas/panda-1.png',
   ),
   const Bundle(
     id: 'emotion_tracker-avatars-people-bundle',
@@ -115,6 +120,7 @@ final List<Bundle> bundles = [
       'emotion_tracker-static-avatar-person-15',
       'emotion_tracker-static-avatar-person-16',
     ],
+    image: 'assets/people/person-1.png',
   ),
   const Bundle(
     id: 'emotion_tracker-themes-dark',
@@ -134,6 +140,7 @@ final List<Bundle> bundles = [
       'emotion_tracker-deepPurpleDark',
       'emotion_tracker-royalOrangeDark',
     ],
+    image: 'assets/banners/default/dark_theme.png',
   ),
   const Bundle(
     id: 'emotion_tracker-themes-light',
@@ -153,6 +160,7 @@ final List<Bundle> bundles = [
       'emotion_tracker-crimsonRed',
       'emotion_tracker-deepPurple',
     ],
+    image: 'assets/banners/default/light_theme.png',
   ),
 ];
 
@@ -183,6 +191,16 @@ class BundleDisplay extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.asset(
+              bundle.image,
+              height: 80,
+              width: 80,
+              fit: BoxFit.cover,
+            ),
+          ),
+          const SizedBox(height: 12),
           Text(
             bundle.name,
             style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
