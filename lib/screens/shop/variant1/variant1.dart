@@ -314,8 +314,11 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8.0),
             child: Text(
-              'Earth',
-              style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+              'Earth Banners',
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: theme.colorScheme.primary,
+              ),
             ),
           ),
           const SizedBox(height: 12),
@@ -323,18 +326,20 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2, // Match avatar grid
+              crossAxisCount: 2,
               crossAxisSpacing: 16,
               mainAxisSpacing: 16,
-              childAspectRatio: 0.7, // Match avatar grid
+              childAspectRatio: 0.75,
             ),
             itemCount: earthBanners.length,
             itemBuilder: (context, index) {
               final banner = earthBanners[index];
+              final canShowRentButton = banner.rewardedAdId != null && banner.rewardedAdId!.isNotEmpty;
+
               return Card(
-                elevation: 2,
+                elevation: 4,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(16),
                 ),
                 clipBehavior: Clip.antiAlias,
                 child: InkWell(
@@ -348,52 +353,73 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
                       ),
                     );
                   },
-                  child: Container(
-                    width: double.infinity,
-                    height: 210, // Increased height to prevent overflow
-                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        SizedBox(
-                          height: 70, // Increased image size
-                          width: 110,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                theme.colorScheme.primary.withOpacity(0.1),
+                                theme.colorScheme.secondary.withOpacity(0.1),
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                          ),
                           child: ProfileBannerDisplay(
                             banner: banner,
-                            height: 70,
-                            fit: BoxFit.contain,
+                            height: 120,
+                            fit: BoxFit.cover,
                           ),
                         ),
-                        const SizedBox(height: 12),
-                        Text(
-                          banner.name ?? '',
-                          style: theme.textTheme.bodyMedium,
-                          textAlign: TextAlign.center,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          '${banner.price} SBD',
-                          style: theme.textTheme.bodySmall,
-                        ),
-                        const SizedBox(height: 6),
-                        IconButton(
-                          icon: const Icon(Icons.add_shopping_cart_outlined),
-                          iconSize: 22,
-                          color: theme.colorScheme.secondary,
-                          tooltip: 'Add to Cart',
-                          onPressed: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Added to cart (feature coming soon!)'),
-                                duration: Duration(seconds: 2),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              banner.name ?? '',
+                              style: theme.textTheme.bodyLarge?.copyWith(
+                                fontWeight: FontWeight.bold,
                               ),
-                            );
-                          },
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${banner.price} SBD',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.colorScheme.secondary,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            if (!canShowRentButton)
+                              ElevatedButton.icon(
+                                onPressed: () {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Added to cart (feature coming soon!)'),
+                                      duration: Duration(seconds: 2),
+                                    ),
+                                  );
+                                },
+                                icon: const Icon(Icons.add_shopping_cart_outlined),
+                                label: const Text('Add to Cart'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: theme.colorScheme.primary,
+                                  foregroundColor: theme.colorScheme.onPrimary,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
               );
@@ -1169,6 +1195,7 @@ class _BannerDetailDialogState extends ConsumerState<BannerDetailDialog> {
 
     const double bannerSize = 120;
     const double dialogCornerRadius = 20;
+    final canShowRentButton = !isBannerAdReady || (widget.banner.rewardedAdId != null && widget.banner.rewardedAdId!.isNotEmpty);
 
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -1267,28 +1294,34 @@ class _BannerDetailDialogState extends ConsumerState<BannerDetailDialog> {
                   children: [
                     Row(
                       children: [
-                        if (widget.banner.rewardedAdId != null && widget.banner.rewardedAdId!.isNotEmpty)
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed: () async {
-                                await ref.read(bannerUnlockProvider).showBannerUnlockAd(
-                                  context,
-                                  widget.banner.id,
-                                  onBannerUnlocked: _refreshUnlockInfo,
-                                );
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: theme.colorScheme.secondary.withOpacity(0.1),
-                                foregroundColor: theme.colorScheme.secondary,
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                elevation: 0,
+                        if (canShowRentButton) ...[
+                          const SizedBox(height: 6),
+                          ElevatedButton(
+                            onPressed: () async {
+                              await ref.read(bannerUnlockProvider).showBannerUnlockAd(
+                                context,
+                                widget.banner.id,
+                                onBannerUnlocked: _refreshUnlockInfo,
+                              );
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: theme.colorScheme.secondary.withOpacity(0.1),
+                              foregroundColor: theme.colorScheme.secondary,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
                               ),
-                              child: const Text('Rent (Ad)'),
+                              elevation: 0,
                             ),
+                            child: const Text('Rent (Ad)'),
                           ),
+                        ] else ...[
+                          const SizedBox(height: 6),
+                          SizedBox(
+                            height: 50,
+                            child: AdWidget(ad: bannerAd!),
+                          ),
+                        ],
                         const SizedBox(width: 16),
                         Expanded(
                           child: ElevatedButton(
@@ -1311,26 +1344,6 @@ class _BannerDetailDialogState extends ConsumerState<BannerDetailDialog> {
                         ),
                       ],
                     ),
-                    if (bannerAd != null && isBannerAdReady) ...[
-                      Padding(
-                        padding: const EdgeInsets.only(top: 28.0),
-                        child: FittedBox(
-                          fit: BoxFit.contain,
-                          child: SizedBox(
-                            width: bannerAd.size.width.toDouble(),
-                            height: bannerAd.size.height.toDouble(),
-                            child: AdWidget(ad: bannerAd),
-                          ),
-                        ),
-                      ),
-                    ] else if (bannerAd == null || !isBannerAdReady) ...[
-                      Padding(
-                        padding: const EdgeInsets.only(top: 28.0),
-                        child: Center(
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                      ),
-                    ],
                   ],
                 ),
               ],
