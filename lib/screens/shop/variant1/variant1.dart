@@ -254,44 +254,67 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
                         ),
                       );
                     },
-                    child: FittedBox(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          AvatarDisplay(
-                            avatar: avatar,
-                            size: 50,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(
+                          child: Container(
+                            color: theme.colorScheme.onSurface.withOpacity(0.05),
+                            padding: const EdgeInsets.all(8),
+                            child: AvatarDisplay(
+                              avatar: avatar,
+                              size: 50,
+                            ),
                           ),
-                          const SizedBox(height: 8),
-                          Text(
-                            avatar.name,
-                            style: theme.textTheme.bodyMedium,
-                            textAlign: TextAlign.center,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                avatar.name,
+                                style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    '${avatar.price} SBD',
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: theme.colorScheme.secondary,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  SizedBox(
+                                    height: 30,
+                                    width: 30,
+                                    child: IconButton(
+                                      padding: EdgeInsets.zero,
+                                      icon: const Icon(Icons.add_shopping_cart_outlined),
+                                      iconSize: 20,
+                                      color: theme.colorScheme.secondary,
+                                      tooltip: 'Add to Cart',
+                                      onPressed: () {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(
+                                            content: Text('Added to cart (feature coming soon!)'),
+                                            duration: Duration(seconds: 2),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '${avatar.price} SBD',
-                            style: theme.textTheme.bodySmall,
-                          ),
-                          const SizedBox(height: 4),
-                          IconButton(
-                            icon: const Icon(Icons.add_shopping_cart_outlined),
-                            iconSize: 22,
-                            color: theme.colorScheme.secondary,
-                            tooltip: 'Add to Cart',
-                            onPressed: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Added to cart (feature coming soon!)'),
-                                  duration: Duration(seconds: 2),
-                                ),
-                              );
-                            },
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
                 );
@@ -685,6 +708,8 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
   }
 
   Widget _buildThemeCard(ThemeData theme, ThemeData appTheme, String themeName, int themePrice, String themeKey) {
+    final bool isOwned = themePrice == 0;
+
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(
@@ -693,76 +718,101 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () {
-          // TODO: Handle theme purchase
+          // TODO: Handle theme purchase or selection
         },
-        child: FittedBox(
-          child: Container(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: LinearGradient(
-                      colors: [
-                        appTheme.primaryColor,
-                        appTheme.colorScheme.secondary,
-                        appTheme.scaffoldBackgroundColor,
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      appTheme.primaryColor.withOpacity(0.1),
+                      appTheme.scaffoldBackgroundColor,
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
                 ),
-                const SizedBox(height: 12),
-                Flexible(
-                  child: Text(
-                    themeName,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurface,
-                      fontWeight: FontWeight.w500,
-                    ),
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  themePrice == 0 ? 'Owned' : '$themePrice SBD',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    fontWeight: themePrice > 0 ? FontWeight.bold : FontWeight.w600,
-                    color: themePrice == 0
-                        ? Colors.green
-                        : (themePrice > 0
-                            ? theme.colorScheme.primary
-                            : theme.colorScheme.onSurfaceVariant),
-                  ),
-                ),
-                if (themePrice > 0) ...[
-                  const SizedBox(height: 4),
-                  IconButton(
-                    icon: const Icon(Icons.add_shopping_cart_outlined),
-                    iconSize: 22,
-                    color: theme.colorScheme.secondary,
-                    tooltip: 'Add to Cart',
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Added to cart (feature coming soon!)'),
-                          duration: Duration(seconds: 2),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          colors: [
+                            appTheme.primaryColor,
+                            appTheme.colorScheme.secondary,
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
                         ),
-                      );
-                    },
-                  ),
-                ],
-              ],
+                        border: Border.all(color: appTheme.cardColor, width: 2),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      themeName,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Text(
+                    isOwned ? 'Owned' : '$themePrice SBD',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: isOwned ? Colors.green : theme.colorScheme.primary,
+                    ),
+                  ),
+                  if (!isOwned)
+                    SizedBox(
+                      height: 30,
+                      width: 30,
+                      child: IconButton(
+                        padding: EdgeInsets.zero,
+                        icon: const Icon(Icons.add_shopping_cart_outlined),
+                        iconSize: 20,
+                        color: theme.colorScheme.secondary,
+                        tooltip: 'Add to Cart',
+                        onPressed: () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Added to cart (feature coming soon!)'),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
