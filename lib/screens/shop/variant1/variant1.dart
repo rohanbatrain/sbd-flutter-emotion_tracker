@@ -380,13 +380,34 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              banner.name ?? '',
-                              style: theme.textTheme.bodyLarge?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    banner.name ?? '',
+                                    style: theme.textTheme.bodyLarge?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.add_shopping_cart_outlined),
+                                  iconSize: 22,
+                                  color: theme.colorScheme.secondary,
+                                  tooltip: 'Add to Cart',
+                                  onPressed: () {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Added to cart (feature coming soon!)'),
+                                        duration: Duration(seconds: 2),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ],
                             ),
                             const SizedBox(height: 4),
                             Text(
@@ -399,21 +420,13 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
                             if (!canShowRentButton)
                               ElevatedButton.icon(
                                 onPressed: () {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Added to cart (feature coming soon!)'),
-                                      duration: Duration(seconds: 2),
-                                    ),
-                                  );
+                                  // TODO: Implement banner purchase logic
                                 },
-                                icon: const Icon(Icons.add_shopping_cart_outlined),
-                                label: const Text('Add to Cart'),
+                                icon: const Icon(Icons.shopping_bag_outlined),
+                                label: const Text('Buy'),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: theme.colorScheme.primary,
                                   foregroundColor: theme.colorScheme.onPrimary,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
                                 ),
                               ),
                           ],
@@ -646,24 +659,6 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
                             ),
                           ),
                         ),
-                        Positioned(
-                          bottom: 8,
-                          right: 8,
-                          child: IconButton(
-                            icon: const Icon(Icons.add_shopping_cart_outlined),
-                            iconSize: 22,
-                            color: theme.colorScheme.secondary,
-                            tooltip: 'Add to Cart',
-                            onPressed: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Added to cart (feature coming soon!)'),
-                                  duration: Duration(seconds: 2),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
                       ],
                     ),
                   ),
@@ -736,22 +731,6 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
                             : theme.colorScheme.onSurfaceVariant),
                   ),
                 ),
-                const SizedBox(height: 4),
-                if (themePrice > 0)
-                  IconButton(
-                    icon: const Icon(Icons.add_shopping_cart_outlined),
-                    iconSize: 22,
-                    color: theme.colorScheme.secondary,
-                    tooltip: 'Add to Cart',
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Added to cart (feature coming soon!)'),
-                          duration: Duration(seconds: 2),
-                        ),
-                      );
-                    },
-                  ),
               ],
             ),
           ),
@@ -1193,71 +1172,120 @@ class _BannerDetailDialogState extends ConsumerState<BannerDetailDialog> {
     final bannerAd = ref.watch(bannerAdProvider(widget.adId));
     final isBannerAdReady = ref.watch(adProvider.notifier).isBannerAdReady(widget.adId);
 
-    const double bannerSize = 120;
-    const double dialogCornerRadius = 20;
-    final canShowRentButton = !isBannerAdReady || (widget.banner.rewardedAdId != null && widget.banner.rewardedAdId!.isNotEmpty);
-
     return Dialog(
-      backgroundColor: Colors.transparent,
-      elevation: 0,
-      child: Stack(
-        alignment: Alignment.topCenter,
-        clipBehavior: Clip.none,
-        children: [
-          // Dialog content card
-          Container(
-            margin: const EdgeInsets.only(top: bannerSize / 2),
-            padding: const EdgeInsets.only(
-              top: bannerSize / 2 + 16,
-              left: 24,
-              right: 24,
-              bottom: 16,
-            ),
-            decoration: BoxDecoration(
-              color: theme.cardColor,
-              borderRadius: BorderRadius.circular(dialogCornerRadius),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 20,
-                  offset: const Offset(0, 5),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      elevation: 5,
+      backgroundColor: theme.cardColor,
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Banner Preview
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(20),
+                    topRight: Radius.circular(20),
+                  ),
+                  child: ProfileBannerDisplay(
+                    banner: widget.banner,
+                    height: 140,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Material(
+                    color: Colors.black.withOpacity(0.5),
+                    shape: const CircleBorder(),
+                    child: IconButton(
+                      icon: const Icon(Icons.close, color: Colors.white),
+                      onPressed: () => Navigator.of(context).pop(),
+                      splashRadius: 20,
+                      tooltip: 'Close',
+                    ),
+                  ),
                 ),
               ],
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Banner name at the top
-                Text(
-                  widget.banner.name ?? 'Banner',
-                  style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 16),
-                // Rental Info Section
-                FutureBuilder<BannerUnlockInfo>(
-                  future: _unlockInfoFuture,
-                  builder: (context, snapshot) {
-                    final info = snapshot.data;
-                    final isUnlocked = info?.isUnlocked ?? false;
-                    final unlockTime = info?.unlockTime;
-                    final now = DateTime.now().toUtc();
-                    Duration? timeLeft;
-                    Duration? timeSinceUnlock;
-                    if (isUnlocked && unlockTime != null) {
-                      final expiry = unlockTime.add(const Duration(hours: 1));
-                      timeLeft = expiry.difference(now);
-                      if (timeLeft.isNegative) timeLeft = Duration.zero;
-                      timeSinceUnlock = now.difference(unlockTime);
-                      if (timeSinceUnlock.isNegative) timeSinceUnlock = Duration.zero;
-                    }
-                    final canShowRentButton = !isUnlocked || (timeSinceUnlock != null && timeSinceUnlock.inMinutes >= 55);
-                    // Only show time left if rent button is NOT visible
-                    if (isUnlocked && timeLeft != null && !canShowRentButton) {
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 12.0),
-                        child: Card(
+
+            Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Title
+                  Text(
+                    widget.banner.name ?? 'Banner',
+                    style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  if (widget.banner.description != null && widget.banner.description!.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.description_outlined, size: 18, color: theme.hintColor),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            widget.banner.description!,
+                            style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                  const SizedBox(height: 16),
+
+                  // Price (conditionally hidden)
+                  FutureBuilder<BannerUnlockInfo>(
+                    future: _unlockInfoFuture,
+                    builder: (context, snapshot) {
+                      final isUnlocked = snapshot.data?.isUnlocked ?? false;
+                      if (isUnlocked) {
+                        return const SizedBox.shrink();
+                      }
+                      return Column(
+                        children: [
+                          Chip(
+                            avatar: Icon(Icons.psychology, color: theme.colorScheme.secondary),
+                            label: Text(
+                              '${widget.banner.price} SBD',
+                              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                            ),
+                            backgroundColor: theme.colorScheme.secondary.withOpacity(0.1),
+                          ),
+                          const SizedBox(height: 20),
+                        ],
+                      );
+                    },
+                  ),
+
+                  // Rental Info Section
+                  FutureBuilder<BannerUnlockInfo>(
+                    future: _unlockInfoFuture,
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+
+                      final info = snapshot.data;
+                      final isUnlocked = info?.isUnlocked ?? false;
+                      final unlockTime = info?.unlockTime;
+                      final now = DateTime.now().toUtc();
+                      Duration? timeLeft;
+
+                      if (isUnlocked && unlockTime != null) {
+                        final expiry = unlockTime.add(const Duration(hours: 1));
+                        timeLeft = expiry.difference(now);
+                        if (timeLeft.isNegative) timeLeft = Duration.zero;
+                      }
+
+                      if (isUnlocked && timeLeft != null && timeLeft > Duration.zero) {
+                        return Card(
                           color: Colors.green.withOpacity(0.12),
                           elevation: 0,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -1266,129 +1294,120 @@ class _BannerDetailDialogState extends ConsumerState<BannerDetailDialog> {
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(Icons.verified, color: Colors.green, size: 22),
+                                const Icon(Icons.verified, color: Colors.green, size: 22),
                                 const SizedBox(width: 8),
                                 Text(
                                   'Rented',
                                   style: theme.textTheme.bodyLarge?.copyWith(color: Colors.green, fontWeight: FontWeight.bold),
                                 ),
                                 const SizedBox(width: 12),
-                                Text(
-                                  'Time left: '
-                                  '${timeLeft.inMinutes > 0 ? '${timeLeft.inMinutes} min' : '${timeLeft.inSeconds} sec'}',
-                                  style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
+                                Expanded(
+                                  child: Text(
+                                    'Time left: ${timeLeft.inMinutes > 0 ? '${timeLeft.inMinutes} min' : '${timeLeft.inSeconds} sec'}',
+                                    style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
                               ],
                             ),
                           ),
-                        ),
-                      );
-                    }
-                    return const SizedBox.shrink();
-                  },
-                ),
-                const SizedBox(height: 8),
-                // Action buttons and Ad rendering
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Row(
-                      children: [
-                        if (canShowRentButton) ...[
-                          const SizedBox(height: 6),
-                          ElevatedButton(
-                            onPressed: () async {
-                              await ref.read(bannerUnlockProvider).showBannerUnlockAd(
-                                context,
-                                widget.banner.id,
-                                onBannerUnlocked: _refreshUnlockInfo,
-                              );
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: theme.colorScheme.secondary.withOpacity(0.1),
-                              foregroundColor: theme.colorScheme.secondary,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              elevation: 0,
-                            ),
-                            child: const Text('Rent (Ad)'),
-                          ),
-                        ] else ...[
-                          const SizedBox(height: 6),
-                          SizedBox(
-                            height: 50,
-                            child: AdWidget(ad: bannerAd!),
-                          ),
-                        ],
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Buy feature coming soon!')),
-                              );
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: theme.primaryColor,
-                              foregroundColor: theme.colorScheme.onPrimary,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              elevation: 2,
-                            ),
-                            child: Text('Buy (${widget.banner.price} SBD)'),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          // Overlapping Banner image
-          Positioned(
-            top: 0,
-            child: Container(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.2),
-                    blurRadius: 15,
-                    offset: const Offset(0, 5),
-                  )
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    },
+                  ),
+                  const SizedBox(height: 20),
+                  const Divider(),
+                  const SizedBox(height: 20),
+
+                  // Action Buttons
+                  _buildActionButtons(theme, isBannerAdReady, bannerAd),
                 ],
               ),
-              child: SizedBox(
-                width: bannerSize,
-                height: bannerSize,
-                child: ProfileBannerDisplay(
-                  banner: widget.banner,
-                  height: bannerSize,
-                  fit: BoxFit.contain,
-                ),
-              ),
             ),
-          ),
-          // Close button
-          Positioned(
-            top: (bannerSize / 2) + 5,
-            right: 5,
-            child: Material(
-              color: Colors.transparent,
-              child: IconButton(
-                icon: Icon(Icons.close, color: theme.colorScheme.onSurface.withOpacity(0.6)),
-                onPressed: () => Navigator.of(context).pop(),
-                splashRadius: 20,
-              ),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
+    );
+  }
+
+  Widget _buildActionButtons(ThemeData theme, bool isBannerAdReady, BannerAd? bannerAd) {
+    final bannerUnlockService = ref.watch(bannerUnlockProvider);
+
+    return FutureBuilder<BannerUnlockInfo>(
+      future: _unlockInfoFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final info = snapshot.data;
+        final isUnlocked = info?.isUnlocked ?? false;
+        final unlockTime = info?.unlockTime;
+        final now = DateTime.now().toUtc();
+        Duration? timeSinceUnlock;
+
+        if (isUnlocked && unlockTime != null) {
+          timeSinceUnlock = now.difference(unlockTime);
+        }
+
+        // Show rent button if not unlocked, or if unlocked more than 55 minutes ago
+        final canShowRentButton = widget.banner.rewardedAdId != null &&
+            widget.banner.rewardedAdId!.isNotEmpty &&
+            (!isUnlocked || (timeSinceUnlock != null && timeSinceUnlock.inMinutes >= 55));
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            ElevatedButton.icon(
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Buy feature coming soon!')),
+                );
+              },
+              icon: const Icon(Icons.shopping_bag_outlined),
+              label: Text('Buy (${widget.banner.price} SBD)'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: theme.primaryColor,
+                foregroundColor: theme.colorScheme.onPrimary,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 2,
+              ),
+            ),
+            if (canShowRentButton) ...[
+              const SizedBox(height: 12),
+              ElevatedButton(
+                onPressed: () async {
+                  await bannerUnlockService.showBannerUnlockAd(
+                    context,
+                    widget.banner.id,
+                    onBannerUnlocked: _refreshUnlockInfo,
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: theme.colorScheme.secondary.withOpacity(0.1),
+                  foregroundColor: theme.colorScheme.secondary,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 0,
+                ),
+                child: const Text('Rent by Watching an Ad'),
+              ),
+            ] else if (isUnlocked && isBannerAdReady && bannerAd != null) ...[
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 50,
+                child: AdWidget(ad: bannerAd),
+              ),
+            ],
+          ],
+        );
+      },
     );
   }
 }
