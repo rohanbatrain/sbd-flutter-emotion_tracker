@@ -269,50 +269,49 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
                         ),
                         Padding(
                           padding: const EdgeInsets.all(8.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
-                              Text(
-                                avatar.name,
-                                style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 4),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  Expanded(
-                                    child: Text(
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      avatar.name,
+                                      style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
                                       '${avatar.price} SBD',
                                       style: theme.textTheme.bodySmall?.copyWith(
                                         color: theme.colorScheme.secondary,
                                         fontWeight: FontWeight.w600,
                                       ),
-                                      overflow: TextOverflow.ellipsis, // Added for safety
+                                      overflow: TextOverflow.ellipsis,
                                     ),
-                                  ),
-                                  SizedBox(
-                                    height: 30,
-                                    width: 30,
-                                    child: IconButton(
-                                      padding: EdgeInsets.zero,
-                                      icon: const Icon(Icons.add_shopping_cart_outlined),
-                                      iconSize: 20,
-                                      color: theme.colorScheme.secondary,
-                                      tooltip: 'Add to Cart',
-                                      onPressed: () {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(
-                                            content: Text('Added to cart (feature coming soon!)'),
-                                            duration: Duration(seconds: 2),
-                                          ),
-                                        );
-                                      },
-                                    ),
-                                  ),
-                                ],
+                                  ],
+                                ),
+                              ),
+                              SizedBox(
+                                height: 30,
+                                width: 30,
+                                child: IconButton(
+                                  padding: EdgeInsets.zero,
+                                  icon: const Icon(Icons.add_shopping_cart_outlined),
+                                  iconSize: 20,
+                                  color: theme.colorScheme.secondary,
+                                  tooltip: 'Add to Cart',
+                                  onPressed: () {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Added to cart (feature coming soon!)'),
+                                        duration: Duration(seconds: 2),
+                                      ),
+                                    );
+                                  },
+                                ),
                               ),
                             ],
                           ),
@@ -1585,7 +1584,30 @@ class BundleDetailDialog extends ConsumerWidget {
                   child: ListView.builder(
                     itemCount: bundle.includedItems.length,
                     itemBuilder: (context, index) {
-                      return Text('• ${bundle.includedItems[index].split('-').last.capitalize()}');
+                      final itemId = bundle.includedItems[index];
+                      String itemName = 'Unknown Item';
+
+                      if (bundle.id.contains('avatars')) {
+                        try {
+                          final avatar = allAvatars.firstWhere((a) => a.id == itemId);
+                          itemName = avatar.name;
+                        } catch (e) {
+                          // Avatar not found, keep default name
+                        }
+                      } else if (bundle.id.contains('themes')) {
+                        // Use the theme name from the map, or format the ID to be readable
+                        itemName = AppThemes.themeNames[itemId] ??
+                            itemId
+                                .replaceFirst('emotion_tracker-', '')
+                                .split(RegExp(r'(?=[A-Z])'))
+                                .map((word) => word.capitalize())
+                                .join(' ');
+                      }
+
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 2.0),
+                        child: Text('• $itemName'),
+                      );
                     },
                   ),
                 ),
