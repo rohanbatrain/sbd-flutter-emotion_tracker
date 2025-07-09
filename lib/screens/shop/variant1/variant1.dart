@@ -230,7 +230,7 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
               physics: const NeverScrollableScrollPhysics(),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 3,
-                crossAxisSpacing: 16,
+                crossAxisSpacing: 12, // Adjusted to prevent overflow
                 mainAxisSpacing: 16,
                 childAspectRatio: 0.7,
               ),
@@ -283,11 +283,14 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 crossAxisAlignment: CrossAxisAlignment.center,
                                 children: [
-                                  Text(
-                                    '${avatar.price} SBD',
-                                    style: theme.textTheme.bodySmall?.copyWith(
-                                      color: theme.colorScheme.secondary,
-                                      fontWeight: FontWeight.w600,
+                                  Expanded(
+                                    child: Text(
+                                      '${avatar.price} SBD',
+                                      style: theme.textTheme.bodySmall?.copyWith(
+                                        color: theme.colorScheme.secondary,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                      overflow: TextOverflow.ellipsis, // Added for safety
                                     ),
                                   ),
                                   SizedBox(
