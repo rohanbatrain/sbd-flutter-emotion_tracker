@@ -230,9 +230,9 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
               physics: const NeverScrollableScrollPhysics(),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 3,
-                crossAxisSpacing: 12, // Adjusted to prevent overflow
+                crossAxisSpacing: 12,
                 mainAxisSpacing: 16,
-                childAspectRatio: 0.7,
+                childAspectRatio: 0.65, // Adjusted for better layout
               ),
               itemCount: avatars.length,
               itemBuilder: (context, index) {
@@ -268,39 +268,34 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
                           ),
                         ),
                         Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: Row(
+                          padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 12.0),
+                          child: Column(
                             crossAxisAlignment: CrossAxisAlignment.center,
+                            mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      avatar.name,
-                                      style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      '${avatar.price} SBD',
-                                      style: theme.textTheme.bodySmall?.copyWith(
-                                        color: theme.colorScheme.secondary,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ],
-                                ),
+                              Text(
+                                avatar.name,
+                                style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
                               ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '${avatar.price} SBD',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.secondary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 4),
                               SizedBox(
                                 height: 30,
-                                width: 30,
                                 child: IconButton(
                                   padding: EdgeInsets.zero,
                                   icon: const Icon(Icons.add_shopping_cart_outlined),
-                                  iconSize: 20,
+                                  iconSize: 22,
                                   color: theme.colorScheme.secondary,
                                   tooltip: 'Add to Cart',
                                   onPressed: () {
