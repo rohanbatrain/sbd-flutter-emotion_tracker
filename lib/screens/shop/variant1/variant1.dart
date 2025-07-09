@@ -558,7 +558,7 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
                 crossAxisCount: 2,
                 crossAxisSpacing: 16,
                 mainAxisSpacing: 16,
-                childAspectRatio: 0.60, // Adjusted aspect ratio to resolve overflow
+                childAspectRatio: 0.74, // Adjusted aspect ratio to resolve overflow
               ),
               itemCount: categoryBundles.length,
               itemBuilder: (context, index) {
@@ -614,26 +614,38 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
                                   children: [
                                     Text(
                                       bundle.name,
-                                      style: theme.textTheme.titleSmall?.copyWith(
+                                      style: theme.textTheme.bodyLarge?.copyWith(
                                         fontWeight: FontWeight.bold,
                                       ),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                     const SizedBox(height: 4),
-                                    Text(
-                                      bundle.description,
-                                      style: theme.textTheme.bodySmall,
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      '${bundle.price} SBD',
-                                      style: theme.textTheme.bodyMedium?.copyWith(
-                                        color: theme.colorScheme.primary,
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          '${bundle.price} SBD',
+                                          style: theme.textTheme.bodyMedium?.copyWith(
+                                            color: theme.colorScheme.secondary,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        IconButton(
+                                          icon: const Icon(Icons.add_shopping_cart_outlined),
+                                          iconSize: 22,
+                                          color: theme.colorScheme.secondary,
+                                          tooltip: 'Add to Cart',
+                                          onPressed: () {
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              const SnackBar(
+                                                content: Text('Added to cart (feature coming soon!)'),
+                                                duration: Duration(seconds: 2),
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                      ],
                                     ),
                                   ],
                                 ),
@@ -731,6 +743,23 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
                             : theme.colorScheme.onSurfaceVariant),
                   ),
                 ),
+                if (themePrice > 0) ...[
+                  const SizedBox(height: 4),
+                  IconButton(
+                    icon: const Icon(Icons.add_shopping_cart_outlined),
+                    iconSize: 22,
+                    color: theme.colorScheme.secondary,
+                    tooltip: 'Add to Cart',
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Added to cart (feature coming soon!)'),
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    },
+                  ),
+                ],
               ],
             ),
           ),
