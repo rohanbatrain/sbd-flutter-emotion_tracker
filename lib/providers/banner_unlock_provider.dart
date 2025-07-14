@@ -20,6 +20,11 @@ class BannerUnlockService {
   // In-memory cache: bannerId -> { unlocked: bool, unlockTime: DateTime? }
   final Map<String, _BannerUnlockCache> _unlockCache = {};
 
+  /// Clears the in-memory unlock cache (for pull-to-refresh or logout)
+  void clearCache() {
+    _unlockCache.clear();
+  }
+
   /// Unlocks the banner for the user by updating secure storage with a 1-hour expiry.
   Future<void> unlockBanner(String bannerId) async {
     final storage = ref.read(secureStorageProvider);
