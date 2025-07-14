@@ -2151,10 +2151,11 @@ class _ThemeDetailDialogState extends ConsumerState<ThemeDetailDialog> {
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
                     ),
                     onPressed: () async {
-                      // Directly trigger ad, use parent context
+                      // Fix: Use parent context captured before dialog
+                      final parentContext = Navigator.of(context).context;
                       Navigator.of(context).pop();
                       await ref.read(themeUnlockProvider).showThemeUnlockAd(
-                        context,
+                        parentContext,
                         widget.themeKey,
                         onThemeUnlocked: widget.onThemeUnlocked,
                       );
