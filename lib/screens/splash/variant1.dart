@@ -2,12 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lottie/lottie.dart';
 import 'dart:async';
-import 'dart:convert';
 import 'package:emotion_tracker/providers/theme_provider.dart';
 import 'package:emotion_tracker/providers/app_providers.dart';
 import 'package:emotion_tracker/providers/transition_provider.dart';
 import 'package:emotion_tracker/providers/shared_prefs_provider.dart';
-import 'package:emotion_tracker/providers/secure_storage_provider.dart';
 import 'package:emotion_tracker/utils/http_util.dart';
 import 'package:emotion_tracker/screens/auth/variant1.dart';
 import 'package:emotion_tracker/screens/home/variant1.dart';
@@ -67,8 +65,7 @@ class _SplashScreenV1State extends ConsumerState<SplashScreenV1>
     _animationController.forward();
   }
 
-
-  Future<void> _checkAuthAndNavigate() async {
+  _checkAuthAndNavigate() async {
     // Minimum splash duration for branding (reduced to 1 second for faster startup)
     const minSplashDuration = Duration(milliseconds: 1000);
     
@@ -83,8 +80,6 @@ class _SplashScreenV1State extends ConsumerState<SplashScreenV1>
     
     final finalAuthState = ref.read(authProvider);
     if (finalAuthState.isLoggedIn) {
-      // (Removed) Fetch /shop/owned on first boot/shop load
-      // await _fetchAndCacheShopOwned();
       // Use beautiful transition to home
       Navigator.of(context).pushReplacementWithTransition(
         const AuthGuard(child: HomeScreenV1()),

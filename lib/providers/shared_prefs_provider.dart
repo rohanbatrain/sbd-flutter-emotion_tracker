@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter/widgets.dart';
 
 final sharedPrefsProvider = FutureProvider<SharedPreferences>((ref) async {
   return await SharedPreferences.getInstance();
@@ -84,20 +83,19 @@ class TimezoneNotifier extends StateNotifier<String> {
     // Do not call _load or set state here to avoid build errors
   }
 
+  // Optionally, provide a method to load the timezone manually if needed
   Future<void> load() async {
-    if (prefs == null) return;
-    final tz = prefs!.getString(_key);
-    if (tz != null && tz.isNotEmpty && state != tz) {
-      state = tz;
+    if (prefs != null) {
+      final tz = prefs!.getString(_key);
+      if (tz != null && tz.isNotEmpty) {
+        if (state != tz) state = tz;
+      }
     }
   }
 
   Future<void> setTimezone(String timezone) async {
     if (state != timezone) {
-      // Defer state update to after build to avoid setState during build errors
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (state != timezone) state = timezone;
-      });
+      Future.microtask(() => state = timezone);
     }
     if (prefs != null) {
       await prefs!.setString(_key, timezone);

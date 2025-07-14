@@ -17,77 +17,48 @@ class AvatarUnlockService {
   final Ref ref;
   AvatarUnlockService(this.ref);
 
-  // In-memory cache: avatarId -> { unlocked: bool, unlockTime: DateTime?, permanent: bool }
+  // In-memory cache: avatarId -> { unlocked: bool, unlockTime: DateTime? }
   final Map<String, _AvatarUnlockCache> _unlockCache = {};
 
-  /// Clears the in-memory unlock cache (for pull-to-refresh or logout)
-  void clearCache() {
-    _unlockCache.clear();
-  }
-
-  /// Unlocks the avatar for the user by updating secure storage with a 1-hour expiry or permanent ownership.
-  Future<void> unlockAvatar(String avatarId, {bool permanent = false}) async {
+  /// Unlocks the avatar for the user by updating secure storage with a 1-hour expiry.
+  Future<void> unlockAvatar(String avatarId) async {
     final storage = ref.read(secureStorageProvider);
-    if (permanent) {
-      final ownedJson = (await storage.read(key: 'owned_avatars')) ?? '[]';
-      List<String> ownedList;
-      try {
-        ownedList = List<String>.from(jsonDecode(ownedJson));
-      } catch (_) {
-        ownedList = [];
-      }
-      if (!ownedList.contains(avatarId)) {
-        ownedList.add(avatarId);
-        await storage.write(key: 'owned_avatars', value: jsonEncode(ownedList));
-      }
-    } else {
-      final unlockedJson = (await storage.read(key: 'unlocked_avatars')) ?? '{}';
-      Map<String, dynamic> unlockedMap;
-      try {
-        unlockedMap = Map<String, dynamic>.from(jsonDecode(unlockedJson));
-      } catch (_) {
-        unlockedMap = {};
-      }
-      unlockedMap[avatarId] = DateTime.now().millisecondsSinceEpoch;
-      await storage.write(key: 'unlocked_avatars', value: jsonEncode(unlockedMap));
+    final unlockedJson = (await storage.read(key: 'unlocked_avatars')) ?? '{}';
+    Map<String, dynamic> unlockedMap;
+    try {
+      unlockedMap = Map<String, dynamic>.from(jsonDecode(unlockedJson));
+    } catch (_) {
+      unlockedMap = {};
     }
+    unlockedMap[avatarId] = DateTime.now().millisecondsSinceEpoch;
+    await storage.write(key: 'unlocked_avatars', value: jsonEncode(unlockedMap));
   }
 
-  /// Returns unlock status, unlock timestamp, and permanent ownership for UI logic.
+  /// Returns unlock status and unlock timestamp for UI logic.
   /// Always checks server if cache is expired (older than 1 hour), else uses cache.
   Future<AvatarUnlockInfo> getAvatarUnlockInfo(String avatarId) async {
     final now = DateTime.now().toUtc();
     final cache = _unlockCache[avatarId];
-    bool _safePermanent(dynamic value) {
-      if (value is bool) return value;
-      return false;
-    }
     if (cache != null && now.difference(cache.lastChecked).inMinutes < 60) {
       // Use cache if less than 1 hour old
       return AvatarUnlockInfo(
         isUnlocked: cache.isUnlocked,
         unlockTime: cache.unlockTime,
-        permanent: _safePermanent(cache.permanent),
       );
     }
     // Fetch from storage/server
-    final unlocks = await getMergedUnlockedAvatarsWithTimes();
-    final info = unlocks[avatarId] ?? AvatarUnlockInfo(isUnlocked: false, unlockTime: null, permanent: false);
+    final unlocks = await _getMergedUnlockedAvatarsWithTimes();
+    final info = unlocks[avatarId] ?? AvatarUnlockInfo(isUnlocked: false, unlockTime: null);
     _unlockCache[avatarId] = _AvatarUnlockCache(
       isUnlocked: info.isUnlocked,
       unlockTime: info.unlockTime,
-      permanent: _safePermanent(info.permanent),
       lastChecked: now,
     );
-    return AvatarUnlockInfo(
-      isUnlocked: info.isUnlocked,
-      unlockTime: info.unlockTime,
-      permanent: _safePermanent(info.permanent),
-    );
+    return info;
   }
 
-  /// Helper: like getMergedUnlockedAvatars, but returns unlock time and permanent ownership for each avatar.
-  Future<Map<String, AvatarUnlockInfo>> getMergedUnlockedAvatarsWithTimes() async {
+  /// Helper: like getMergedUnlockedAvatars, but returns unlock time for each avatar.
+  Future<Map<String, AvatarUnlockInfo>> _getMergedUnlockedAvatarsWithTimes() async {
     final storage = ref.read(secureStorageProvider);
     final accessToken = await storage.read(key: 'access_token');
     final protocol = ref.read(serverProtocolProvider);
@@ -157,32 +128,19 @@ class AvatarUnlockService {
       await storage.write(key: 'unlocked_avatars', value: jsonEncode(unlockedMap));
     }
 
-    // Get owned avatars
-    final ownedJson = (await storage.read(key: 'owned_avatars')) ?? '[]';
-    List<String> ownedList;
-    try {
-      ownedList = List<String>.from(jsonDecode(ownedJson));
-    } catch (_) {
-      ownedList = [];
-    }
-
-    // Merge: owned avatars always permanent, then server unlocks, then local unlocks
+    // Merge: only avatars present in serverUnlocks are considered unlocked (except always-free/default avatar)
     final result = <String, AvatarUnlockInfo>{};
     for (final avatar in allAvatars) {
       if (avatar.id == 'person') {
-        result[avatar.id] = AvatarUnlockInfo(isUnlocked: true, unlockTime: null, permanent: true);
-        continue;
-      }
-      if (ownedList.contains(avatar.id)) {
-        result[avatar.id] = AvatarUnlockInfo(isUnlocked: true, unlockTime: null, permanent: true);
+        result[avatar.id] = AvatarUnlockInfo(isUnlocked: true, unlockTime: null);
         continue;
       }
       final serverValid = serverUnlocks[avatar.id];
       if (serverValid != null && serverValid.isAfter(now)) {
+        // Use server unlock time (subtract 1 hour to get unlock time)
         result[avatar.id] = AvatarUnlockInfo(
           isUnlocked: true,
           unlockTime: serverValid.subtract(const Duration(hours: 1)),
-          permanent: false,
         );
         continue;
       }
@@ -191,18 +149,17 @@ class AvatarUnlockService {
         result[avatar.id] = AvatarUnlockInfo(
           isUnlocked: true,
           unlockTime: localValid,
-          permanent: false,
         );
         continue;
       }
-      result[avatar.id] = AvatarUnlockInfo(isUnlocked: false, unlockTime: null, permanent: false);
+      result[avatar.id] = AvatarUnlockInfo(isUnlocked: false, unlockTime: null);
     }
     return result;
   }
 
   /// Helper to fetch and merge server and local unlocks. Server always wins if locked.
   Future<Set<String>> getMergedUnlockedAvatars() async {
-    final unlocks = await getMergedUnlockedAvatarsWithTimes();
+    final unlocks = await _getMergedUnlockedAvatarsWithTimes();
     return unlocks.entries.where((entry) => entry.value.isUnlocked).map((entry) => entry.key).toSet();
   }
 
@@ -215,9 +172,6 @@ class AvatarUnlockService {
   /// Loads and shows a rewarded ad for avatar unlock, passing username as SSV custom data.
   /// No confirmation popup, ad loads immediately.
   Future<void> showAvatarUnlockAd(BuildContext context, String avatarId, {VoidCallback? onAvatarUnlocked}) async {
-    // Defensive: Prevent ad/rent for owned avatars
-    final info = await getAvatarUnlockInfo(avatarId);
-    if (info.permanent == true) return;
     final avatar = allAvatars.firstWhere((a) => a.id == avatarId, orElse: () => allAvatars.first);
     final adUnitId = avatar.rewardedAdId;
     if (adUnitId == null || adUnitId.isEmpty) return;
@@ -283,105 +237,17 @@ class AvatarUnlockService {
       }
     }
   }
-
-  /// Buys the avatar from the backend shop API and updates local unlock state.
-  Future<void> buyAvatar(String avatarId, BuildContext context) async {
-    final storage = ref.read(secureStorageProvider);
-    final accessToken = await storage.read(key: 'access_token');
-    final protocol = ref.read(serverProtocolProvider);
-    final domain = ref.read(serverDomainProvider);
-    final apiUrl = Uri.parse('$protocol://$domain/shop/avatars/buy');
-    final userAgent = await getUserAgent();
-
-    if (accessToken == null || accessToken.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Not authenticated. Please log in.')),
-      );
-      return;
-    }
-
-    try {
-      final response = await http.post(
-        apiUrl,
-        headers: {
-          'Authorization': 'Bearer $accessToken',
-          'Content-Type': 'application/json',
-          'User-Agent': userAgent,
-        },
-        body: jsonEncode({'avatar_id': avatarId}),
-      );
-      final data = jsonDecode(response.body);
-      if (response.statusCode == 200 && data['status'] == 'success') {
-        final isPermanent = data['avatar']?['permanent'] == true;
-        await unlockAvatar(avatarId, permanent: isPermanent);
-        _unlockCache.remove(avatarId);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(isPermanent ? 'Avatar purchased and owned forever!' : 'Avatar rented!')),
-        );
-        return;
-      } else if (response.statusCode == 400 && data['detail'] == 'Avatar already owned') {
-        await unlockAvatar(avatarId, permanent: true);
-        _unlockCache.remove(avatarId);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Avatar already owned.')),
-        );
-        return;
-      } else if (response.statusCode == 400 && data['detail'] == 'Not enough SBD tokens') {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Not enough SBD tokens.')),
-        );
-        return;
-      } else if (response.statusCode == 400 && data['detail'] == 'Insufficient SBD tokens or race condition') {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Insufficient SBD tokens or race condition.')),
-        );
-        return;
-      } else if (response.statusCode == 400 && data['detail'] == 'Invalid or missing avatar_id') {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Invalid or missing avatar ID.')),
-        );
-        return;
-      } else if (response.statusCode == 404 && data['detail'] == 'User not found') {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('User not found.')),
-        );
-        return;
-      } else if (response.statusCode == 401 || response.statusCode == 403) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Not authenticated.')),
-        );
-        return;
-      } else if (response.statusCode == 500) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Internal server error: ${data['error'] ?? ''}')),
-        );
-        return;
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Unknown error: ${data['detail'] ?? response.body}')),
-        );
-        return;
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Network error: $e')),
-      );
-      return;
-    }
-  }
 }
 
 class AvatarUnlockInfo {
   final bool isUnlocked;
   final DateTime? unlockTime;
-  final bool permanent;
-  AvatarUnlockInfo({required this.isUnlocked, required this.unlockTime, this.permanent = false});
+  AvatarUnlockInfo({required this.isUnlocked, required this.unlockTime});
 }
 
 class _AvatarUnlockCache {
   final bool isUnlocked;
   final DateTime? unlockTime;
-  final bool permanent;
   final DateTime lastChecked;
-  _AvatarUnlockCache({required this.isUnlocked, required this.unlockTime, required this.permanent, required this.lastChecked});
+  _AvatarUnlockCache({required this.isUnlocked, required this.unlockTime, required this.lastChecked});
 }

@@ -125,12 +125,6 @@ class ThemeUnlockService {
     return unlocked.contains(themeKey);
   }
 
-  /// Clears the in-memory unlock cache (for pull-to-refresh or logout)
-  void clearCache() {
-    // No in-memory cache in this provider, but method is here for API consistency
-    // If you add a cache in the future, clear it here.
-  }
-
   /// Loads and shows a rewarded ad for theme unlock, passing username as SSV custom data.
   Future<void> showThemeUnlockAd(BuildContext context, String themeKey, {VoidCallback? onThemeUnlocked}) async {
     final adUnitId = AppThemes.themeAdUnitIds[themeKey];
