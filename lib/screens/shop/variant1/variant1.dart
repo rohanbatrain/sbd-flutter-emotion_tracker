@@ -14,6 +14,7 @@ import 'package:emotion_tracker/providers/custom_bundle.dart';
 import 'package:emotion_tracker/providers/secure_storage_provider.dart';
 import 'package:emotion_tracker/providers/shared_prefs_provider.dart';
 import 'package:emotion_tracker/utils/http_util.dart';
+import 'package:emotion_tracker/providers/theme_unlock_provider.dart';
 import 'dart:convert';
 
 extension StringExtension on String {
@@ -349,28 +350,29 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
                   clipBehavior: Clip.antiAlias,
                   child: InkWell(
                     onTap: () async {
-  final info = _avatarUnlockInfoMap![avatar.id];
-  if (info?.permanent == true) {
-    await showDialog(
-      context: context,
-      barrierColor: Colors.black.withOpacity(0.5),
-      builder: (context) => OwnedAvatarDetailDialog(
-        avatar: avatar,
-        adId: avatarDetailBannerAdId,
-      ),
-    );
-  } else {
-    await showDialog(
-      context: context,
-      barrierColor: Colors.black.withOpacity(0.5),
-      builder: (context) => AvatarDetailDialog(
-        avatar: avatar,
-        adId: avatarDetailBannerAdId,
-      ),
-    );
-    await _fetchAndCacheAllAvatarUnlockInfo();
-  }
-},child: Column(
+                      final info = _avatarUnlockInfoMap![avatar.id];
+                      if (info?.permanent == true) {
+                        await showDialog(
+                          context: context,
+                          barrierColor: Colors.black.withOpacity(0.5),
+                          builder: (context) => OwnedAvatarDetailDialog(
+                            avatar: avatar,
+                            adId: avatarDetailBannerAdId,
+                          ),
+                        );
+                      } else {
+                        await showDialog(
+                          context: context,
+                          barrierColor: Colors.black.withOpacity(0.5),
+                          builder: (context) => AvatarDetailDialog(
+                            avatar: avatar,
+                            adId: avatarDetailBannerAdId,
+                          ),
+                        );
+                        await _fetchAndCacheAllAvatarUnlockInfo();
+                      }
+                    },
+                    child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Expanded(
@@ -436,7 +438,10 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
                                   ),
                                 )
                               else
-                                ElevatedButton.icon(
+                                IconButton(
+                                  icon: const Icon(Icons.add_shopping_cart_outlined),
+                                  tooltip: 'Add to Cart',
+                                  color: theme.colorScheme.secondary,
                                   onPressed: isOwned
                                       ? null
                                       : () {
@@ -444,13 +449,6 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
                                             SnackBar(content: Text('Added to cart!')),
                                           );
                                         },
-                                  icon: const Icon(Icons.add_shopping_cart_outlined),
-                                  label: const Text('Add to Cart'),
-                                  style: ElevatedButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                                    minimumSize: const Size.fromHeight(32),
-                                    textStyle: theme.textTheme.labelLarge,
-                                  ),
                                 ),
                             ],
                           ),
@@ -585,7 +583,10 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
                             ),
                             const SizedBox(height: 8),
                             if (!isOwned)
-                              ElevatedButton.icon(
+                              IconButton(
+                                icon: const Icon(Icons.add_shopping_cart_outlined),
+                                tooltip: 'Add to Cart',
+                                color: theme.colorScheme.secondary,
                                 onPressed: () {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
@@ -594,15 +595,6 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
                                     ),
                                   );
                                 },
-                                icon: const Icon(Icons.add_shopping_cart_outlined),
-                                label: const Text('Add to Cart'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: theme.colorScheme.secondary.withOpacity(0.15),
-                                  foregroundColor: theme.colorScheme.secondary,
-                                  textStyle: theme.textTheme.labelSmall,
-                                  minimumSize: const Size(0, 32),
-                                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                                ),
                               ),
                           ],
                         ),
@@ -631,73 +623,77 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
       return const Center(child: CircularProgressIndicator());
     }
 
-    return ListView(
-      padding: const EdgeInsets.all(16.0),
-      children: [
-        if (lightThemes.isNotEmpty) ...[
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8.0),
-            child: Text(
-              'Light Themes',
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return ListView(
+          padding: const EdgeInsets.all(16.0),
+          children: [
+            if (lightThemes.isNotEmpty) ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                child: Text(
+                  'Light Themes',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
-              childAspectRatio: 0.85,
-            ),
-            itemCount: lightThemes.length,
-            itemBuilder: (context, index) {
-              final themeKey = lightThemes[index].key;
-              final appTheme = lightThemes[index].value;
-              final themeName = AppThemes.themeNames[themeKey]!;
-              final themePrice = AppThemes.themePrices[themeKey]!;
-              final isOwned = _ownedThemes!.contains(themeKey);
-              return _buildThemeCard(theme, appTheme, themeName, themePrice, themeKey, isOwned);
-            },
-          ),
-          const SizedBox(height: 16),
-        ],
-        if (darkThemes.isNotEmpty) ...[
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8.0),
-            child: Text(
-              'Dark Themes',
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
+              const SizedBox(height: 12),
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: constraints.maxWidth > 600 ? 3 : 2,
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 24,
+                  childAspectRatio: 0.7,
+                ),
+                itemCount: lightThemes.length,
+                itemBuilder: (context, index) {
+                  final themeKey = lightThemes[index].key;
+                  final appTheme = lightThemes[index].value;
+                  final themeName = AppThemes.themeNames[themeKey]!;
+                  final themePrice = AppThemes.themePrices[themeKey]!;
+                  final isOwned = _ownedThemes!.contains(themeKey);
+                  return _buildThemeCard(theme, appTheme, themeName, themePrice, themeKey, isOwned);
+                },
               ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
-              childAspectRatio: 0.85,
-            ),
-            itemCount: darkThemes.length,
-            itemBuilder: (context, index) {
-              final themeKey = darkThemes[index].key;
-              final appTheme = darkThemes[index].value;
-              final themeName = AppThemes.themeNames[themeKey]!;
-              final themePrice = AppThemes.themePrices[themeKey]!;
-              final isOwned = _ownedThemes!.contains(themeKey);
-              return _buildThemeCard(theme, appTheme, themeName, themePrice, themeKey, isOwned);
-            },
-          ),
-        ],
-      ],
+              const SizedBox(height: 24),
+            ],
+            if (darkThemes.isNotEmpty) ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                child: Text(
+                  'Dark Themes',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: constraints.maxWidth > 600 ? 3 : 2,
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 24,
+                  childAspectRatio: 0.7,
+                ),
+                itemCount: darkThemes.length,
+                itemBuilder: (context, index) {
+                  final themeKey = darkThemes[index].key;
+                  final appTheme = darkThemes[index].value;
+                  final themeName = AppThemes.themeNames[themeKey]!;
+                  final themePrice = AppThemes.themePrices[themeKey]!;
+                  final isOwned = _ownedThemes!.contains(themeKey);
+                  return _buildThemeCard(theme, appTheme, themeName, themePrice, themeKey, isOwned);
+                },
+              ),
+            ],
+          ],
+        );
+      },
     );
   }
 
@@ -871,106 +867,6 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
   }
 
   Widget _buildThemeCard(ThemeData theme, ThemeData appTheme, String themeName, int themePrice, String themeKey, [bool isOwned = false]) {
-    if (isOwned) {
-      return Card(
-        elevation: 2,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: () {
-            // TODO: Handle theme selection
-          },
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        appTheme.scaffoldBackgroundColor,
-                        appTheme.scaffoldBackgroundColor,
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: LinearGradient(
-                            colors: [
-                              appTheme.primaryColor,
-                              appTheme.colorScheme.secondary,
-                            ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          border: Border.all(color: appTheme.cardColor, width: 2),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.1),
-                              blurRadius: 4,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        themeName,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                        textAlign: TextAlign.center,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Text(
-                      themeName,
-                      style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.primary.withOpacity(0.9),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        'Owned',
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(
@@ -978,8 +874,31 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: () {
-          // TODO: Handle theme purchase or selection
+        onTap: () async {
+          final dialogContext = context;
+          // Always use a light background for dark themes for readability
+          await Future.delayed(Duration(milliseconds: 0)); // placeholder for any future await
+          if (!mounted) return;
+          await showDialog(
+            context: dialogContext,
+            barrierColor: Colors.black.withOpacity(0.5),
+            builder: (context) => ThemeDetailDialog(
+              themeKey: themeKey,
+              theme: theme,
+              price: themePrice,
+              isOwned: isOwned,
+              adUnitId: AppThemes.themeAdUnitIds[themeKey],
+              onThemeUnlocked: () async {
+                await _loadOwnedCaches();
+                setState(() {});
+              },
+              onThemeBought: () async {
+                // TODO: Implement buy logic
+                await _loadOwnedCaches();
+                setState(() {});
+              },
+            ),
+          );
         },
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -988,14 +907,8 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
               child: Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      appTheme.scaffoldBackgroundColor,
-                      appTheme.scaffoldBackgroundColor,
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
+                  color: Colors.white, // Always use white for tile bg for readability
+                  // Remove gradient for dark themes
                 ),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -1033,6 +946,32 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '$themePrice SBD',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.secondary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    if (isOwned)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primary.withOpacity(0.9),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          'Owned',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -1040,43 +979,23 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: CrossAxisAlignment.center,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(
-                    themeName,
-                    style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
-                  ),
-                  Text(
-                    '$themePrice SBD',
-                    style: theme.textTheme.bodySmall?.copyWith(
+                  if (!isOwned)
+                    IconButton(
+                      icon: const Icon(Icons.add_shopping_cart_outlined),
+                      tooltip: 'Add to Cart',
                       color: theme.colorScheme.secondary,
-                      fontWeight: FontWeight.w600,
+                      onPressed: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Added to cart (feature coming soon!)'),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      },
                     ),
-                  ),
                 ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Added to cart (feature coming soon!)'),
-                      duration: Duration(seconds: 2),
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.add_shopping_cart_outlined),
-                label: const Text('Add to Cart'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: theme.colorScheme.secondary.withOpacity(0.15),
-                  foregroundColor: theme.colorScheme.secondary,
-                  textStyle: theme.textTheme.labelSmall,
-                  minimumSize: const Size(0, 32),
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                ),
               ),
             ),
           ],
@@ -2076,6 +1995,212 @@ class BundleDetailDialog extends ConsumerWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class ThemeDetailDialog extends ConsumerStatefulWidget {
+  final String themeKey;
+  final ThemeData theme;
+  final int price;
+  final bool isOwned;
+  final String? adUnitId;
+  final VoidCallback onThemeUnlocked;
+  final VoidCallback onThemeBought;
+
+  const ThemeDetailDialog({
+    Key? key,
+    required this.themeKey,
+    required this.theme,
+    required this.price,
+    required this.isOwned,
+    required this.adUnitId,
+    required this.onThemeUnlocked,
+    required this.onThemeBought,
+  }) : super(key: key);
+
+  @override
+  ConsumerState<ThemeDetailDialog> createState() => _ThemeDetailDialogState();
+}
+
+class _ThemeDetailDialogState extends ConsumerState<ThemeDetailDialog> {
+  bool _isUnlocked = false;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchUnlockStatus();
+  }
+
+  Future<void> _fetchUnlockStatus() async {
+    final unlocked = await ref.read(themeUnlockProvider).isThemeUnlocked(widget.themeKey);
+    if (mounted) setState(() {
+      _isUnlocked = unlocked;
+      _loading = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final themeName = AppThemes.themeNames[widget.themeKey] ?? widget.themeKey.capitalize();
+    final previewTheme = AppThemes.allThemes[widget.themeKey] ?? widget.theme;
+    final isFree = widget.price == 0;
+    final canRent = !widget.isOwned && !_isUnlocked && widget.adUnitId != null && widget.adUnitId!.isNotEmpty;
+    final canBuy = !widget.isOwned && widget.price > 0;
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: [
+                      previewTheme.primaryColor,
+                      previewTheme.colorScheme.secondary,
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: previewTheme.primaryColor.withOpacity(0.18),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Icon(Icons.palette_rounded, color: Colors.white, size: 40),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                themeName,
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black,
+                  letterSpacing: 0.5,
+                  shadows: [Shadow(color: Colors.black12, blurRadius: 2)],
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 10),
+              Text(
+                widget.isOwned
+                    ? 'You own this theme permanently.'
+                    : _isUnlocked
+                        ? 'You have rented this theme for 1 hour.'
+                        : isFree
+                            ? 'This theme is free for all users.'
+                            : 'Unlock this theme to use it.',
+                style: TextStyle(
+                  color: Colors.black.withOpacity(0.92),
+                  fontSize: 15,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 18),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (widget.isOwned)
+                    Chip(
+                      label: Text('Owned', style: TextStyle(color: previewTheme.primaryColor)),
+                      backgroundColor: Colors.white,
+                    ),
+                  if (!widget.isOwned && _isUnlocked)
+                    Chip(
+                      label: Text('Rented', style: TextStyle(color: previewTheme.primaryColor)),
+                      backgroundColor: Colors.white,
+                    ),
+                  if (!widget.isOwned && !_isUnlocked && !isFree)
+                    Chip(
+                      label: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.monetization_on, color: previewTheme.primaryColor, size: 18),
+                          const SizedBox(width: 4),
+                          Text('${widget.price}', style: TextStyle(color: previewTheme.primaryColor)),
+                        ],
+                      ),
+                      backgroundColor: Colors.white,
+                    ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              if (canRent)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10.0),
+                  child: ElevatedButton.icon(
+                    icon: const Icon(Icons.ondemand_video),
+                    label: const Text('Rent 1h (Ad)'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: previewTheme.primaryColor,
+                      textStyle: const TextStyle(fontWeight: FontWeight.bold),
+                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                    ),
+                    onPressed: () async {
+                      // Directly trigger ad, use parent context
+                      Navigator.of(context).pop();
+                      await ref.read(themeUnlockProvider).showThemeUnlockAd(
+                        context,
+                        widget.themeKey,
+                        onThemeUnlocked: widget.onThemeUnlocked,
+                      );
+                    },
+                  ),
+                ),
+              if (canBuy)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10.0),
+                  child: ElevatedButton.icon(
+                    icon: const Icon(Icons.shopping_cart),
+                    label: const Text('Buy'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: previewTheme.primaryColor,
+                      foregroundColor: Colors.white,
+                      textStyle: const TextStyle(fontWeight: FontWeight.bold),
+                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                    ),
+                    onPressed: () {
+                      // TODO: Implement buy logic
+                      Navigator.of(context).pop();
+                      widget.onThemeBought();
+                    },
+                  ),
+                ),
+              if (widget.isOwned || _isUnlocked || isFree)
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.check_circle),
+                  label: const Text('Apply'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: previewTheme.primaryColor,
+                    foregroundColor: Colors.white,
+                    textStyle: const TextStyle(fontWeight: FontWeight.bold),
+                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                  ),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    ref.read(themeProvider.notifier).setTheme(widget.themeKey);
+                  },
+                ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
       ),
     );
   }
