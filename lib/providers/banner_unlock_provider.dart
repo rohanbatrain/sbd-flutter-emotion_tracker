@@ -64,10 +64,12 @@ class BannerUnlockService {
     final protocol = ref.read(serverProtocolProvider);
     final domain = ref.read(serverDomainProvider);
     final apiUrl = Uri.parse('$protocol://$domain/banners/rented');
+    final ownedUrl = Uri.parse('$protocol://$domain/shop/banners/owned');
     final now = DateTime.now().toUtc();
     Map<String, DateTime> serverUnlocks = {};
+    Set<String> ownedPermanent = {};
 
-    // Fetch server unlocks
+    // Fetch server rentals
     if (accessToken != null && accessToken.isNotEmpty) {
       try {
         final userAgent = await getUserAgent();
@@ -100,6 +102,30 @@ class BannerUnlockService {
       } catch (e) {
         // On error, treat as all locked except local unlocks
       }
+      // Fetch permanent owned banners
+      try {
+        final userAgent = await getUserAgent();
+        final ownedResp = await http.get(
+          ownedUrl,
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'User-Agent': userAgent,
+          },
+        );
+        if (ownedResp.statusCode == 200) {
+          final data = jsonDecode(ownedResp.body);
+          final List<dynamic> owned = data['banners_owned'] ?? [];
+          for (final entry in owned) {
+            final bannerId = entry['banner_id'] as String?;
+            final permanent = entry['permanent'] == true;
+            if (bannerId != null && permanent) {
+              ownedPermanent.add(bannerId);
+            }
+          }
+        }
+      } catch (e) {
+        // On error, treat as not owned
+      }
     }
 
     // Get valid local unlocks
@@ -128,16 +154,19 @@ class BannerUnlockService {
       await storage.write(key: 'unlocked_banners', value: jsonEncode(unlockedMap));
     }
 
-    // Merge: only banners present in serverUnlocks are considered unlocked (except always-free/default banners)
+    // Merge: ownedPermanent always unlocked, then server rentals, then local unlocks
     final result = <String, BannerUnlockInfo>{};
     for (final banner in allProfileBanners) {
       if (banner.id == 'default-dark' || banner.id == 'default-light') {
         result[banner.id] = BannerUnlockInfo(isUnlocked: true, unlockTime: null);
         continue;
       }
+      if (ownedPermanent.contains(banner.id)) {
+        result[banner.id] = BannerUnlockInfo(isUnlocked: true, unlockTime: null);
+        continue;
+      }
       final serverValid = serverUnlocks[banner.id];
       if (serverValid != null && serverValid.isAfter(now)) {
-        // Use server unlock time (subtract 1 hour to get unlock time)
         result[banner.id] = BannerUnlockInfo(
           isUnlocked: true,
           unlockTime: serverValid.subtract(const Duration(hours: 1)),
@@ -235,6 +264,71 @@ class BannerUnlockService {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ad error: $e')));
       }
+    }
+  }
+
+  /// Attempts to buy a banner permanently via the /shop/banners/buy endpoint.
+  /// Throws an Exception with a user-friendly message on failure.
+  Future<void> buyBanner(BuildContext context, String bannerId) async {
+    final storage = ref.read(secureStorageProvider);
+    final accessToken = await storage.read(key: 'access_token');
+    final protocol = ref.read(serverProtocolProvider);
+    final domain = ref.read(serverDomainProvider);
+    final apiUrl = Uri.parse('$protocol://$domain/shop/banners/buy');
+    final userAgent = await getUserAgent();
+
+    if (accessToken == null || accessToken.isEmpty) {
+      throw Exception('You must be logged in to buy banners.');
+    }
+
+    // Show loading dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      final response = await http.post(
+        apiUrl,
+        headers: {
+          'Authorization': 'Bearer $accessToken',
+          'User-Agent': userAgent,
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'banner_id': bannerId}),
+      );
+      if (Navigator.of(context).canPop()) Navigator.of(context).pop();
+      if (response.statusCode == 200) {
+        // Success: update local cache by refetching owned banners
+        _unlockCache.remove(bannerId);
+        await getBannerUnlockInfo(bannerId);
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Banner purchased successfully!')),
+          );
+        }
+        return;
+      }
+      // Error handling
+      final data = jsonDecode(response.body);
+      final detail = data['detail'] ?? 'Unknown error';
+      if (response.statusCode == 400 && detail == 'Banner already owned') {
+        throw Exception('You already own this banner.');
+      } else if (response.statusCode == 400 && (detail == 'Not enough SBD tokens' || detail == 'Insufficient SBD tokens or race condition')) {
+        throw Exception('You do not have enough SBD tokens.');
+      } else if (response.statusCode == 400 && detail == 'Invalid or missing banner_id') {
+        throw Exception('Invalid banner.');
+      } else if (response.statusCode == 404 && detail == 'User not found') {
+        throw Exception('User not found. Please log in again.');
+      } else if (response.statusCode == 500) {
+        throw Exception('Server error. Please try again later.');
+      } else {
+        throw Exception(detail.toString());
+      }
+    } catch (e) {
+      if (Navigator.of(context).canPop()) Navigator.of(context).pop();
+      rethrow;
     }
   }
 }
