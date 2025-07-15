@@ -1588,31 +1588,51 @@ class _BannerDetailDialogState extends ConsumerState<BannerDetailDialog> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            ElevatedButton.icon(
-              onPressed: () async {
-                try {
-                  await bannerUnlockService.buyBanner(context, widget.banner.id);
-                  _refreshUnlockInfo();
-                } catch (e) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(e.toString()), backgroundColor: theme.colorScheme.error),
-                    );
-                  }
-                }
-              },
-              icon: const Icon(Icons.shopping_bag_outlined),
-              label: Text('Buy (${widget.banner.price} SBD)'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: theme.primaryColor,
-                foregroundColor: theme.colorScheme.onPrimary,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+            if (isUnlocked)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8.0),
+                child: ElevatedButton.icon(
+                  onPressed: null,
+                  icon: const Icon(Icons.verified, color: Colors.white),
+                  label: const Text('Owned'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: theme.colorScheme.primary.withOpacity(0.9),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 0,
+                  ),
                 ),
-                elevation: 2,
+              )
+            else ...[
+              ElevatedButton.icon(
+                onPressed: () async {
+                  try {
+                    await bannerUnlockService.buyBanner(context, widget.banner.id);
+                    _refreshUnlockInfo();
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(e.toString()), backgroundColor: theme.colorScheme.error),
+                      );
+                    }
+                  }
+                },
+                icon: const Icon(Icons.shopping_bag_outlined),
+                label: Text('Buy (${widget.banner.price} SBD)'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: theme.primaryColor,
+                  foregroundColor: theme.colorScheme.onPrimary,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 2,
+                ),
               ),
-            ),
+            ],
             if (canShowRentButton) ...[
               const SizedBox(height: 12),
               ElevatedButton(
