@@ -388,140 +388,145 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
   Widget _buildBannersGrid(ThemeData theme) {
     final earthBanners = allProfileBanners.where((b) => b.price > 0 && b.id.contains('earth')).toList();
 
-    return ListView(
-      padding: const EdgeInsets.all(16.0),
-      children: [
-        if (earthBanners.isNotEmpty) ...[
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8.0),
-            child: Text(
-              'Earth Banners',
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: theme.colorScheme.primary,
+    return RefreshIndicator(
+      onRefresh: () async {
+        setState(() {}); // Triggers a rebuild and refetches unlock info for banners
+      },
+      child: ListView(
+        padding: const EdgeInsets.all(16.0),
+        children: [
+          if (earthBanners.isNotEmpty) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8.0),
+              child: Text(
+                'Earth Banners',
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: theme.colorScheme.primary,
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 12),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
-              childAspectRatio: 0.75,
-            ),
-            itemCount: earthBanners.length,
-            itemBuilder: (context, index) {
-              final banner = earthBanners[index];
-              final canShowRentButton = banner.rewardedAdId != null && banner.rewardedAdId!.isNotEmpty;
+            const SizedBox(height: 12),
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                crossAxisSpacing: 16,
+                mainAxisSpacing: 16,
+                childAspectRatio: 0.75,
+              ),
+              itemCount: earthBanners.length,
+              itemBuilder: (context, index) {
+                final banner = earthBanners[index];
+                final canShowRentButton = banner.rewardedAdId != null && banner.rewardedAdId!.isNotEmpty;
 
-              return Card(
-                elevation: 4,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: InkWell(
-                  onTap: () {
-                    showDialog(
-                      context: context,
-                      barrierColor: Colors.black.withOpacity(0.5),
-                      builder: (context) => BannerDetailDialog(
-                        banner: banner,
-                        adId: 'banner_detail_banner_ad',
-                      ),
-                    );
-                  },
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Expanded(
-                        child: Container(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                theme.colorScheme.primary.withOpacity(0.1),
-                                theme.colorScheme.secondary.withOpacity(0.1),
-                              ],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
+                return Card(
+                  elevation: 4,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: InkWell(
+                    onTap: () {
+                      showDialog(
+                        context: context,
+                        barrierColor: Colors.black.withOpacity(0.5),
+                        builder: (context) => BannerDetailDialog(
+                          banner: banner,
+                          adId: 'banner_detail_banner_ad',
+                        ),
+                      );
+                    },
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  theme.colorScheme.primary.withOpacity(0.1),
+                                  theme.colorScheme.secondary.withOpacity(0.1),
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                            ),
+                            child: ProfileBannerDisplay(
+                              banner: banner,
+                              height: 120,
+                              fit: BoxFit.cover,
                             ),
                           ),
-                          child: ProfileBannerDisplay(
-                            banner: banner,
-                            height: 120,
-                            fit: BoxFit.cover,
-                          ),
                         ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.all(8.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    banner.name ?? '',
-                                    style: theme.textTheme.bodyLarge?.copyWith(
-                                      fontWeight: FontWeight.bold,
+                        Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      banner.name ?? '',
+                                      style: theme.textTheme.bodyLarge?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.add_shopping_cart_outlined),
+                                    iconSize: 22,
+                                    color: theme.colorScheme.secondary,
+                                    tooltip: 'Add to Cart',
+                                    onPressed: () {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Added to cart (feature coming soon!)'),
+                                          duration: Duration(seconds: 2),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '${banner.price} SBD',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: theme.colorScheme.secondary,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              if (!canShowRentButton)
+                                ElevatedButton.icon(
+                                  onPressed: () {
+                                    // TODO: Implement banner purchase logic
+                                  },
+                                  icon: const Icon(Icons.shopping_bag_outlined),
+                                  label: const Text('Buy'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: theme.colorScheme.primary,
+                                    foregroundColor: theme.colorScheme.onPrimary,
                                   ),
                                 ),
-                                IconButton(
-                                  icon: const Icon(Icons.add_shopping_cart_outlined),
-                                  iconSize: 22,
-                                  color: theme.colorScheme.secondary,
-                                  tooltip: 'Add to Cart',
-                                  onPressed: () {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('Added to cart (feature coming soon!)'),
-                                        duration: Duration(seconds: 2),
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              '${banner.price} SBD',
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: theme.colorScheme.secondary,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            if (!canShowRentButton)
-                              ElevatedButton.icon(
-                                onPressed: () {
-                                  // TODO: Implement banner purchase logic
-                                },
-                                icon: const Icon(Icons.shopping_bag_outlined),
-                                label: const Text('Buy'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: theme.colorScheme.primary,
-                                  foregroundColor: theme.colorScheme.onPrimary,
-                                ),
-                              ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: 16),
+                );
+              },
+            ),
+            const SizedBox(height: 16),
+          ],
         ],
-      ],
+      ),
     );
   }
 
@@ -533,99 +538,18 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
         .where((entry) => entry.value.brightness == Brightness.dark)
         .toList();
 
-    return ListView(
-      padding: const EdgeInsets.all(16.0),
-      children: [
-        if (lightThemes.isNotEmpty) ...[
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8.0),
-            child: Text(
-              'Light Themes',
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
-              childAspectRatio: 0.85,
-            ),
-            itemCount: lightThemes.length,
-            itemBuilder: (context, index) {
-              final themeKey = lightThemes[index].key;
-              final appTheme = lightThemes[index].value;
-              final themeName = AppThemes.themeNames[themeKey]!;
-              final themePrice = AppThemes.themePrices[themeKey]!;
-
-              return _buildThemeCard(theme, appTheme, themeName, themePrice, themeKey);
-            },
-          ),
-          const SizedBox(height: 16),
-        ],
-        if (darkThemes.isNotEmpty) ...[
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8.0),
-            child: Text(
-              'Dark Themes',
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
-              childAspectRatio: 0.85,
-            ),
-            itemCount: darkThemes.length,
-            itemBuilder: (context, index) {
-              final themeKey = darkThemes[index].key;
-              final appTheme = darkThemes[index].value;
-              final themeName = AppThemes.themeNames[themeKey]!;
-              final themePrice = AppThemes.themePrices[themeKey]!;
-
-              return _buildThemeCard(theme, appTheme, themeName, themePrice, themeKey);
-            },
-          ),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildBundlesGrid(ThemeData theme) {
-    final avatarBundles = bundles.where((b) => b.id.contains('avatars')).toList();
-    final themeBundles = bundles.where((b) => b.id.contains('themes')).toList();
-
-    final Map<String, List<Bundle>> bundleCategories = {
-      'Avatar Bundles 📦': avatarBundles,
-      'Theme Bundles 🎨': themeBundles,
-    };
-
-    return ListView.builder(
-      padding: const EdgeInsets.all(16.0),
-      itemCount: bundleCategories.length,
-      itemBuilder: (context, index) {
-        final category = bundleCategories.keys.elementAt(index);
-        final categoryBundles = bundleCategories[category]!;
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+    return RefreshIndicator(
+      onRefresh: () async {
+        setState(() {}); // Triggers a rebuild and refetches unlock info for themes
+      },
+      child: ListView(
+        padding: const EdgeInsets.all(16.0),
+        children: [
+          if (lightThemes.isNotEmpty) ...[
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8.0),
               child: Text(
-                category,
+                'Light Themes',
                 style: theme.textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
@@ -639,129 +563,220 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
                 crossAxisCount: 2,
                 crossAxisSpacing: 16,
                 mainAxisSpacing: 16,
-                childAspectRatio: 0.74, // Adjusted aspect ratio to resolve overflow
+                childAspectRatio: 0.85,
               ),
-              itemCount: categoryBundles.length,
+              itemCount: lightThemes.length,
               itemBuilder: (context, index) {
-                final bundle = categoryBundles[index];
-                return Card(
-                  elevation: 4,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  clipBehavior: Clip.antiAlias,
-                  child: InkWell(
-                    onTap: () {
-                      showDialog(
-                        context: context,
-                        barrierColor: Colors.black.withOpacity(0.5),
-                        builder: (context) => BundleDetailDialog(
-                          bundle: bundle,
-                        ),
-                      );
-                    },
-                    child: Stack(
-                      children: [
-                        Container(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                theme.colorScheme.primary.withOpacity(0.1),
-                                theme.colorScheme.secondary.withOpacity(0.1),
-                              ],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              ClipRRect(
-                                borderRadius: const BorderRadius.only(
-                                  topLeft: Radius.circular(16),
-                                  topRight: Radius.circular(16),
-                                ),
-                                child: Image.asset(
-                                  bundle.image,
-                                  height: 120,
-                                  width: double.infinity,
-                                  fit: BoxFit.cover,
-                                ),
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.all(8.0),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      bundle.name,
-                                      style: theme.textTheme.bodyLarge?.copyWith(
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Text(
-                                          '${bundle.price} SBD',
-                                          style: theme.textTheme.bodyMedium?.copyWith(
-                                            color: theme.colorScheme.secondary,
-                                          ),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        IconButton(
-                                          icon: const Icon(Icons.add_shopping_cart_outlined),
-                                          iconSize: 22,
-                                          color: theme.colorScheme.secondary,
-                                          tooltip: 'Add to Cart',
-                                          onPressed: () {
-                                            ScaffoldMessenger.of(context).showSnackBar(
-                                              const SnackBar(
-                                                content: Text('Added to cart (feature coming soon!)'),
-                                                duration: Duration(seconds: 2),
-                                              ),
-                                            );
-                                          },
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Positioned(
-                          top: 8,
-                          right: 8,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.secondary,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              'New',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSecondary,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
+                final themeKey = lightThemes[index].key;
+                final appTheme = lightThemes[index].value;
+                final themeName = AppThemes.themeNames[themeKey]!;
+                final themePrice = AppThemes.themePrices[themeKey]!;
+
+                return _buildThemeCard(theme, appTheme, themeName, themePrice, themeKey);
               },
             ),
             const SizedBox(height: 16),
           ],
-        );
+          if (darkThemes.isNotEmpty) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8.0),
+              child: Text(
+                'Dark Themes',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                crossAxisSpacing: 16,
+                mainAxisSpacing: 16,
+                childAspectRatio: 0.85,
+              ),
+              itemCount: darkThemes.length,
+              itemBuilder: (context, index) {
+                final themeKey = darkThemes[index].key;
+                final appTheme = darkThemes[index].value;
+                final themeName = AppThemes.themeNames[themeKey]!;
+                final themePrice = AppThemes.themePrices[themeKey]!;
+
+                return _buildThemeCard(theme, appTheme, themeName, themePrice, themeKey);
+              },
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBundlesGrid(ThemeData theme) {
+    final avatarBundles = bundles.where((b) => b.id.contains('avatars')).toList();
+    final themeBundles = bundles.where((b) => b.id.contains('themes')).toList();
+
+    final Map<String, List<Bundle>> bundleCategories = {
+      'Avatar Bundles 📦': avatarBundles,
+      'Theme Bundles 🎨': themeBundles,
+    };
+
+    return RefreshIndicator(
+      onRefresh: () async {
+        setState(() {}); // Triggers a rebuild and refetches unlock info for bundles
       },
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16.0),
+        itemCount: bundleCategories.length,
+        itemBuilder: (context, index) {
+          final category = bundleCategories.keys.elementAt(index);
+          final categoryBundles = bundleCategories[category]!;
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                child: Text(
+                  category,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 16,
+                  childAspectRatio: 0.74, // Adjusted aspect ratio to resolve overflow
+                ),
+                itemCount: categoryBundles.length,
+                itemBuilder: (context, index) {
+                  final bundle = categoryBundles[index];
+                  return Card(
+                    elevation: 4,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: InkWell(
+                      onTap: () {
+                        showDialog(
+                          context: context,
+                          barrierColor: Colors.black.withOpacity(0.5),
+                          builder: (context) => BundleDetailDialog(
+                            bundle: bundle,
+                          ),
+                        );
+                      },
+                      child: Stack(
+                        children: [
+                          Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  theme.colorScheme.primary.withOpacity(0.1),
+                                  theme.colorScheme.secondary.withOpacity(0.1),
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                ClipRRect(
+                                  borderRadius: const BorderRadius.only(
+                                    topLeft: Radius.circular(16),
+                                    topRight: Radius.circular(16),
+                                  ),
+                                  child: Image.asset(
+                                    bundle.image,
+                                    height: 120,
+                                    width: double.infinity,
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.all(8.0),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        bundle.name,
+                                        style: theme.textTheme.bodyLarge?.copyWith(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Text(
+                                            '${bundle.price} SBD',
+                                            style: theme.textTheme.bodyMedium?.copyWith(
+                                              color: theme.colorScheme.secondary,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          IconButton(
+                                            icon: const Icon(Icons.add_shopping_cart_outlined),
+                                            iconSize: 22,
+                                            color: theme.colorScheme.secondary,
+                                            tooltip: 'Add to Cart',
+                                            onPressed: () {
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                const SnackBar(
+                                                  content: Text('Added to cart (feature coming soon!)'),
+                                                  duration: Duration(seconds: 2),
+                                                ),
+                                              );
+                                            },
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Positioned(
+                            top: 8,
+                            right: 8,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.secondary,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                'New',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSecondary,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 16),
+            ],
+          );
+        },
+      ),
     );
   }
 
