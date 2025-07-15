@@ -20,6 +20,11 @@ class BannerUnlockService {
   // In-memory cache: bannerId -> { unlocked: bool, unlockTime: DateTime? }
   final Map<String, _BannerUnlockCache> _unlockCache = {};
 
+  /// Force-invalidate the in-memory cache for a given banner (for pull-to-refresh or navigation).
+  void invalidateBannerCache(String bannerId) {
+    _unlockCache.remove(bannerId);
+  }
+
   /// Unlocks the banner for the user by updating secure storage with a 1-hour expiry.
   Future<void> unlockBanner(String bannerId) async {
     final storage = ref.read(secureStorageProvider);
@@ -32,6 +37,8 @@ class BannerUnlockService {
     }
     unlockedMap[bannerId] = DateTime.now().millisecondsSinceEpoch;
     await storage.write(key: 'unlocked_banners', value: jsonEncode(unlockedMap));
+    // Invalidate cache for this banner
+    invalidateBannerCache(bannerId);
   }
 
   /// Returns unlock status and unlock timestamp for UI logic.
@@ -301,7 +308,7 @@ class BannerUnlockService {
       if (Navigator.of(context).canPop()) Navigator.of(context).pop();
       if (response.statusCode == 200) {
         // Success: update local cache by refetching owned banners
-        _unlockCache.remove(bannerId);
+        invalidateBannerCache(bannerId);
         await getBannerUnlockInfo(bannerId);
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(

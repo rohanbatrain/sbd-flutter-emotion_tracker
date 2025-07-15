@@ -390,6 +390,10 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
 
     return RefreshIndicator(
       onRefresh: () async {
+        // Invalidate cache for all earth banners before refreshing UI
+        for (final banner in earthBanners) {
+          ref.read(bannerUnlockProvider).invalidateBannerCache(banner.id);
+        }
         setState(() {}); // Triggers a rebuild and refetches unlock info for banners
       },
       child: ListView(
@@ -419,7 +423,6 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
               itemCount: earthBanners.length,
               itemBuilder: (context, index) {
                 final banner = earthBanners[index];
-                final canShowRentButton = banner.rewardedAdId != null && banner.rewardedAdId!.isNotEmpty;
 
                 return Card(
                   elevation: 4,
@@ -462,59 +465,82 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
                         ),
                         Padding(
                           padding: const EdgeInsets.all(8.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Expanded(
-                                    child: Text(
+                          child: FutureBuilder<BannerUnlockInfo>(
+                            future: ref.read(bannerUnlockProvider).getBannerUnlockInfo(banner.id),
+                            builder: (context, snapshot) {
+                              final info = snapshot.data;
+                              final isUnlocked = info?.isUnlocked ?? false;
+                              if (isUnlocked) {
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    Text(
                                       banner.name ?? '',
-                                      style: theme.textTheme.bodyLarge?.copyWith(
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                                      style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
+                                      textAlign: TextAlign.center,
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: theme.colorScheme.primary.withOpacity(0.9),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(
+                                        'Owned',
+                                        style: theme.textTheme.labelSmall?.copyWith(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              }
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    banner.name ?? '',
+                                    style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    textAlign: TextAlign.center,
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '${banner.price} SBD',
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: theme.colorScheme.secondary,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 4),
+                                  SizedBox(
+                                    height: 30,
+                                    child: IconButton(
+                                      padding: EdgeInsets.zero,
+                                      icon: const Icon(Icons.add_shopping_cart_outlined),
+                                      iconSize: 22,
+                                      color: theme.colorScheme.secondary,
+                                      tooltip: 'Add to Cart',
+                                      onPressed: () {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(
+                                            content: Text('Added to cart (feature coming soon!)'),
+                                            duration: Duration(seconds: 2),
+                                          ),
+                                        );
+                                      },
                                     ),
                                   ),
-                                  IconButton(
-                                    icon: const Icon(Icons.add_shopping_cart_outlined),
-                                    iconSize: 22,
-                                    color: theme.colorScheme.secondary,
-                                    tooltip: 'Add to Cart',
-                                    onPressed: () {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(
-                                          content: Text('Added to cart (feature coming soon!)'),
-                                          duration: Duration(seconds: 2),
-                                        ),
-                                      );
-                                    },
-                                  ),
                                 ],
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                '${banner.price} SBD',
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                  color: theme.colorScheme.secondary,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              if (!canShowRentButton)
-                                ElevatedButton.icon(
-                                  onPressed: () {
-                                    // TODO: Implement banner purchase logic
-                                  },
-                                  icon: const Icon(Icons.shopping_bag_outlined),
-                                  label: const Text('Buy'),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: theme.colorScheme.primary,
-                                    foregroundColor: theme.colorScheme.onPrimary,
-                                  ),
-                                ),
-                            ],
+                              );
+                            },
                           ),
                         ),
                       ],
