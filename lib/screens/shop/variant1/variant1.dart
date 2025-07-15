@@ -94,6 +94,7 @@ class ShopScreenV1 extends ConsumerStatefulWidget {
 class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerProviderStateMixin {
   late TabController _tabController;
   static const String avatarDetailBannerAdId = 'avatar_detail_banner';
+  List<String>? _ownedThemes;
 
   @override
   void initState() {
@@ -105,6 +106,12 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
         ref.read(adProvider.notifier).loadBannerAd(avatarDetailBannerAdId);
       }
     });
+    _loadOwnedCaches();
+  }
+
+  Future<void> _loadOwnedCaches() async {
+    // Simulate loading owned themes from a cache or provider
+    _ownedThemes = ['theme1', 'theme2']; // Example owned themes
   }
 
   @override
@@ -705,8 +712,7 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
   }
 
   Widget _buildThemeCard(ThemeData theme, ThemeData appTheme, String themeName, int themePrice, String themeKey) {
-    final bool isOwned = themePrice == 0;
-
+    final isThemeOwned = (_ownedThemes?.contains(themeKey) ?? false) || themePrice == 0;
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(
@@ -714,86 +720,68 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: () {
-          // TODO: Handle theme purchase or selection
+        onTap: () async {
+          if (!isThemeOwned) {
+            await showDialog(
+              context: context,
+              barrierColor: Colors.black.withOpacity(0.5),
+              builder: (context) => ThemeDetailDialog(
+                themeKey: themeKey,
+                theme: theme,
+                price: themePrice,
+                isOwned: false,
+                adUnitId: AppThemes.themeAdUnitIds[themeKey],
+                onThemeUnlocked: () async {
+                  await _loadOwnedCaches();
+                  setState(() {});
+                },
+                onThemeBought: () async {
+                  await _loadOwnedCaches();
+                  setState(() {});
+                },
+              ),
+            );
+          }
         },
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Expanded(
               child: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      appTheme.primaryColor.withOpacity(0.1),
-                      appTheme.scaffoldBackgroundColor,
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: LinearGradient(
-                          colors: [
-                            appTheme.primaryColor,
-                            appTheme.colorScheme.secondary,
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        border: Border.all(color: appTheme.cardColor, width: 2),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      themeName,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                      textAlign: TextAlign.center,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
+                color: theme.colorScheme.onSurface.withOpacity(0.05),
+                child: Center(
+                  child: Icon(Icons.palette_rounded, size: 48, color: appTheme.primaryColor),
                 ),
               ),
             ),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: CrossAxisAlignment.center,
+              padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
+              child: Column(
                 children: [
                   Text(
-                    isOwned ? 'Owned' : '$themePrice SBD',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: isOwned ? Colors.green : theme.colorScheme.primary,
-                    ),
+                    themeName,
+                    style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
                   ),
-                  if (!isOwned)
+                  const SizedBox(height: 4),
+                  Text(
+                    themePrice == 0 ? 'Free' : '$themePrice SBD',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.secondary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  if (!isThemeOwned) // Only show Add to Cart if not owned
                     SizedBox(
                       height: 30,
-                      width: 30,
                       child: IconButton(
                         padding: EdgeInsets.zero,
                         icon: const Icon(Icons.add_shopping_cart_outlined),
-                        iconSize: 20,
+                        iconSize: 22,
                         color: theme.colorScheme.secondary,
                         tooltip: 'Add to Cart',
                         onPressed: () {
@@ -804,6 +792,22 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
                             ),
                           );
                         },
+                      ),
+                    ),
+                  if (isThemeOwned)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primary.withOpacity(0.9),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        'Owned',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
                       ),
                     ),
                 ],
@@ -1646,6 +1650,175 @@ class BundleDetailDialog extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class ThemeDetailDialog extends StatelessWidget {
+  final String themeKey;
+  final ThemeData theme;
+  final int price;
+  final bool isOwned;
+  final String? adUnitId;
+  final VoidCallback? onThemeUnlocked;
+  final VoidCallback? onThemeBought;
+
+  const ThemeDetailDialog({
+    Key? key,
+    required this.themeKey,
+    required this.theme,
+    required this.price,
+    required this.isOwned,
+    this.adUnitId,
+    this.onThemeUnlocked,
+    this.onThemeBought,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final isFree = price == 0;
+    final Gradient themeGradient = _getThemeGradient(themeKey, theme);
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      elevation: 5,
+      backgroundColor: theme.cardColor,
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              AppThemes.themeNames[themeKey] ?? 'Theme',
+              style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+            // Unique gradient circle preview
+            Center(
+              child: Container(
+                width: 70,
+                height: 70,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: themeGradient,
+                  boxShadow: [
+                    BoxShadow(
+                      color: theme.primaryColor.withOpacity(0.18),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            if (isOwned || isFree)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withOpacity(0.9),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'Owned',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              )
+            else ...[
+              Row(
+                children: [
+                  if (adUnitId != null && adUnitId!.isNotEmpty) ...[
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          if (onThemeUnlocked != null) {
+                            onThemeUnlocked!();
+                          }
+                          Navigator.of(context).pop();
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: theme.colorScheme.secondary.withOpacity(0.1),
+                          foregroundColor: theme.colorScheme.secondary,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: const Text('Rent'),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                  ],
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        if (onThemeBought != null) {
+                          onThemeBought!();
+                        }
+                        Navigator.of(context).pop();
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: theme.primaryColor,
+                        foregroundColor: theme.colorScheme.onPrimary,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 2,
+                      ),
+                      child: Text('Buy (${price} SBD)'),
+                    ),
+                  ),
+                ],
+              ),
+              if (adUnitId != null && adUnitId!.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Text(
+                  'Watch an ad to rent this theme for 1 hour',
+                  style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Helper for unique theme gradients
+  Gradient _getThemeGradient(String themeKey, ThemeData fallbackTheme) {
+    // You can expand this map for more unique gradients per theme
+    const gradients = {
+      'serenityGreen': LinearGradient(colors: [Color(0xFF43E97B), Color(0xFF38F9D7)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+      'pacificBlue': LinearGradient(colors: [Color(0xFF2193b0), Color(0xFF6dd5ed)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+      'blushRose': LinearGradient(colors: [Color(0xFFFFAFBD), Color(0xFFFFC3A0)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+      'cloudGray': LinearGradient(colors: [Color(0xFFbdc3c7), Color(0xFF2c3e50)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+      'sunsetPeach': LinearGradient(colors: [Color(0xFFFF9966), Color(0xFFFF5E62)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+      'midnightLavender': LinearGradient(colors: [Color(0xFF232526), Color(0xFF414345)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+      'crimsonRed': LinearGradient(colors: [Color(0xFFcb2d3e), Color(0xFFef473a)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+      'forestGreen': LinearGradient(colors: [Color(0xFF56ab2f), Color(0xFFa8e063)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+      'goldenYellow': LinearGradient(colors: [Color(0xFFf7971e), Color(0xFFffd200)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+      'deepPurple': LinearGradient(colors: [Color(0xFF8e2de2), Color(0xFF4a00e0)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+      'royalOrange': LinearGradient(colors: [Color(0xFFf857a6), Color(0xFFFF5858)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+      // Add more as needed
+    };
+    // Try to match by key, fallback to theme colors
+    final key = themeKey.replaceAll('Dark', '').replaceAll('Light', '');
+    if (gradients.containsKey(themeKey)) return gradients[themeKey]!;
+    if (gradients.containsKey(key)) return gradients[key]!;
+    // Fallback: use theme's primary/secondary
+    return LinearGradient(
+      colors: [fallbackTheme.primaryColor, fallbackTheme.colorScheme.secondary],
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
     );
   }
 }

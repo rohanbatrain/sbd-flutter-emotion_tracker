@@ -64,10 +64,12 @@ class AvatarUnlockService {
     final protocol = ref.read(serverProtocolProvider);
     final domain = ref.read(serverDomainProvider);
     final apiUrl = Uri.parse('$protocol://$domain/avatars/rented');
+    final ownedUrl = Uri.parse('$protocol://$domain/shop/avatars/owned');
     final now = DateTime.now().toUtc();
     Map<String, DateTime> serverUnlocks = {};
+    Set<String> ownedPermanent = {};
 
-    // Fetch server unlocks
+    // Fetch server rentals
     if (accessToken != null && accessToken.isNotEmpty) {
       try {
         final userAgent = await getUserAgent();
@@ -100,9 +102,32 @@ class AvatarUnlockService {
       } catch (e) {
         // On error, treat as all locked except local unlocks
       }
+      // Fetch permanent owned avatars
+      try {
+        final userAgent = await getUserAgent();
+        final ownedResp = await http.get(
+          ownedUrl,
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'User-Agent': userAgent,
+          },
+        );
+        if (ownedResp.statusCode == 200) {
+          final data = jsonDecode(ownedResp.body);
+          final List<dynamic> owned = data['avatars_owned'] ?? [];
+          for (final entry in owned) {
+            final avatarId = entry['avatar_id'] as String?;
+            final permanent = entry['permanent'] == true;
+            if (avatarId != null && permanent) {
+              ownedPermanent.add(avatarId);
+            }
+          }
+        }
+      } catch (e) {
+        // On error, treat as not owned
+      }
     }
 
-    // Get valid local unlocks
     final unlockedJson = (await storage.read(key: 'unlocked_avatars')) ?? '{}';
     Map<String, dynamic> unlockedMap;
     try {
@@ -128,16 +153,19 @@ class AvatarUnlockService {
       await storage.write(key: 'unlocked_avatars', value: jsonEncode(unlockedMap));
     }
 
-    // Merge: only avatars present in serverUnlocks are considered unlocked (except always-free/default avatar)
+    // Merge: ownedPermanent always unlocked, then server rentals, then local unlocks
     final result = <String, AvatarUnlockInfo>{};
     for (final avatar in allAvatars) {
       if (avatar.id == 'person') {
         result[avatar.id] = AvatarUnlockInfo(isUnlocked: true, unlockTime: null);
         continue;
       }
+      if (ownedPermanent.contains(avatar.id)) {
+        result[avatar.id] = AvatarUnlockInfo(isUnlocked: true, unlockTime: null);
+        continue;
+      }
       final serverValid = serverUnlocks[avatar.id];
       if (serverValid != null && serverValid.isAfter(now)) {
-        // Use server unlock time (subtract 1 hour to get unlock time)
         result[avatar.id] = AvatarUnlockInfo(
           isUnlocked: true,
           unlockTime: serverValid.subtract(const Duration(hours: 1)),
