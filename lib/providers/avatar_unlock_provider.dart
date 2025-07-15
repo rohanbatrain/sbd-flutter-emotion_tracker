@@ -265,6 +265,71 @@ class AvatarUnlockService {
       }
     }
   }
+
+  /// Attempts to buy an avatar permanently via the /shop/avatars/buy endpoint.
+  /// Throws an Exception with a user-friendly message on failure.
+  Future<void> buyAvatar(BuildContext context, String avatarId) async {
+    final storage = ref.read(secureStorageProvider);
+    final accessToken = await storage.read(key: 'access_token');
+    final protocol = ref.read(serverProtocolProvider);
+    final domain = ref.read(serverDomainProvider);
+    final apiUrl = Uri.parse('$protocol://$domain/shop/avatars/buy');
+    final userAgent = await getUserAgent();
+
+    if (accessToken == null || accessToken.isEmpty) {
+      throw Exception('You must be logged in to buy avatars.');
+    }
+
+    // Show loading dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      final response = await http.post(
+        apiUrl,
+        headers: {
+          'Authorization': 'Bearer $accessToken',
+          'User-Agent': userAgent,
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'avatar_id': avatarId}),
+      );
+      if (Navigator.of(context).canPop()) Navigator.of(context).pop();
+      if (response.statusCode == 200) {
+        // Success: update local cache by refetching owned avatars
+        _unlockCache.remove(avatarId);
+        await getAvatarUnlockInfo(avatarId);
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Avatar purchased successfully!')),
+          );
+        }
+        return;
+      }
+      // Error handling
+      final data = jsonDecode(response.body);
+      final detail = data['detail'] ?? 'Unknown error';
+      if (response.statusCode == 400 && detail == 'Avatar already owned') {
+        throw Exception('You already own this avatar.');
+      } else if (response.statusCode == 400 && (detail == 'Not enough SBD tokens' || detail == 'Insufficient SBD tokens or race condition')) {
+        throw Exception('You do not have enough SBD tokens.');
+      } else if (response.statusCode == 400 && detail == 'Invalid or missing avatar_id') {
+        throw Exception('Invalid avatar.');
+      } else if (response.statusCode == 404 && detail == 'User not found') {
+        throw Exception('User not found. Please log in again.');
+      } else if (response.statusCode == 500) {
+        throw Exception('Server error. Please try again later.');
+      } else {
+        throw Exception(detail.toString());
+      }
+    } catch (e) {
+      if (Navigator.of(context).canPop()) Navigator.of(context).pop();
+      rethrow;
+    }
+  }
 }
 
 class AvatarUnlockInfo {

@@ -244,83 +244,132 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
               itemCount: avatars.length,
               itemBuilder: (context, index) {
                 final avatar = avatars[index];
-                return Card(
-                  elevation: 2,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  clipBehavior: Clip.antiAlias,
-                  child: InkWell(
-                    onTap: () {
-                      showDialog(
-                        context: context,
-                        barrierColor: Colors.black.withOpacity(0.5),
-                        builder: (context) => AvatarDetailDialog(
-                          avatar: avatar,
-                          adId: avatarDetailBannerAdId,
-                        ),
-                      );
-                    },
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Expanded(
-                          child: Container(
-                            color: theme.colorScheme.onSurface.withOpacity(0.05),
-                            padding: const EdgeInsets.all(8),
-                            child: AvatarDisplay(
+                return FutureBuilder<AvatarUnlockInfo>(
+                  future: ref.read(avatarUnlockProvider).getAvatarUnlockInfo(avatar.id),
+                  builder: (context, snapshot) {
+                    final info = snapshot.data;
+                    bool isUnlocked = info?.isUnlocked ?? false;
+                    DateTime? unlockTime = info?.unlockTime;
+                    final now = DateTime.now().toUtc();
+                    bool isRented = false;
+                    if (isUnlocked && unlockTime != null) {
+                      final expiry = unlockTime.add(const Duration(hours: 1));
+                      final timeLeft = expiry.difference(now);
+                      isRented = timeLeft > Duration.zero;
+                    }
+                    return Card(
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: InkWell(
+                        onTap: () {
+                          showDialog(
+                            context: context,
+                            barrierColor: Colors.black.withOpacity(0.5),
+                            builder: (context) => AvatarDetailDialog(
                               avatar: avatar,
-                              size: 50,
+                              adId: avatarDetailBannerAdId,
                             ),
-                          ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 12.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                avatar.name,
-                                style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                textAlign: TextAlign.center,
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                '${avatar.price} SBD',
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: theme.colorScheme.secondary,
-                                  fontWeight: FontWeight.w600,
+                          );
+                        },
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Expanded(
+                              child: Container(
+                                color: theme.colorScheme.onSurface.withOpacity(0.05),
+                                padding: const EdgeInsets.all(8),
+                                child: AvatarDisplay(
+                                  avatar: avatar,
+                                  size: 50,
                                 ),
-                                overflow: TextOverflow.ellipsis,
                               ),
-                              const SizedBox(height: 4),
-                              SizedBox(
-                                height: 30,
-                                child: IconButton(
-                                  padding: EdgeInsets.zero,
-                                  icon: const Icon(Icons.add_shopping_cart_outlined),
-                                  iconSize: 22,
-                                  color: theme.colorScheme.secondary,
-                                  tooltip: 'Add to Cart',
-                                  onPressed: () {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('Added to cart (feature coming soon!)'),
-                                        duration: Duration(seconds: 2),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 12.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    avatar.name,
+                                    style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    textAlign: TextAlign.center,
+                                  ),
+                                  const SizedBox(height: 4),
+                                  if (!isUnlocked)
+                                    Text(
+                                      avatar.price == 0 ? 'Free' : '${avatar.price} SBD',
+                                      style: theme.textTheme.bodySmall?.copyWith(
+                                        color: theme.colorScheme.secondary,
+                                        fontWeight: FontWeight.w600,
                                       ),
-                                    );
-                                  },
-                                ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  const SizedBox(height: 4),
+                                  if (!isUnlocked) // Only show Add to Cart if not owned/rented
+                                    SizedBox(
+                                      height: 30,
+                                      child: IconButton(
+                                        padding: EdgeInsets.zero,
+                                        icon: const Icon(Icons.add_shopping_cart_outlined),
+                                        iconSize: 22,
+                                        color: theme.colorScheme.secondary,
+                                        tooltip: 'Add to Cart',
+                                        onPressed: () {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(
+                                              content: Text('Added to cart (feature coming soon!)'),
+                                              duration: Duration(seconds: 2),
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  if (isRented)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: Colors.green.withOpacity(0.9),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(
+                                        'Rented',
+                                        style: theme.textTheme.labelSmall?.copyWith(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ),
+                                  if (isUnlocked && !isRented)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: theme.colorScheme.primary.withOpacity(0.9),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(
+                                        'Owned',
+                                        style: theme.textTheme.labelSmall?.copyWith(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ),
+                                ],
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                  ),
+                      ),
+                    );
+                  },
                 );
               },
             ),
@@ -1015,12 +1064,15 @@ class _AvatarDetailDialogState extends ConsumerState<AvatarDetailDialog> {
                     final now = DateTime.now().toUtc();
                     Duration? timeLeft;
                     Duration? timeSinceUnlock;
+                    bool isRented = false;
                     if (isUnlocked && unlockTime != null) {
                       final expiry = unlockTime.add(const Duration(hours: 1));
                       timeLeft = expiry.difference(now);
                       if (timeLeft.isNegative) timeLeft = Duration.zero;
                       timeSinceUnlock = now.difference(unlockTime);
                       if (timeSinceUnlock.isNegative) timeSinceUnlock = Duration.zero;
+                      // Consider rented if less than 1 hour since unlock
+                      isRented = timeLeft > Duration.zero;
                     }
                     final canShowRentButton = !isUnlocked || (timeSinceUnlock != null && timeSinceUnlock.inMinutes >= 55);
                     // Only show time left if rent button is NOT visible
@@ -1067,64 +1119,115 @@ class _AvatarDetailDialogState extends ConsumerState<AvatarDetailDialog> {
                     final isUnlocked = info?.isUnlocked ?? false;
                     final unlockTime = info?.unlockTime;
                     final now = DateTime.now().toUtc();
+                    Duration? timeLeft;
                     Duration? timeSinceUnlock;
+                    bool isRented = false;
                     if (isUnlocked && unlockTime != null) {
+                      final expiry = unlockTime.add(const Duration(hours: 1));
+                      timeLeft = expiry.difference(now);
+                      if (timeLeft.isNegative) timeLeft = Duration.zero;
                       timeSinceUnlock = now.difference(unlockTime);
                       if (timeSinceUnlock.isNegative) timeSinceUnlock = Duration.zero;
+                      // Consider rented if less than 1 hour since unlock
+                      isRented = timeLeft > Duration.zero;
                     }
                     final canShowRentButton = !isUnlocked || (timeSinceUnlock != null && timeSinceUnlock.inMinutes >= 55);
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Row(
-                          children: [
-                            if (canShowRentButton && widget.avatar.rewardedAdId != null && widget.avatar.rewardedAdId!.isNotEmpty)
+                        if (!(info?.isUnlocked ?? false))
+                          Row(
+                            children: [
+                              if (canShowRentButton && widget.avatar.rewardedAdId != null && widget.avatar.rewardedAdId!.isNotEmpty)
+                                Expanded(
+                                  child: ElevatedButton(
+                                    onPressed: () async {
+                                      await avatarUnlockService.showAvatarUnlockAd(
+                                        context,
+                                        widget.avatar.id,
+                                        onAvatarUnlocked: () {
+                                          _refreshUnlockInfo();
+                                        },
+                                      );
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: theme.colorScheme.secondary.withOpacity(0.1),
+                                      foregroundColor: theme.colorScheme.secondary,
+                                      padding: const EdgeInsets.symmetric(vertical: 12),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      elevation: 0,
+                                    ),
+                                    child: const Text('Rent (Ad)'),
+                                  ),
+                                ),
+                              if (canShowRentButton && widget.avatar.rewardedAdId != null && widget.avatar.rewardedAdId!.isNotEmpty)
+                                const SizedBox(width: 16),
                               Expanded(
                                 child: ElevatedButton(
                                   onPressed: () async {
-                                    await avatarUnlockService.showAvatarUnlockAd(
-                                      context,
-                                      widget.avatar.id,
-                                      onAvatarUnlocked: () {
-                                        _refreshUnlockInfo();
-                                      },
-                                    );
+                                    try {
+                                      await avatarUnlockService.buyAvatar(context, widget.avatar.id);
+                                      _refreshUnlockInfo();
+                                    } catch (e) {
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(content: Text(e.toString()), backgroundColor: theme.colorScheme.error),
+                                        );
+                                      }
+                                    }
                                   },
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: theme.colorScheme.secondary.withOpacity(0.1),
-                                    foregroundColor: theme.colorScheme.secondary,
+                                    backgroundColor: theme.primaryColor,
+                                    foregroundColor: theme.colorScheme.onPrimary,
                                     padding: const EdgeInsets.symmetric(vertical: 12),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(12),
                                     ),
-                                    elevation: 0,
+                                    elevation: 2,
                                   ),
-                                  child: const Text('Rent (Ad)'),
+                                  child: Text('Buy (${widget.avatar.price} SBD)'),
                                 ),
                               ),
-                            if (canShowRentButton && widget.avatar.rewardedAdId != null && widget.avatar.rewardedAdId!.isNotEmpty)
-                              const SizedBox(width: 16),
-                            Expanded(
-                              child: ElevatedButton(
-                                onPressed: () {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Buy feature coming soon!')),
-                                  );
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: theme.primaryColor,
-                                  foregroundColor: theme.colorScheme.onPrimary,
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  elevation: 2,
+                            ],
+                          ),
+                        if (isRented)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8.0),
+                            child: ElevatedButton.icon(
+                              onPressed: null,
+                              icon: const Icon(Icons.verified, color: Colors.white),
+                              label: const Text('Rented'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.green.withOpacity(0.9),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
                                 ),
-                                child: Text('Buy (${widget.avatar.price} SBD)'),
+                                elevation: 0,
                               ),
                             ),
-                          ],
-                        ),
+                          ),
+                        if (isUnlocked && !isRented)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8.0),
+                            child: ElevatedButton.icon(
+                              onPressed: null,
+                              icon: const Icon(Icons.verified, color: Colors.white),
+                              label: const Text('Owned'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: theme.colorScheme.primary.withOpacity(0.9),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                elevation: 0,
+                              ),
+                            ),
+                          ),
                         if (canShowRentButton && widget.avatar.rewardedAdId != null && widget.avatar.rewardedAdId!.isNotEmpty)
                           Padding(
                             padding: const EdgeInsets.only(top: 16.0, left: 4.0, right: 4.0),
