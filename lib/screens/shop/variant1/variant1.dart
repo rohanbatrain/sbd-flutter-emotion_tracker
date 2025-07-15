@@ -212,171 +212,176 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
       'Animated ✨': animatedAvatars,
     };
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16.0),
-      itemCount: avatarCategories.length,
-      itemBuilder: (context, index) {
-        final category = avatarCategories.keys.elementAt(index);
-        final avatars = avatarCategories[category]!;
+    return RefreshIndicator(
+      onRefresh: () async {
+        setState(() {}); // Triggers a rebuild and refetches unlock info for avatars
+      },
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16.0),
+        itemCount: avatarCategories.length,
+        itemBuilder: (context, index) {
+          final category = avatarCategories.keys.elementAt(index);
+          final avatars = avatarCategories[category]!;
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8.0),
-              child: Text(
-                category,
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                child: Text(
+                  category,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 12),
-            GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 3,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 16,
-                childAspectRatio: 0.65, // Adjusted for better layout
-              ),
-              itemCount: avatars.length,
-              itemBuilder: (context, index) {
-                final avatar = avatars[index];
-                return FutureBuilder<AvatarUnlockInfo>(
-                  future: ref.read(avatarUnlockProvider).getAvatarUnlockInfo(avatar.id),
-                  builder: (context, snapshot) {
-                    final info = snapshot.data;
-                    bool isUnlocked = info?.isUnlocked ?? false;
-                    DateTime? unlockTime = info?.unlockTime;
-                    final now = DateTime.now().toUtc();
-                    bool isRented = false;
-                    if (isUnlocked && unlockTime != null) {
-                      final expiry = unlockTime.add(const Duration(hours: 1));
-                      final timeLeft = expiry.difference(now);
-                      isRented = timeLeft > Duration.zero;
-                    }
-                    return Card(
-                      elevation: 2,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      clipBehavior: Clip.antiAlias,
-                      child: InkWell(
-                        onTap: () {
-                          showDialog(
-                            context: context,
-                            barrierColor: Colors.black.withOpacity(0.5),
-                            builder: (context) => AvatarDetailDialog(
-                              avatar: avatar,
-                              adId: avatarDetailBannerAdId,
-                            ),
-                          );
-                        },
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Expanded(
-                              child: Container(
-                                color: theme.colorScheme.onSurface.withOpacity(0.05),
-                                padding: const EdgeInsets.all(8),
-                                child: AvatarDisplay(
-                                  avatar: avatar,
-                                  size: 50,
+              const SizedBox(height: 12),
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 3,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 16,
+                  childAspectRatio: 0.65, // Adjusted for better layout
+                ),
+                itemCount: avatars.length,
+                itemBuilder: (context, index) {
+                  final avatar = avatars[index];
+                  return FutureBuilder<AvatarUnlockInfo>(
+                    future: ref.read(avatarUnlockProvider).getAvatarUnlockInfo(avatar.id),
+                    builder: (context, snapshot) {
+                      final info = snapshot.data;
+                      bool isUnlocked = info?.isUnlocked ?? false;
+                      DateTime? unlockTime = info?.unlockTime;
+                      final now = DateTime.now().toUtc();
+                      bool isRented = false;
+                      if (isUnlocked && unlockTime != null) {
+                        final expiry = unlockTime.add(const Duration(hours: 1));
+                        final timeLeft = expiry.difference(now);
+                        isRented = timeLeft > Duration.zero;
+                      }
+                      return Card(
+                        elevation: 2,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: InkWell(
+                          onTap: () {
+                            showDialog(
+                              context: context,
+                              barrierColor: Colors.black.withOpacity(0.5),
+                              builder: (context) => AvatarDetailDialog(
+                                avatar: avatar,
+                                adId: avatarDetailBannerAdId,
+                              ),
+                            );
+                          },
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Expanded(
+                                child: Container(
+                                  color: theme.colorScheme.onSurface.withOpacity(0.05),
+                                  padding: const EdgeInsets.all(8),
+                                  child: AvatarDisplay(
+                                    avatar: avatar,
+                                    size: 50,
+                                  ),
                                 ),
                               ),
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 12.0),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    avatar.name,
-                                    style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    textAlign: TextAlign.center,
-                                  ),
-                                  const SizedBox(height: 4),
-                                  if (!isUnlocked)
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 12.0),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
                                     Text(
-                                      avatar.price == 0 ? 'Free' : '${avatar.price} SBD',
-                                      style: theme.textTheme.bodySmall?.copyWith(
-                                        color: theme.colorScheme.secondary,
-                                        fontWeight: FontWeight.w600,
-                                      ),
+                                      avatar.name,
+                                      style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+                                      maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
+                                      textAlign: TextAlign.center,
                                     ),
-                                  const SizedBox(height: 4),
-                                  if (!isUnlocked) // Only show Add to Cart if not owned/rented
-                                    SizedBox(
-                                      height: 30,
-                                      child: IconButton(
-                                        padding: EdgeInsets.zero,
-                                        icon: const Icon(Icons.add_shopping_cart_outlined),
-                                        iconSize: 22,
-                                        color: theme.colorScheme.secondary,
-                                        tooltip: 'Add to Cart',
-                                        onPressed: () {
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            const SnackBar(
-                                              content: Text('Added to cart (feature coming soon!)'),
-                                              duration: Duration(seconds: 2),
-                                            ),
-                                          );
-                                        },
+                                    const SizedBox(height: 4),
+                                    if (!isUnlocked)
+                                      Text(
+                                        avatar.price == 0 ? 'Free' : '${avatar.price} SBD',
+                                        style: theme.textTheme.bodySmall?.copyWith(
+                                          color: theme.colorScheme.secondary,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
                                       ),
-                                    ),
-                                  if (isRented)
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: Colors.green.withOpacity(0.9),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: Text(
-                                        'Rented',
-                                        style: theme.textTheme.labelSmall?.copyWith(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 12,
+                                    const SizedBox(height: 4),
+                                    if (!isUnlocked) // Only show Add to Cart if not owned/rented
+                                      SizedBox(
+                                        height: 30,
+                                        child: IconButton(
+                                          padding: EdgeInsets.zero,
+                                          icon: const Icon(Icons.add_shopping_cart_outlined),
+                                          iconSize: 22,
+                                          color: theme.colorScheme.secondary,
+                                          tooltip: 'Add to Cart',
+                                          onPressed: () {
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              const SnackBar(
+                                                content: Text('Added to cart (feature coming soon!)'),
+                                                duration: Duration(seconds: 2),
+                                              ),
+                                            );
+                                          },
                                         ),
                                       ),
-                                    ),
-                                  if (isUnlocked && !isRented)
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: theme.colorScheme.primary.withOpacity(0.9),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: Text(
-                                        'Owned',
-                                        style: theme.textTheme.labelSmall?.copyWith(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 12,
+                                    if (isRented)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: Colors.green.withOpacity(0.9),
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: Text(
+                                          'Rented',
+                                          style: theme.textTheme.labelSmall?.copyWith(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 12,
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                ],
+                                    if (isUnlocked && !isRented)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: theme.colorScheme.primary.withOpacity(0.9),
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: Text(
+                                          'Owned',
+                                          style: theme.textTheme.labelSmall?.copyWith(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
-                    );
-                  },
-                );
-              },
-            ),
-            const SizedBox(height: 16),
-          ],
-        );
-      },
+                      );
+                    },
+                  );
+                },
+              ),
+              const SizedBox(height: 16),
+            ],
+          );
+        },
+      ),
     );
   }
 
