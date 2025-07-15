@@ -35,12 +35,12 @@ class AvatarUnlockService {
   }
 
   /// Returns unlock status and unlock timestamp for UI logic.
-  /// Always checks server if cache is expired (older than 1 hour), else uses cache.
+  /// Always checks server/storage if cache is expired (older than 30 seconds), else uses cache.
   Future<AvatarUnlockInfo> getAvatarUnlockInfo(String avatarId) async {
     final now = DateTime.now().toUtc();
     final cache = _unlockCache[avatarId];
-    if (cache != null && now.difference(cache.lastChecked).inMinutes < 60) {
-      // Use cache if less than 1 hour old
+    if (cache != null && now.difference(cache.lastChecked).inSeconds < 30) {
+      // Use cache if less than 30 seconds old
       return AvatarUnlockInfo(
         isUnlocked: cache.isUnlocked,
         unlockTime: cache.unlockTime,
@@ -55,6 +55,11 @@ class AvatarUnlockService {
       lastChecked: now,
     );
     return info;
+  }
+
+  /// Force-invalidate the in-memory cache for a given avatar (for pull-to-refresh or navigation).
+  void invalidateAvatarCache(String avatarId) {
+    _unlockCache.remove(avatarId);
   }
 
   /// Helper: like getMergedUnlockedAvatars, but returns unlock time for each avatar.

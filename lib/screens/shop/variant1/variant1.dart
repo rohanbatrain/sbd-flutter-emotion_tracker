@@ -1069,15 +1069,12 @@ class _AvatarDetailDialogState extends ConsumerState<AvatarDetailDialog> {
                     final now = DateTime.now().toUtc();
                     Duration? timeLeft;
                     Duration? timeSinceUnlock;
-                    bool isRented = false;
                     if (isUnlocked && unlockTime != null) {
                       final expiry = unlockTime.add(const Duration(hours: 1));
                       timeLeft = expiry.difference(now);
                       if (timeLeft.isNegative) timeLeft = Duration.zero;
                       timeSinceUnlock = now.difference(unlockTime);
                       if (timeSinceUnlock.isNegative) timeSinceUnlock = Duration.zero;
-                      // Consider rented if less than 1 hour since unlock
-                      isRented = timeLeft > Duration.zero;
                     }
                     final canShowRentButton = !isUnlocked || (timeSinceUnlock != null && timeSinceUnlock.inMinutes >= 55);
                     // Only show time left if rent button is NOT visible
@@ -1126,15 +1123,12 @@ class _AvatarDetailDialogState extends ConsumerState<AvatarDetailDialog> {
                     final now = DateTime.now().toUtc();
                     Duration? timeLeft;
                     Duration? timeSinceUnlock;
-                    bool isRented = false;
                     if (isUnlocked && unlockTime != null) {
                       final expiry = unlockTime.add(const Duration(hours: 1));
                       timeLeft = expiry.difference(now);
                       if (timeLeft.isNegative) timeLeft = Duration.zero;
                       timeSinceUnlock = now.difference(unlockTime);
                       if (timeSinceUnlock.isNegative) timeSinceUnlock = Duration.zero;
-                      // Consider rented if less than 1 hour since unlock
-                      isRented = timeLeft > Duration.zero;
                     }
                     final canShowRentButton = !isUnlocked || (timeSinceUnlock != null && timeSinceUnlock.inMinutes >= 55);
                     return Column(
@@ -1197,7 +1191,7 @@ class _AvatarDetailDialogState extends ConsumerState<AvatarDetailDialog> {
                               ),
                             ],
                           ),
-                        if (isRented)
+                        if (isUnlocked && timeLeft != null && timeLeft > Duration.zero)
                           Padding(
                             padding: const EdgeInsets.symmetric(vertical: 8.0),
                             child: ElevatedButton.icon(
@@ -1215,7 +1209,7 @@ class _AvatarDetailDialogState extends ConsumerState<AvatarDetailDialog> {
                               ),
                             ),
                           ),
-                        if (isUnlocked && !isRented)
+                        if (isUnlocked && (timeLeft == null || timeLeft <= Duration.zero))
                           Padding(
                             padding: const EdgeInsets.symmetric(vertical: 8.0),
                             child: ElevatedButton.icon(
