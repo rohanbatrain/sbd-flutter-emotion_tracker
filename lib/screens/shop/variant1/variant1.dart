@@ -1563,10 +1563,17 @@ class _BannerDetailDialogState extends ConsumerState<BannerDetailDialog> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             ElevatedButton.icon(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Buy feature coming soon!')),
-                );
+              onPressed: () async {
+                try {
+                  await bannerUnlockService.buyBanner(context, widget.banner.id);
+                  _refreshUnlockInfo();
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(e.toString()), backgroundColor: theme.colorScheme.error),
+                    );
+                  }
+                }
               },
               icon: const Icon(Icons.shopping_bag_outlined),
               label: Text('Buy (${widget.banner.price} SBD)'),
