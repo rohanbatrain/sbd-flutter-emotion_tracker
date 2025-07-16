@@ -31,22 +31,24 @@ class ThemeUnlockService {
     await storage.write(key: 'unlocked_themes', value: jsonEncode(unlockedMap));
   }
 
-  /// Helper to fetch and merge server and local unlocks. Server always wins if locked.
+  /// Helper to fetch and merge server and local unlocks, including permanent ownership.
   Future<Set<String>> getMergedUnlockedThemes() async {
     final storage = ref.read(secureStorageProvider);
     final accessToken = await storage.read(key: 'access_token');
     final protocol = ref.read(serverProtocolProvider);
     final domain = ref.read(serverDomainProvider);
-    final apiUrl = Uri.parse('$protocol://$domain/themes/rented');
+    final rentedUrl = Uri.parse('$protocol://$domain/themes/rented');
+    final ownedUrl = Uri.parse('$protocol://$domain/shop/themes/owned');
     final now = DateTime.now().toUtc();
     Map<String, DateTime> serverUnlocks = {};
+    Set<String> ownedPermanent = {};
 
-    // Fetch server unlocks
+    // Fetch server rentals
     if (accessToken != null && accessToken.isNotEmpty) {
       try {
         final userAgent = await getUserAgent();
         final response = await http.get(
-          apiUrl,
+          rentedUrl,
           headers: {
             'Authorization': 'Bearer $accessToken',
             'User-Agent': userAgent,
@@ -74,6 +76,32 @@ class ThemeUnlockService {
       } catch (e) {
         // On error, treat as all locked except local unlocks
       }
+      // Fetch permanent owned themes
+      try {
+        final userAgent = await getUserAgent();
+        final ownedResp = await http.get(
+          ownedUrl,
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'User-Agent': userAgent,
+          },
+        );
+        if (ownedResp.statusCode == 200) {
+          final data = jsonDecode(ownedResp.body);
+          final List<dynamic> owned = data['themes_owned'] ?? [];
+          for (final entry in owned) {
+            final themeId = entry['theme_id'] as String?;
+            final permanent = entry['permanent'] == true;
+            if (themeId != null && permanent) {
+              // Remove prefix for local key
+              final localKey = themeId.replaceFirst('emotion_tracker-', '');
+              ownedPermanent.add(localKey);
+            }
+          }
+        }
+      } catch (e) {
+        // On error, treat as not owned
+      }
     }
 
     // Get valid local unlocks
@@ -90,7 +118,7 @@ class ThemeUnlockService {
     final nowMs = DateTime.now().millisecondsSinceEpoch;
     unlockedMap.forEach((key, value) {
       if (value is int && nowMs - value < hourMs) {
-        validLocal[key] = DateTime.fromMillisecondsSinceEpoch(value).toUtc().add(Duration(hours: 1));
+        validLocal[key] = DateTime.fromMillisecondsSinceEpoch(value).toUtc();
       } else if (value is int && nowMs - value >= hourMs) {
         expired.add(key);
       }
@@ -102,16 +130,25 @@ class ThemeUnlockService {
       await storage.write(key: 'unlocked_themes', value: jsonEncode(unlockedMap));
     }
 
-    // Merge: only themes present in serverUnlocks are considered unlocked (except always-free themes)
+    // Merge: ownedPermanent always unlocked, then server rentals, then local unlocks
     final unlocked = <String>{};
     for (final themeKey in AppThemes.allThemes.keys) {
       if (themeKey == 'lightTheme' || themeKey == 'darkTheme') {
         unlocked.add(themeKey);
         continue;
       }
+      if (ownedPermanent.contains(themeKey)) {
+        unlocked.add(themeKey);
+        continue;
+      }
       final serverKey = 'emotion_tracker-$themeKey';
       final serverValid = serverUnlocks[serverKey];
       if (serverValid != null && serverValid.isAfter(now)) {
+        unlocked.add(themeKey);
+        continue;
+      }
+      final localValid = validLocal[themeKey];
+      if (localValid != null && now.isBefore(localValid.add(const Duration(hours: 1)))) {
         unlocked.add(themeKey);
         continue;
       }
@@ -234,6 +271,72 @@ class ThemeUnlockService {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ad error: $e')));
       }
+    }
+  }
+
+  /// Attempts to buy a theme permanently via the /shop/themes/buy endpoint.
+  /// Throws an Exception with a user-friendly message on failure.
+  Future<void> buyTheme(BuildContext context, String themeKey) async {
+    final storage = ref.read(secureStorageProvider);
+    final accessToken = await storage.read(key: 'access_token');
+    final protocol = ref.read(serverProtocolProvider);
+    final domain = ref.read(serverDomainProvider);
+    final apiUrl = Uri.parse('$protocol://$domain/shop/themes/buy');
+    final userAgent = await getUserAgent();
+
+    if (accessToken == null || accessToken.isEmpty) {
+      throw Exception('You must be logged in to buy themes.');
+    }
+
+    // Show loading dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      final response = await http.post(
+        apiUrl,
+        headers: {
+          'Authorization': 'Bearer $accessToken',
+          'User-Agent': userAgent,
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'theme_id': 'emotion_tracker-$themeKey'}),
+      );
+      if (Navigator.of(context).canPop()) Navigator.of(context).pop();
+      if (response.statusCode == 200) {
+        // Success: update local cache by refetching owned themes
+        await unlockTheme(themeKey); // Mark as unlocked locally
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Theme purchased successfully!')),
+          );
+        }
+        return;
+      }
+      // Error handling
+      final data = jsonDecode(response.body);
+      final detail = data['detail'] ?? 'Unknown error';
+      if (response.statusCode == 400 && detail == 'Theme already owned') {
+        throw Exception('You already own this theme.');
+      } else if (response.statusCode == 400 && (detail == 'Not enough SBD tokens' || detail == 'Insufficient SBD tokens or race condition')) {
+        throw Exception('You do not have enough SBD tokens.');
+      } else if (response.statusCode == 400 && detail == 'Invalid or missing theme_id') {
+        throw Exception('Invalid theme.');
+      } else if (response.statusCode == 403 && detail == 'Shop access denied: invalid client') {
+        throw Exception('Shop access denied: invalid client.');
+      } else if (response.statusCode == 404 && detail == 'User not found') {
+        throw Exception('User not found. Please log in again.');
+      } else if (response.statusCode == 500) {
+        throw Exception('Server error. Please try again later.');
+      } else {
+        throw Exception(detail.toString());
+      }
+    } catch (e) {
+      if (Navigator.of(context).canPop()) Navigator.of(context).pop();
+      rethrow;
     }
   }
 }
