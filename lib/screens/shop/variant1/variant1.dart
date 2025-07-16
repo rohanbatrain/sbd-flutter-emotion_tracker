@@ -96,18 +96,20 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
   late TabController _tabController;
   static const String avatarDetailBannerAdId = 'avatar_detail_banner';
   List<String>? _ownedThemes;
+  Set<String> _ownedAvatars = {}; // Store owned avatar IDs
+  bool _loadingAvatars = true;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 5, vsync: this); // Updated to 5 tabs
-    // Preload the ad for the dialog
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && defaultTargetPlatform != TargetPlatform.linux) {
         ref.read(adProvider.notifier).loadBannerAd(avatarDetailBannerAdId);
       }
     });
     _loadOwnedCaches();
+    _fetchOwnedAvatars();
   }
 
   Future<void> _loadOwnedCaches() async {
@@ -115,11 +117,27 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
     _ownedThemes = ['theme1', 'theme2']; // Example owned themes
   }
 
+  Future<void> _fetchOwnedAvatars() async {
+    setState(() {
+      _loadingAvatars = true;
+    });
+    try {
+      final unlockService = ref.read(avatarUnlockProvider);
+      final owned = await unlockService.getMergedUnlockedAvatars();
+      setState(() {
+        _ownedAvatars = owned;
+        _loadingAvatars = false;
+      });
+    } catch (_) {
+      setState(() {
+        _loadingAvatars = false;
+      });
+    }
+  }
+
   @override
   void dispose() {
     _tabController.dispose();
-    // We are not disposing the ad here anymore to keep it available.
-    // The ad provider will manage its lifecycle.
     super.dispose();
   }
 
@@ -213,9 +231,13 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
       'Animated ✨': animatedAvatars,
     };
 
+    if (_loadingAvatars) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
     return RefreshIndicator(
       onRefresh: () async {
-        setState(() {}); // Triggers a rebuild and refetches unlock info for avatars
+        await _fetchOwnedAvatars();
       },
       child: ListView.builder(
         padding: const EdgeInsets.all(16.0),
@@ -249,132 +271,105 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
                 itemCount: avatars.length,
                 itemBuilder: (context, index) {
                   final avatar = avatars[index];
-                  return FutureBuilder<AvatarUnlockInfo>(
-                    future: ref.read(avatarUnlockProvider).getAvatarUnlockInfo(avatar.id),
-                    builder: (context, snapshot) {
-                      final info = snapshot.data;
-                      bool isUnlocked = info?.isUnlocked ?? false;
-                      DateTime? unlockTime = info?.unlockTime;
-                      final now = DateTime.now().toUtc();
-                      bool isRented = false;
-                      if (isUnlocked && unlockTime != null) {
-                        final expiry = unlockTime.add(const Duration(hours: 1));
-                        final timeLeft = expiry.difference(now);
-                        isRented = timeLeft > Duration.zero;
-                      }
-                      return Card(
-                        elevation: 2,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        clipBehavior: Clip.antiAlias,
-                        child: InkWell(
-                          onTap: () {
-                            showDialog(
-                              context: context,
-                              barrierColor: Colors.black.withOpacity(0.5),
-                              builder: (context) => AvatarDetailDialog(
-                                avatar: avatar,
-                                adId: avatarDetailBannerAdId,
-                              ),
-                            );
-                          },
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Expanded(
-                                child: Container(
-                                  color: theme.colorScheme.onSurface.withOpacity(0.05),
-                                  padding: const EdgeInsets.all(8),
-                                  child: AvatarDisplay(
-                                    avatar: avatar,
-                                    size: 50,
-                                  ),
-                                ),
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 12.0),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.center,
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Text(
-                                      avatar.name,
-                                      style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      textAlign: TextAlign.center,
-                                    ),
-                                    const SizedBox(height: 4),
-                                    if (!isUnlocked)
-                                      Text(
-                                        avatar.price == 0 ? 'Free' : '${avatar.price} SBD',
-                                        style: theme.textTheme.bodySmall?.copyWith(
-                                          color: theme.colorScheme.secondary,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    const SizedBox(height: 4),
-                                    if (!isUnlocked) // Only show Add to Cart if not owned/rented
-                                      SizedBox(
-                                        height: 30,
-                                        child: IconButton(
-                                          padding: EdgeInsets.zero,
-                                          icon: const Icon(Icons.add_shopping_cart_outlined),
-                                          iconSize: 22,
-                                          color: theme.colorScheme.secondary,
-                                          tooltip: 'Add to Cart',
-                                          onPressed: () {
-                                            ScaffoldMessenger.of(context).showSnackBar(
-                                              const SnackBar(
-                                                content: Text('Added to cart (feature coming soon!)'),
-                                                duration: Duration(seconds: 2),
-                                              ),
-                                            );
-                                          },
-                                        ),
-                                      ),
-                                    if (isRented)
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                        decoration: BoxDecoration(
-                                          color: Colors.green.withOpacity(0.9),
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                        child: Text(
-                                          'Rented',
-                                          style: theme.textTheme.labelSmall?.copyWith(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                      ),
-                                    if (isUnlocked && !isRented)
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                        decoration: BoxDecoration(
-                                          color: theme.colorScheme.primary.withOpacity(0.9),
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                        child: Text(
-                                          'Owned',
-                                          style: theme.textTheme.labelSmall?.copyWith(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              ),
-                            ],
+                  final isUnlocked = _ownedAvatars.contains(avatar.id);
+                  return Card(
+                    elevation: 2,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: InkWell(
+                      onTap: () {
+                        showDialog(
+                          context: context,
+                          barrierColor: Colors.black.withOpacity(0.5),
+                          builder: (context) => AvatarDetailDialog(
+                            avatar: avatar,
+                            adId: avatarDetailBannerAdId,
+                            onAvatarBought: () async {
+                              await _fetchOwnedAvatars();
+                            },
                           ),
-                        ),
-                      );
-                    },
+                        );
+                      },
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(
+                            child: Container(
+                              color: theme.colorScheme.onSurface.withOpacity(0.05),
+                              padding: const EdgeInsets.all(8),
+                              child: AvatarDisplay(
+                                avatar: avatar,
+                                size: 50,
+                              ),
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 12.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  avatar.name,
+                                  style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 4),
+                                if (!isUnlocked)
+                                  Text(
+                                    avatar.price == 0 ? 'Free' : '${avatar.price} SBD',
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: theme.colorScheme.secondary,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                const SizedBox(height: 4),
+                                if (!isUnlocked)
+                                  SizedBox(
+                                    height: 30,
+                                    child: IconButton(
+                                      padding: EdgeInsets.zero,
+                                      icon: const Icon(Icons.add_shopping_cart_outlined),
+                                      iconSize: 22,
+                                      color: theme.colorScheme.secondary,
+                                      tooltip: 'Add to Cart',
+                                      onPressed: () {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(
+                                            content: Text('Added to cart (feature coming soon!)'),
+                                            duration: Duration(seconds: 2),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                if (isUnlocked)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: theme.colorScheme.primary.withOpacity(0.9),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      'Owned',
+                                      style: theme.textTheme.labelSmall?.copyWith(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   );
                 },
               ),
@@ -391,11 +386,10 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
 
     return RefreshIndicator(
       onRefresh: () async {
-        // Invalidate cache for all earth banners before refreshing UI
         for (final banner in earthBanners) {
           ref.read(bannerUnlockProvider).invalidateBannerCache(banner.id);
         }
-        setState(() {}); // Triggers a rebuild and refetches unlock info for banners
+        setState(() {});
       },
       child: ListView(
         padding: const EdgeInsets.all(16.0),
@@ -407,7 +401,6 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
                 'Earth Banners',
                 style: theme.textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.bold,
-                  // color: theme.colorScheme.primary,
                 ),
               ),
             ),
@@ -595,7 +588,7 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
 
     return RefreshIndicator(
       onRefresh: () async {
-        setState(() {}); // Triggers a rebuild and refetches unlock info for themes
+        setState(() {});
       },
       child: ListView(
         padding: const EdgeInsets.all(16.0),
@@ -679,7 +672,7 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
 
     return RefreshIndicator(
       onRefresh: () async {
-        setState(() {}); // Triggers a rebuild and refetches unlock info for bundles
+        setState(() {});
       },
       child: ListView.builder(
         padding: const EdgeInsets.all(16.0),
@@ -948,17 +941,15 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
       padding: const EdgeInsets.all(16.0),
       children: [
         Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8.0),
-        child: Text(
-          'Currency Packs',
-          style: theme.textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.bold,
-            // color: theme.colorScheme.primary,
+          padding: const EdgeInsets.symmetric(horizontal: 8.0),
+          child: Text(
+            'Currency Packs',
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.bold,
             ),
           ),
         ),
         const SizedBox(height: 12),
-        
         GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
@@ -1063,11 +1054,13 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
 class AvatarDetailDialog extends ConsumerStatefulWidget {
   final Avatar avatar;
   final String adId;
+  final VoidCallback? onAvatarBought;
 
   const AvatarDetailDialog({
     Key? key,
     required this.avatar,
     required this.adId,
+    this.onAvatarBought,
   }) : super(key: key);
 
   @override
@@ -1076,6 +1069,7 @@ class AvatarDetailDialog extends ConsumerStatefulWidget {
 
 class _AvatarDetailDialogState extends ConsumerState<AvatarDetailDialog> {
   late Future<AvatarUnlockInfo> _unlockInfoFuture;
+  bool _hasRefreshed = false;
 
   @override
   void initState() {
@@ -1084,9 +1078,12 @@ class _AvatarDetailDialogState extends ConsumerState<AvatarDetailDialog> {
   }
 
   void _refreshUnlockInfo() {
-    setState(() {
-      _unlockInfoFuture = ref.read(avatarUnlockProvider).getAvatarUnlockInfo(widget.avatar.id);
-    });
+    if (!_hasRefreshed) {
+      setState(() {
+        _unlockInfoFuture = ref.read(avatarUnlockProvider).getAvatarUnlockInfo(widget.avatar.id);
+        _hasRefreshed = true;
+      });
+    }
   }
 
   @override
@@ -1110,7 +1107,6 @@ class _AvatarDetailDialogState extends ConsumerState<AvatarDetailDialog> {
         alignment: Alignment.topCenter,
         clipBehavior: Clip.none,
         children: [
-          // Dialog content card
           Container(
             margin: const EdgeInsets.only(top: avatarSize / 2),
             padding: const EdgeInsets.only(
@@ -1134,14 +1130,12 @@ class _AvatarDetailDialogState extends ConsumerState<AvatarDetailDialog> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Avatar name at the top
                 Text(
                   widget.avatar.name,
                   style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 16),
-                // --- Rental Info Section (improved placement) ---
                 FutureBuilder<AvatarUnlockInfo>(
                   future: _unlockInfoFuture,
                   builder: (context, snapshot) {
@@ -1159,7 +1153,6 @@ class _AvatarDetailDialogState extends ConsumerState<AvatarDetailDialog> {
                       if (timeSinceUnlock.isNegative) timeSinceUnlock = Duration.zero;
                     }
                     final canShowRentButton = !isUnlocked || (timeSinceUnlock != null && timeSinceUnlock.inMinutes >= 55);
-                    // Only show time left if rent button is NOT visible
                     if (isUnlocked && timeLeft != null && !canShowRentButton) {
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 12.0),
@@ -1193,9 +1186,7 @@ class _AvatarDetailDialogState extends ConsumerState<AvatarDetailDialog> {
                     return const SizedBox.shrink();
                   },
                 ),
-                // --- End Rental Info Section ---
                 const SizedBox(height: 8),
-                // Action buttons
                 FutureBuilder<AvatarUnlockInfo>(
                   future: _unlockInfoFuture,
                   builder: (context, snapshot) {
@@ -1249,8 +1240,11 @@ class _AvatarDetailDialogState extends ConsumerState<AvatarDetailDialog> {
                                 child: ElevatedButton(
                                   onPressed: () async {
                                     try {
-                                      await avatarUnlockService.buyAvatar(context, widget.avatar.id);
+                                      await ref.read(avatarUnlockProvider).buyAvatar(context, widget.avatar.id);
                                       _refreshUnlockInfo();
+                                      if (widget.onAvatarBought != null) {
+                                        widget.onAvatarBought!();
+                                      }
                                     } catch (e) {
                                       if (context.mounted) {
                                         ScaffoldMessenger.of(context).showSnackBar(
@@ -1318,7 +1312,6 @@ class _AvatarDetailDialogState extends ConsumerState<AvatarDetailDialog> {
                               textAlign: TextAlign.center,
                             ),
                           ),
-                        // Banner ad only when rented (not when rent button is visible)
                         if (!canShowRentButton && bannerAd != null) ...[
                           if (!isBannerAdReady) ...[
                             FutureBuilder<void>(
@@ -1357,7 +1350,6 @@ class _AvatarDetailDialogState extends ConsumerState<AvatarDetailDialog> {
               ],
             ),
           ),
-          // Overlapping Avatar
           Positioned(
             top: 0,
             child: Container(
@@ -1377,7 +1369,6 @@ class _AvatarDetailDialogState extends ConsumerState<AvatarDetailDialog> {
               ),
             ),
           ),
-          // Close button
           Positioned(
             top: (avatarSize / 2) + 5,
             right: 5,
@@ -1470,7 +1461,6 @@ class _BannerDetailDialogState extends ConsumerState<BannerDetailDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Banner Preview
             Stack(
               children: [
                 ClipRRect(
@@ -1500,13 +1490,11 @@ class _BannerDetailDialogState extends ConsumerState<BannerDetailDialog> {
                 ),
               ],
             ),
-
             Padding(
               padding: const EdgeInsets.all(24.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // Title
                   Text(
                     widget.banner.name ?? 'Banner',
                     style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
@@ -1521,8 +1509,6 @@ class _BannerDetailDialogState extends ConsumerState<BannerDetailDialog> {
                     ),
                   ],
                   const SizedBox(height: 16),
-
-                  // Price (conditionally hidden)
                   FutureBuilder<BannerUnlockInfo>(
                     future: _unlockInfoFuture,
                     builder: (context, snapshot) {
@@ -1530,11 +1516,9 @@ class _BannerDetailDialogState extends ConsumerState<BannerDetailDialog> {
                       if (isUnlocked) {
                         return const SizedBox.shrink();
                       }
-                      return Column(                                           );
+                      return Column();
                     },
                   ),
-
-                  // Rental Info Section
                   FutureBuilder<BannerUnlockInfo>(
                     future: _unlockInfoFuture,
                     builder: (context, snapshot) {
@@ -1589,8 +1573,6 @@ class _BannerDetailDialogState extends ConsumerState<BannerDetailDialog> {
                   const SizedBox(height: 20),
                   const Divider(),
                   const SizedBox(height: 20),
-
-                  // Action Buttons
                   _buildActionButtons(theme, _isAdLoaded, _bannerAd),
                 ],
               ),
@@ -1712,7 +1694,6 @@ class _BannerDetailDialogState extends ConsumerState<BannerDetailDialog> {
                     }
                   }
                 },
-                // icon: const Icon(Icons.shopping_bag_outlined),
                 label: Text('Buy (${widget.banner.price} SBD)'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: theme.primaryColor,
@@ -1794,7 +1775,7 @@ class BundleDetailDialog extends ConsumerWidget {
                 ),
                 const SizedBox(height: 8),
                 SizedBox(
-                  height: 100, // Adjust height as needed
+                  height: 100,
                   child: ListView.builder(
                     itemCount: bundle.includedItems.length,
                     itemBuilder: (context, index) {
@@ -1805,11 +1786,8 @@ class BundleDetailDialog extends ConsumerWidget {
                         try {
                           final avatar = allAvatars.firstWhere((a) => a.id == itemId);
                           itemName = avatar.name;
-                        } catch (e) {
-                          // Avatar not found, keep default name
-                        }
+                        } catch (e) {}
                       } else if (bundle.id.contains('themes')) {
-                        // Use the theme name from the map, or format the ID to be readable
                         itemName = AppThemes.themeNames[itemId] ??
                             itemId
                                 .replaceFirst('emotion_tracker-', '')
@@ -1928,7 +1906,6 @@ class ThemeDetailDialog extends ConsumerWidget {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 20),
-            // Unique gradient circle preview
             Center(
               child: Container(
                 width: 70,
@@ -2049,9 +2026,7 @@ class ThemeDetailDialog extends ConsumerWidget {
     );
   }
 
-  // Helper for unique theme gradients
   Gradient _getThemeGradient(String themeKey, ThemeData fallbackTheme) {
-    // You can expand this map for more unique gradients per theme
     const gradients = {
       'serenityGreen': LinearGradient(colors: [Color(0xFF43E97B), Color(0xFF38F9D7)], begin: Alignment.topLeft, end: Alignment.bottomRight),
       'pacificBlue': LinearGradient(colors: [Color(0xFF2193b0), Color(0xFF6dd5ed)], begin: Alignment.topLeft, end: Alignment.bottomRight),
@@ -2064,13 +2039,10 @@ class ThemeDetailDialog extends ConsumerWidget {
       'goldenYellow': LinearGradient(colors: [Color(0xFFf7971e), Color(0xFFffd200)], begin: Alignment.topLeft, end: Alignment.bottomRight),
       'deepPurple': LinearGradient(colors: [Color(0xFF8e2de2), Color(0xFF4a00e0)], begin: Alignment.topLeft, end: Alignment.bottomRight),
       'royalOrange': LinearGradient(colors: [Color(0xFFf857a6), Color(0xFFFF5858)], begin: Alignment.topLeft, end: Alignment.bottomRight),
-      // Add more as needed
     };
-    // Try to match by key, fallback to theme colors
     final key = themeKey.replaceAll('Dark', '').replaceAll('Light', '');
     if (gradients.containsKey(themeKey)) return gradients[themeKey]!;
     if (gradients.containsKey(key)) return gradients[key]!;
-    // Fallback: use theme's primary/secondary
     return LinearGradient(
       colors: [fallbackTheme.primaryColor, fallbackTheme.colorScheme.secondary],
       begin: Alignment.topLeft,
