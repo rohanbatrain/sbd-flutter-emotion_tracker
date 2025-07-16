@@ -11,6 +11,7 @@ import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:emotion_tracker/providers/avatar_unlock_provider.dart';
 import 'package:emotion_tracker/providers/custom_bundle.dart';
+import 'package:emotion_tracker/providers/theme_unlock_provider.dart';
 
 extension StringExtension on String {
   String capitalize() {
@@ -1824,7 +1825,7 @@ class BundleDetailDialog extends ConsumerWidget {
   }
 }
 
-class ThemeDetailDialog extends StatelessWidget {
+class ThemeDetailDialog extends ConsumerWidget {
   final String themeKey;
   final ThemeData theme;
   final int price;
@@ -1845,7 +1846,7 @@ class ThemeDetailDialog extends StatelessWidget {
   }) : super(key: key);
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final isFree = price == 0;
     final Gradient themeGradient = _getThemeGradient(themeKey, theme);
     return Dialog(
@@ -1906,11 +1907,23 @@ class ThemeDetailDialog extends StatelessWidget {
                   if (adUnitId != null && adUnitId!.isNotEmpty) ...[
                     Expanded(
                       child: ElevatedButton(
-                        onPressed: () {
-                          if (onThemeUnlocked != null) {
-                            onThemeUnlocked!();
+                        onPressed: () async {
+                          final themeUnlockService = ref.read(themeUnlockProvider);
+                          try {
+                            await themeUnlockService.showThemeUnlockAd(
+                              context,
+                              themeKey,
+                              onThemeUnlocked: () {
+                                if (onThemeUnlocked != null) onThemeUnlocked!();
+                              },
+                            );
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text(e.toString()), backgroundColor: theme.colorScheme.error),
+                              );
+                            }
                           }
-                          Navigator.of(context).pop();
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: theme.colorScheme.secondary.withOpacity(0.1),
@@ -1928,11 +1941,21 @@ class ThemeDetailDialog extends StatelessWidget {
                   ],
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: () {
-                        if (onThemeBought != null) {
-                          onThemeBought!();
+                      onPressed: () async {
+                        final themeUnlockService = ref.read(themeUnlockProvider);
+                        try {
+                          await themeUnlockService.buyTheme(context, themeKey);
+                          if (onThemeBought != null) {
+                            onThemeBought!();
+                          }
+                          Navigator.of(context).pop();
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text(e.toString()), backgroundColor: theme.colorScheme.error),
+                            );
+                          }
                         }
-                        Navigator.of(context).pop();
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: theme.primaryColor,

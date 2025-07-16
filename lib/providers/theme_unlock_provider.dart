@@ -17,6 +17,9 @@ class ThemeUnlockService {
   final Ref ref;
   ThemeUnlockService(this.ref);
 
+  /// In-memory cache: themeKey -> { unlockInfo, lastChecked }
+  final Map<String, _ThemeUnlockCache> _unlockCache = {};
+
   /// Unlocks the theme for the user by updating secure storage with a 1-hour expiry.
   Future<void> unlockTheme(String themeKey) async {
     final storage = ref.read(secureStorageProvider);
@@ -29,6 +32,7 @@ class ThemeUnlockService {
     }
     unlockedMap[themeKey] = DateTime.now().millisecondsSinceEpoch;
     await storage.write(key: 'unlocked_themes', value: jsonEncode(unlockedMap));
+    invalidateThemeCache(themeKey); // Invalidate cache after unlock
   }
 
   /// Helper to fetch and merge server and local unlocks, including permanent ownership.
@@ -339,4 +343,134 @@ class ThemeUnlockService {
       rethrow;
     }
   }
+
+  /// Returns unlock status and unlock timestamp for UI logic (permanent, rental, ad unlock), using cache for speed.
+  Future<ThemeUnlockInfo> getThemeUnlockInfo(String themeKey) async {
+    final now = DateTime.now();
+    final cache = _unlockCache[themeKey];
+    // Use cache if not expired (30 seconds)
+    if (cache != null && now.difference(cache.lastChecked).inSeconds < 30) {
+      return cache.info;
+    }
+    // Fetch fresh info
+    final info = await _fetchThemeUnlockInfo(themeKey);
+    _unlockCache[themeKey] = _ThemeUnlockCache(info, now);
+    return info;
+  }
+
+  /// Helper to fetch unlock info from server/storage (no cache).
+  Future<ThemeUnlockInfo> _fetchThemeUnlockInfo(String themeKey) async {
+    final storage = ref.read(secureStorageProvider);
+    final accessToken = await storage.read(key: 'access_token');
+    final protocol = ref.read(serverProtocolProvider);
+    final domain = ref.read(serverDomainProvider);
+    final rentedUrl = Uri.parse('$protocol://$domain/themes/rented');
+    final ownedUrl = Uri.parse('$protocol://$domain/shop/themes/owned');
+    final now = DateTime.now().toUtc();
+    DateTime? unlockTime;
+
+    // Check permanent ownership
+    if (accessToken != null && accessToken.isNotEmpty) {
+      try {
+        final userAgent = await getUserAgent();
+        final ownedResp = await http.get(
+          ownedUrl,
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'User-Agent': userAgent,
+          },
+        );
+        if (ownedResp.statusCode == 200) {
+          final data = jsonDecode(ownedResp.body);
+          final List<dynamic> owned = data['themes_owned'] ?? [];
+          for (final entry in owned) {
+            final themeId = entry['theme_id'] as String?;
+            final permanent = entry['permanent'] == true;
+            if (themeId != null && permanent) {
+              final localKey = themeId.replaceFirst('emotion_tracker-', '');
+              if (localKey == themeKey) {
+                return ThemeUnlockInfo(isUnlocked: true, unlockTime: null, isPermanent: true);
+              }
+            }
+          }
+        }
+      } catch (e) {
+        // On error, treat as not owned
+      }
+    }
+
+    // Check server rentals
+    if (accessToken != null && accessToken.isNotEmpty) {
+      try {
+        final userAgent = await getUserAgent();
+        final response = await http.get(
+          rentedUrl,
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'User-Agent': userAgent,
+          },
+        );
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          final List<dynamic> rented = data['themes_rented'] ?? [];
+          final Map<String, List<DateTime>> grouped = {};
+          for (final entry in rented) {
+            final themeId = entry['theme_id'] as String?;
+            final validTillStr = entry['valid_till'] as String?;
+            if (themeId != null && validTillStr != null) {
+              final validTill = DateTime.parse(validTillStr).toUtc();
+              if (validTill.isAfter(now)) {
+                grouped.putIfAbsent(themeId, () => []).add(validTill);
+              }
+            }
+          }
+          final serverKey = 'emotion_tracker-' + themeKey;
+          if (grouped.containsKey(serverKey)) {
+            final latest = grouped[serverKey]!.reduce((a, b) => a.isAfter(b) ? a : b);
+            if (latest.isAfter(now)) {
+              unlockTime = latest.subtract(const Duration(hours: 1));
+              return ThemeUnlockInfo(isUnlocked: true, unlockTime: unlockTime, isPermanent: false);
+            }
+          }
+        }
+      } catch (e) {
+        // On error, treat as all locked except local unlocks
+      }
+    }
+
+    // Check local ad unlocks
+    final unlockedJson = (await storage.read(key: 'unlocked_themes')) ?? '{}';
+    Map<String, dynamic> unlockedMap;
+    try {
+      unlockedMap = Map<String, dynamic>.from(jsonDecode(unlockedJson));
+    } catch (_) {
+      unlockedMap = {};
+    }
+    final hourMs = 60 * 60 * 1000;
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    final value = unlockedMap[themeKey];
+    if (value is int && nowMs - value < hourMs) {
+      unlockTime = DateTime.fromMillisecondsSinceEpoch(value).toUtc();
+      return ThemeUnlockInfo(isUnlocked: true, unlockTime: unlockTime, isPermanent: false);
+    }
+    return ThemeUnlockInfo(isUnlocked: false, unlockTime: null, isPermanent: false);
+  }
+
+  /// Force-invalidate the in-memory cache for a given theme (for pull-to-refresh or after buy/ad unlock).
+  void invalidateThemeCache(String themeKey) {
+    _unlockCache.remove(themeKey);
+  }
+}
+
+class _ThemeUnlockCache {
+  final ThemeUnlockInfo info;
+  final DateTime lastChecked;
+  _ThemeUnlockCache(this.info, this.lastChecked);
+}
+
+class ThemeUnlockInfo {
+  final bool isUnlocked;
+  final DateTime? unlockTime;
+  final bool isPermanent;
+  ThemeUnlockInfo({required this.isUnlocked, this.unlockTime, this.isPermanent = false});
 }
