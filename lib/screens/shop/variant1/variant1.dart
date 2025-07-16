@@ -405,9 +405,9 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
               padding: const EdgeInsets.symmetric(horizontal: 8.0),
               child: Text(
                 'Earth Banners',
-                style: theme.textTheme.headlineSmall?.copyWith(
+                style: theme.textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.bold,
-                  color: theme.colorScheme.primary,
+                  // color: theme.colorScheme.primary,
                 ),
               ),
             ),
@@ -424,11 +424,10 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
               itemCount: earthBanners.length,
               itemBuilder: (context, index) {
                 final banner = earthBanners[index];
-
                 return Card(
-                  elevation: 4,
+                  elevation: 2,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   clipBehavior: Clip.antiAlias,
                   child: InkWell(
@@ -447,16 +446,7 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
                       children: [
                         Expanded(
                           child: Container(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [
-                                  theme.colorScheme.primary.withOpacity(0.1),
-                                  theme.colorScheme.secondary.withOpacity(0.1),
-                                ],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                            ),
+                            color: theme.colorScheme.onSurface.withOpacity(0.05),
                             child: ProfileBannerDisplay(
                               banner: banner,
                               height: 120,
@@ -471,6 +461,44 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
                             builder: (context, snapshot) {
                               final info = snapshot.data;
                               final isUnlocked = info?.isUnlocked ?? false;
+                              final unlockTime = info?.unlockTime;
+                              final now = DateTime.now().toUtc();
+                              bool isRented = false;
+                              if (isUnlocked && unlockTime != null) {
+                                final expiry = unlockTime.add(const Duration(hours: 1));
+                                final timeLeft = expiry.difference(now);
+                                isRented = timeLeft > Duration.zero;
+                              }
+                              if (isRented) {
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      banner.name ?? '',
+                                      style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      textAlign: TextAlign.center,
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: Colors.green.withOpacity(0.9),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(
+                                        'Rented',
+                                        style: theme.textTheme.labelSmall?.copyWith(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              }
                               if (isUnlocked) {
                                 return Column(
                                   crossAxisAlignment: CrossAxisAlignment.center,
@@ -919,6 +947,18 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
     return ListView(
       padding: const EdgeInsets.all(16.0),
       children: [
+        Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8.0),
+        child: Text(
+          'Currency Packs',
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.bold,
+            // color: theme.colorScheme.primary,
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        
         GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
@@ -1563,52 +1603,103 @@ class _BannerDetailDialogState extends ConsumerState<BannerDetailDialog> {
 
   Widget _buildActionButtons(ThemeData theme, bool isAdLoaded, BannerAd? bannerAd) {
     final bannerUnlockService = ref.watch(bannerUnlockProvider);
-
     return FutureBuilder<BannerUnlockInfo>(
       future: _unlockInfoFuture,
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
         final info = snapshot.data;
         final isUnlocked = info?.isUnlocked ?? false;
         final unlockTime = info?.unlockTime;
         final now = DateTime.now().toUtc();
-        Duration? timeSinceUnlock;
-
+        bool isRented = false;
         if (isUnlocked && unlockTime != null) {
-          timeSinceUnlock = now.difference(unlockTime);
+          final expiry = unlockTime.add(const Duration(hours: 1));
+          final timeLeft = expiry.difference(now);
+          isRented = timeLeft > Duration.zero;
         }
-
-        // Show rent button if not unlocked, or if unlocked more than 55 minutes ago
-        final canShowRentButton = widget.banner.rewardedAdId != null &&
-            widget.banner.rewardedAdId!.isNotEmpty &&
-            (!isUnlocked || (timeSinceUnlock != null && timeSinceUnlock.inMinutes >= 55));
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+        if (isRented) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8.0),
+            child: ElevatedButton.icon(
+              onPressed: null,
+              icon: const Icon(Icons.verified, color: Colors.white),
+              label: const Text('Rented'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green.withOpacity(0.9),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 0,
+              ),
+            ),
+          );
+        }
+        if (isUnlocked && !isRented) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8.0),
+            child: ElevatedButton.icon(
+              onPressed: null,
+              icon: const Icon(Icons.verified, color: Colors.white),
+              label: const Text('Owned'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: theme.colorScheme.primary.withOpacity(0.9),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 0,
+              ),
+            ),
+          );
+        }
+        if (isUnlocked) {
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primary.withOpacity(0.9),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              'Owned',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+              ),
+            ),
+          );
+        }
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            if (isUnlocked)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8.0),
-                child: ElevatedButton.icon(
-                  onPressed: null,
-                  icon: const Icon(Icons.verified, color: Colors.white),
-                  label: const Text('Owned'),
+            if (widget.banner.rewardedAdId != null && widget.banner.rewardedAdId!.isNotEmpty)
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () async {
+                    await bannerUnlockService.showBannerUnlockAd(
+                      context,
+                      widget.banner.id,
+                      onBannerUnlocked: _refreshUnlockInfo,
+                    );
+                  },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: theme.colorScheme.primary.withOpacity(0.9),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    backgroundColor: theme.colorScheme.secondary.withOpacity(0.1),
+                    foregroundColor: theme.colorScheme.secondary,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
                     elevation: 0,
                   ),
+                  child: const Text('Rent (Ad)'),
                 ),
-              )
-            else ...[
-              ElevatedButton.icon(
+              ),
+            if (widget.banner.rewardedAdId != null && widget.banner.rewardedAdId!.isNotEmpty)
+              const SizedBox(width: 16),
+            Expanded(
+              child: ElevatedButton.icon(
                 onPressed: () async {
                   try {
                     await bannerUnlockService.buyBanner(context, widget.banner.id);
@@ -1621,7 +1712,7 @@ class _BannerDetailDialogState extends ConsumerState<BannerDetailDialog> {
                     }
                   }
                 },
-                icon: const Icon(Icons.shopping_bag_outlined),
+                // icon: const Icon(Icons.shopping_bag_outlined),
                 label: Text('Buy (${widget.banner.price} SBD)'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: theme.primaryColor,
@@ -1633,35 +1724,7 @@ class _BannerDetailDialogState extends ConsumerState<BannerDetailDialog> {
                   elevation: 2,
                 ),
               ),
-            ],
-            if (canShowRentButton) ...[
-              const SizedBox(height: 12),
-              ElevatedButton(
-                onPressed: () async {
-                  await bannerUnlockService.showBannerUnlockAd(
-                    context,
-                    widget.banner.id,
-                    onBannerUnlocked: _refreshUnlockInfo,
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: theme.colorScheme.secondary.withOpacity(0.1),
-                  foregroundColor: theme.colorScheme.secondary,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  elevation: 0,
-                ),
-                child: const Text('Rent by Watching an Ad'),
-              ),
-            ] else if (isUnlocked && isAdLoaded && bannerAd != null) ...[
-              const SizedBox(height: 12),
-              SizedBox(
-                height: 50,
-                child: AdWidget(ad: bannerAd),
-              ),
-            ],
+            ),
           ],
         );
       },
