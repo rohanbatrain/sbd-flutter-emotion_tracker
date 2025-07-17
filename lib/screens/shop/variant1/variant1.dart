@@ -12,6 +12,7 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:emotion_tracker/providers/avatar_unlock_provider.dart';
 import 'package:emotion_tracker/providers/custom_bundle.dart';
 import 'package:emotion_tracker/providers/theme_unlock_provider.dart';
+import 'package:emotion_tracker/providers/bundle_unlock_provider.dart';
 
 extension StringExtension on String {
   String capitalize() {
@@ -98,9 +99,11 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
   List<String>? _ownedThemes;
   Set<String> _ownedAvatars = {}; // Store owned avatar IDs
   Set<String> _ownedBanners = {}; // Store owned banner IDs
+  Set<String> _ownedBundles = {}; // Store owned bundle IDs
   bool _loadingAvatars = true;
   bool _loadingBanners = true;
   bool _loadingThemes = true;
+  bool _loadingBundles = true;
 
   @override
   void initState() {
@@ -114,6 +117,7 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
     _loadOwnedCaches();
     _fetchOwnedAvatars();
     _fetchOwnedBanners();
+    _fetchOwnedBundles();
   }
 
   Future<void> _loadOwnedCaches() async {
@@ -160,6 +164,24 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
     } catch (_) {
       setState(() {
         _loadingBanners = false;
+      });
+    }
+  }
+
+  Future<void> _fetchOwnedBundles() async {
+    setState(() {
+      _loadingBundles = true;
+    });
+    try {
+      final unlockService = ref.read(bundleUnlockProvider);
+      final owned = await unlockService.getOwnedBundles();
+      setState(() {
+        _ownedBundles = owned;
+        _loadingBundles = false;
+      });
+    } catch (_) {
+      setState(() {
+        _loadingBundles = false;
       });
     }
   }
@@ -702,8 +724,13 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
       'Theme Bundles 🎨': themeBundles,
     };
 
+    if (_loadingBundles) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
     return RefreshIndicator(
       onRefresh: () async {
+        await _fetchOwnedBundles();
         setState(() {});
       },
       child: ListView.builder(
@@ -738,6 +765,7 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
                 itemCount: categoryBundles.length,
                 itemBuilder: (context, index) {
                   final bundle = categoryBundles[index];
+                  final isOwned = _ownedBundles.contains(bundle.id);
                   return Card(
                     elevation: 4,
                     shape: RoundedRectangleBorder(
@@ -745,12 +773,17 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
                     ),
                     clipBehavior: Clip.antiAlias,
                     child: InkWell(
-                      onTap: () {
-                        showDialog(
+                      onTap: () async {
+                        await showDialog(
                           context: context,
                           barrierColor: Colors.black.withOpacity(0.5),
                           builder: (context) => BundleDetailDialog(
                             bundle: bundle,
+                            isOwned: isOwned,
+                            onBundleBought: () async {
+                              await _fetchOwnedBundles();
+                              setState(() {});
+                            },
                           ),
                         );
                       },
@@ -800,26 +833,28 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
                                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                         children: [
                                           Text(
-                                            '${bundle.price} SBD',
+                                            isOwned ? 'Owned' : '${bundle.price} SBD',
                                             style: theme.textTheme.bodyMedium?.copyWith(
-                                              color: theme.colorScheme.secondary,
+                                              color: isOwned ? theme.colorScheme.primary : theme.colorScheme.secondary,
+                                              fontWeight: isOwned ? FontWeight.bold : FontWeight.normal,
                                             ),
                                             overflow: TextOverflow.ellipsis,
                                           ),
-                                          IconButton(
-                                            icon: const Icon(Icons.add_shopping_cart_outlined),
-                                            iconSize: 22,
-                                            color: theme.colorScheme.secondary,
-                                            tooltip: 'Add to Cart',
-                                            onPressed: () {
-                                              ScaffoldMessenger.of(context).showSnackBar(
-                                                const SnackBar(
-                                                  content: Text('Added to cart (feature coming soon!)'),
-                                                  duration: Duration(seconds: 2),
-                                                ),
-                                              );
-                                            },
-                                          ),
+                                          if (!isOwned)
+                                            IconButton(
+                                              icon: const Icon(Icons.add_shopping_cart_outlined),
+                                              iconSize: 22,
+                                              color: theme.colorScheme.secondary,
+                                              tooltip: 'Add to Cart',
+                                              onPressed: () {
+                                                ScaffoldMessenger.of(context).showSnackBar(
+                                                  const SnackBar(
+                                                    content: Text('Added to cart (feature coming soon!)'),
+                                                    duration: Duration(seconds: 2),
+                                                  ),
+                                                );
+                                              },
+                                            ),
                                         ],
                                       ),
                                     ],
@@ -828,24 +863,25 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
                               ],
                             ),
                           ),
-                          Positioned(
-                            top: 8,
-                            right: 8,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: theme.colorScheme.secondary,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Text(
-                                'New',
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: theme.colorScheme.onSecondary,
-                                  fontWeight: FontWeight.bold,
+                          if (isOwned)
+                            Positioned(
+                              top: 8,
+                              right: 8,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: theme.colorScheme.primary,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  'Owned',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
                         ],
                       ),
                     ),
@@ -1791,10 +1827,14 @@ class _BannerDetailDialogState extends ConsumerState<BannerDetailDialog> {
 
 class BundleDetailDialog extends ConsumerWidget {
   final Bundle bundle;
+  final bool isOwned;
+  final VoidCallback? onBundleBought;
 
   const BundleDetailDialog({
     Key? key,
     required this.bundle,
+    this.isOwned = false,
+    this.onBundleBought,
   }) : super(key: key);
 
   @override
@@ -1880,23 +1920,50 @@ class BundleDetailDialog extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(height: 16),
-                ElevatedButton(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Buy feature coming soon!')),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: theme.primaryColor,
-                    foregroundColor: theme.colorScheme.onPrimary,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                if (isOwned)
+                  ElevatedButton.icon(
+                    onPressed: null,
+                    icon: const Icon(Icons.verified, color: Colors.white),
+                    label: const Text('Owned'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: theme.colorScheme.primary.withOpacity(0.9),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 0,
                     ),
-                    elevation: 2,
+                  )
+                else
+                  ElevatedButton(
+                    onPressed: () async {
+                      final bundleUnlockService = ref.read(bundleUnlockProvider);
+                      try {
+                        await bundleUnlockService.buyBundle(context, bundle.id);
+                        if (onBundleBought != null) onBundleBought!();
+                        if (context.mounted) {
+                          Navigator.of(context).pop();
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(e.toString()), backgroundColor: theme.colorScheme.error),
+                          );
+                        }
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: theme.primaryColor,
+                      foregroundColor: theme.colorScheme.onPrimary,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 2,
+                    ),
+                    child: Text('Buy (${bundle.price} SBD)'),
                   ),
-                  child: Text('Buy (${bundle.price} SBD)'),
-                ),
               ],
             ),
           ),
