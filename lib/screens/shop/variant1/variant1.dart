@@ -1788,7 +1788,7 @@ class _BannerDetailDialogState extends ConsumerState<BannerDetailDialog> {
                                     }
                                   },
                                   label: Text('Buy (${widget.banner.price} SBD)'),
-                                  icon: const Icon(Icons.shopping_cart_outlined),
+                                  // icon: const Icon(Icons.shopping_cart_outlined),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: theme.primaryColor,
                                     foregroundColor: theme.colorScheme.onPrimary,
