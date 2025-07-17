@@ -1,3 +1,4 @@
+import 'package:emotion_tracker/providers/shop_cart_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:emotion_tracker/providers/theme_provider.dart';
@@ -13,6 +14,7 @@ import 'package:emotion_tracker/providers/avatar_unlock_provider.dart';
 import 'package:emotion_tracker/providers/custom_bundle.dart';
 import 'package:emotion_tracker/providers/theme_unlock_provider.dart';
 import 'package:emotion_tracker/providers/bundle_unlock_provider.dart';
+import '../cart/cart_view.dart';
 
 extension StringExtension on String {
   String capitalize() {
@@ -212,12 +214,56 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
       selectedItem: 'shop',
       onItemSelected: _onItemSelected,
       actions: [
-        IconButton(
-          icon: Icon(Icons.shopping_cart_outlined),
-          tooltip: 'Cart',
-          onPressed: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Cart feature coming soon!')),
+        Consumer(
+          builder: (context, ref, _) {
+            return FutureBuilder<List<Map<String, dynamic>>>(
+              future: ref.watch(shopCartProvider).getCart(),
+              builder: (context, snapshot) {
+                int count = (snapshot.data ?? []).length;
+                return Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.shopping_cart_outlined),
+                      tooltip: 'Cart',
+                      onPressed: () async {
+                        await showModalBottomSheet(
+                          context: context,
+                          isScrollControlled: true,
+                          builder: (_) => const SizedBox(
+                            height: 500,
+                            child: CartView(),
+                          ),
+                        );
+                        setState(() {}); // Refresh badge after modal closes
+                      },
+                    ),
+                    if (count > 0)
+                      Positioned(
+                        right: 6,
+                        top: 6,
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.secondary,
+                            shape: BoxShape.circle,
+                          ),
+                          constraints: const BoxConstraints(minWidth: 14, minHeight: 14),
+                          child: Text(
+                            '$count',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                              height: 1,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ),
+                  ],
+                );
+              },
             );
           },
         ),
@@ -398,13 +444,18 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
                                           iconSize: 22,
                                           color: theme.colorScheme.secondary,
                                           tooltip: 'Add to Cart',
-                                          onPressed: () {
-                                            ScaffoldMessenger.of(context).showSnackBar(
-                                              const SnackBar(
-                                                content: Text('Added to cart (feature coming soon!)'),
-                                                duration: Duration(seconds: 2),
-                                              ),
-                                            );
+                                          onPressed: () async {
+                                            final cartService = ref.read(shopCartProvider);
+                                            try {
+                                              await cartService.addToCart(itemId: avatar.id, itemType: 'avatar');
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                const SnackBar(content: Text('Added to cart!'), duration: Duration(seconds: 2)),
+                                              );
+                                            } catch (e) {
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                SnackBar(content: Text(e.toString()), duration: const Duration(seconds: 2)),
+                                              );
+                                            }
                                           },
                                         ),
                                       ),
@@ -568,13 +619,18 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
                                         iconSize: 22,
                                         color: theme.colorScheme.secondary,
                                         tooltip: 'Add to Cart',
-                                        onPressed: () {
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            const SnackBar(
-                                              content: Text('Added to cart (feature coming soon!)'),
-                                              duration: Duration(seconds: 2),
-                                            ),
-                                          );
+                                        onPressed: () async {
+                                          final cartService = ref.read(shopCartProvider);
+                                          try {
+                                            await cartService.addToCart(itemId: banner.id, itemType: 'banner');
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              const SnackBar(content: Text('Added to cart!'), duration: Duration(seconds: 2)),
+                                            );
+                                          } catch (e) {
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              SnackBar(content: Text(e.toString()), duration: const Duration(seconds: 2)),
+                                            );
+                                          }
                                         },
                                       ),
                                     ),
@@ -846,13 +902,18 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
                                               iconSize: 22,
                                               color: theme.colorScheme.secondary,
                                               tooltip: 'Add to Cart',
-                                              onPressed: () {
-                                                ScaffoldMessenger.of(context).showSnackBar(
-                                                  const SnackBar(
-                                                    content: Text('Added to cart (feature coming soon!)'),
-                                                    duration: Duration(seconds: 2),
-                                                  ),
-                                                );
+                                              onPressed: () async {
+                                                final cartService = ref.read(shopCartProvider);
+                                                try {
+                                                  await cartService.addToCart(itemId: bundle.id, itemType: 'bundle');
+                                                  ScaffoldMessenger.of(context).showSnackBar(
+                                                    const SnackBar(content: Text('Added to cart!'), duration: Duration(seconds: 2)),
+                                                  );
+                                                } catch (e) {
+                                                  ScaffoldMessenger.of(context).showSnackBar(
+                                                    SnackBar(content: Text(e.toString()), duration: const Duration(seconds: 2)),
+                                                  );
+                                                }
                                               },
                                             ),
                                         ],
@@ -999,13 +1060,18 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
                             iconSize: 22,
                             color: theme.colorScheme.secondary,
                             tooltip: 'Add to Cart',
-                            onPressed: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Added to cart (feature coming soon!)'),
-                                  duration: Duration(seconds: 2),
-                                ),
-                              );
+                            onPressed: () async {
+                              final cartService = ref.read(shopCartProvider);
+                              try {
+                                await cartService.addToCart(itemId: themeKey, itemType: 'theme');
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Added to cart!'), duration: Duration(seconds: 2)),
+                                );
+                              } catch (e) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text(e.toString()), duration: const Duration(seconds: 2)),
+                                );
+                              }
                             },
                           ),
                         ),
@@ -2186,8 +2252,9 @@ class _ThemeDetailDialogState extends ConsumerState<ThemeDetailDialog> {
                   )
                 else ...[
                   Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      if (widget.adUnitId != null && widget.adUnitId!.isNotEmpty) ...[
+                      if (widget.adUnitId != null && widget.adUnitId!.isNotEmpty)
                         Expanded(
                           child: ElevatedButton(
                             onPressed: () async {
@@ -2221,8 +2288,7 @@ class _ThemeDetailDialogState extends ConsumerState<ThemeDetailDialog> {
                             child: const Text('Rent'),
                           ),
                         ),
-                        const SizedBox(width: 16),
-                      ],
+                      const SizedBox(width: 16),
                       Expanded(
                         child: ElevatedButton(
                           onPressed: () async {
