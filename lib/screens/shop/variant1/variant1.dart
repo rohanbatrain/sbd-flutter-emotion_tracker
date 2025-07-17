@@ -97,7 +97,9 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
   static const String avatarDetailBannerAdId = 'avatar_detail_banner';
   List<String>? _ownedThemes;
   Set<String> _ownedAvatars = {}; // Store owned avatar IDs
+  Set<String> _ownedBanners = {}; // Store owned banner IDs
   bool _loadingAvatars = true;
+  bool _loadingBanners = true;
 
   @override
   void initState() {
@@ -110,6 +112,7 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
     });
     _loadOwnedCaches();
     _fetchOwnedAvatars();
+    _fetchOwnedBanners();
   }
 
   Future<void> _loadOwnedCaches() async {
@@ -131,6 +134,24 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
     } catch (_) {
       setState(() {
         _loadingAvatars = false;
+      });
+    }
+  }
+
+  Future<void> _fetchOwnedBanners() async {
+    setState(() {
+      _loadingBanners = true;
+    });
+    try {
+      final unlockService = ref.read(bannerUnlockProvider);
+      final owned = await unlockService.getMergedUnlockedBanners();
+      setState(() {
+        _ownedBanners = owned;
+        _loadingBanners = false;
+      });
+    } catch (_) {
+      setState(() {
+        _loadingBanners = false;
       });
     }
   }
@@ -272,104 +293,131 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
                 itemBuilder: (context, index) {
                   final avatar = avatars[index];
                   final isUnlocked = _ownedAvatars.contains(avatar.id);
-                  return Card(
-                    elevation: 2,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    clipBehavior: Clip.antiAlias,
-                    child: InkWell(
-                      onTap: () {
-                        showDialog(
-                          context: context,
-                          barrierColor: Colors.black.withOpacity(0.5),
-                          builder: (context) => AvatarDetailDialog(
-                            avatar: avatar,
-                            adId: avatarDetailBannerAdId,
-                            onAvatarBought: () async {
-                              await _fetchOwnedAvatars();
-                            },
-                          ),
-                        );
-                      },
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Expanded(
-                            child: Container(
-                              color: theme.colorScheme.onSurface.withOpacity(0.05),
-                              padding: const EdgeInsets.all(8),
-                              child: AvatarDisplay(
+                  final unlockInfo = ref.read(avatarUnlockProvider).getAvatarUnlockInfo(avatar.id);
+                  return FutureBuilder<AvatarUnlockInfo>(
+                    future: unlockInfo,
+                    builder: (context, snapshot) {
+                      final info = snapshot.data;
+                      final isRented = (info?.isUnlocked ?? false) &&
+                          (info?.unlockTime != null) &&
+                          DateTime.now().toUtc().difference(info!.unlockTime!).inHours < 1;
+                      final isOwned = isUnlocked && (!isRented);
+                      return Card(
+                        elevation: 2,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: InkWell(
+                          onTap: () {
+                            showDialog(
+                              context: context,
+                              barrierColor: Colors.black.withOpacity(0.5),
+                              builder: (context) => AvatarDetailDialog(
                                 avatar: avatar,
-                                size: 50,
+                                adId: avatarDetailBannerAdId,
+                                onAvatarBought: () async {
+                                  await _fetchOwnedAvatars();
+                                },
                               ),
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 12.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  avatar.name,
-                                  style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  textAlign: TextAlign.center,
+                            );
+                          },
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Expanded(
+                                child: Container(
+                                  color: theme.colorScheme.onSurface.withOpacity(0.05),
+                                  padding: const EdgeInsets.all(8),
+                                  child: AvatarDisplay(
+                                    avatar: avatar,
+                                    size: 50,
+                                  ),
                                 ),
-                                const SizedBox(height: 4),
-                                if (!isUnlocked)
-                                  Text(
-                                    avatar.price == 0 ? 'Free' : '${avatar.price} SBD',
-                                    style: theme.textTheme.bodySmall?.copyWith(
-                                      color: theme.colorScheme.secondary,
-                                      fontWeight: FontWeight.w600,
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 12.0),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      avatar.name,
+                                      style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      textAlign: TextAlign.center,
                                     ),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                const SizedBox(height: 4),
-                                if (!isUnlocked)
-                                  SizedBox(
-                                    height: 30,
-                                    child: IconButton(
-                                      padding: EdgeInsets.zero,
-                                      icon: const Icon(Icons.add_shopping_cart_outlined),
-                                      iconSize: 22,
-                                      color: theme.colorScheme.secondary,
-                                      tooltip: 'Add to Cart',
-                                      onPressed: () {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(
-                                            content: Text('Added to cart (feature coming soon!)'),
-                                            duration: Duration(seconds: 2),
-                                          ),
-                                        );
-                                      },
-                                    ),
-                                  ),
-                                if (isUnlocked)
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: theme.colorScheme.primary.withOpacity(0.9),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Text(
-                                      'Owned',
-                                      style: theme.textTheme.labelSmall?.copyWith(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 12,
+                                    const SizedBox(height: 4),
+                                    if (!isUnlocked)
+                                      Text(
+                                        avatar.price == 0 ? 'Free' : '${avatar.price} SBD',
+                                        style: theme.textTheme.bodySmall?.copyWith(
+                                          color: theme.colorScheme.secondary,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
                                       ),
-                                    ),
-                                  ),
-                              ],
-                            ),
+                                    const SizedBox(height: 4),
+                                    if (!isUnlocked)
+                                      SizedBox(
+                                        height: 30,
+                                        child: IconButton(
+                                          padding: EdgeInsets.zero,
+                                          icon: const Icon(Icons.add_shopping_cart_outlined),
+                                          iconSize: 22,
+                                          color: theme.colorScheme.secondary,
+                                          tooltip: 'Add to Cart',
+                                          onPressed: () {
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              const SnackBar(
+                                                content: Text('Added to cart (feature coming soon!)'),
+                                                duration: Duration(seconds: 2),
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                    if (isOwned)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: theme.colorScheme.primary.withOpacity(0.9),
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: Text(
+                                          'Owned',
+                                          style: theme.textTheme.labelSmall?.copyWith(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ),
+                                    if (isRented)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: Colors.green.withOpacity(0.9),
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: Text(
+                                          'Rented',
+                                          style: theme.textTheme.labelSmall?.copyWith(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                    ),
+                        ),
+                      );
+                    },
                   );
                 },
               ),
@@ -384,12 +432,13 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
   Widget _buildBannersGrid(ThemeData theme) {
     final earthBanners = allProfileBanners.where((b) => b.price > 0 && b.id.contains('earth')).toList();
 
+    if (_loadingBanners) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
     return RefreshIndicator(
       onRefresh: () async {
-        for (final banner in earthBanners) {
-          ref.read(bannerUnlockProvider).invalidateBannerCache(banner.id);
-        }
-        setState(() {});
+        await _fetchOwnedBanners();
       },
       child: ListView(
         padding: const EdgeInsets.all(16.0),
@@ -417,6 +466,7 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
               itemCount: earthBanners.length,
               itemBuilder: (context, index) {
                 final banner = earthBanners[index];
+                final isUnlocked = _ownedBanners.contains(banner.id);
                 return Card(
                   elevation: 2,
                   shape: RoundedRectangleBorder(
@@ -425,14 +475,16 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
                   clipBehavior: Clip.antiAlias,
                   child: InkWell(
                     onTap: () {
+                      // Show banner detail dialog, and refresh banners after purchase
                       showDialog(
                         context: context,
                         barrierColor: Colors.black.withOpacity(0.5),
                         builder: (context) => BannerDetailDialog(
                           banner: banner,
                           adId: 'banner_detail_banner_ad',
+                          // Add a callback if you want to refresh after purchase
                         ),
-                      );
+                      ).then((_) => _fetchOwnedBanners());
                     },
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -449,120 +501,63 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
                         ),
                         Padding(
                           padding: const EdgeInsets.all(8.0),
-                          child: FutureBuilder<BannerUnlockInfo>(
-                            future: ref.read(bannerUnlockProvider).getBannerUnlockInfo(banner.id),
-                            builder: (context, snapshot) {
-                              final info = snapshot.data;
-                              final isUnlocked = info?.isUnlocked ?? false;
-                              final unlockTime = info?.unlockTime;
-                              final now = DateTime.now().toUtc();
-                              bool isRented = false;
-                              if (isUnlocked && unlockTime != null) {
-                                final expiry = unlockTime.add(const Duration(hours: 1));
-                                final timeLeft = expiry.difference(now);
-                                isRented = timeLeft > Duration.zero;
-                              }
-                              if (isRented) {
-                                return Column(
-                                  crossAxisAlignment: CrossAxisAlignment.center,
-                                  children: [
-                                    Text(
-                                      banner.name ?? '',
-                                      style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      textAlign: TextAlign.center,
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: Colors.green.withOpacity(0.9),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: Text(
-                                        'Rented',
-                                        style: theme.textTheme.labelSmall?.copyWith(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 12,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Text(
+                                banner.name ?? '',
+                                style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 4),
+                              if (!isUnlocked)
+                                Text(
+                                  '${banner.price} SBD',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: theme.colorScheme.secondary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              const SizedBox(height: 4),
+                              if (!isUnlocked)
+                                SizedBox(
+                                  height: 30,
+                                  child: IconButton(
+                                    padding: EdgeInsets.zero,
+                                    icon: const Icon(Icons.add_shopping_cart_outlined),
+                                    iconSize: 22,
+                                    color: theme.colorScheme.secondary,
+                                    tooltip: 'Add to Cart',
+                                    onPressed: () {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Added to cart (feature coming soon!)'),
+                                          duration: Duration(seconds: 2),
                                         ),
-                                      ),
-                                    ),
-                                  ],
-                                );
-                              }
-                              if (isUnlocked) {
-                                return Column(
-                                  crossAxisAlignment: CrossAxisAlignment.center,
-                                  children: [
-                                    Text(
-                                      banner.name ?? '',
-                                      style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      textAlign: TextAlign.center,
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: theme.colorScheme.primary.withOpacity(0.9),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: Text(
-                                        'Owned',
-                                        style: theme.textTheme.labelSmall?.copyWith(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                );
-                              }
-                              return Column(
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    banner.name ?? '',
-                                    style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    textAlign: TextAlign.center,
+                                      );
+                                    },
                                   ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    '${banner.price} SBD',
-                                    style: theme.textTheme.bodySmall?.copyWith(
-                                      color: theme.colorScheme.secondary,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
+                                ),
+                              if (isUnlocked)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: theme.colorScheme.primary.withOpacity(0.9),
+                                    borderRadius: BorderRadius.circular(8),
                                   ),
-                                  const SizedBox(height: 4),
-                                  SizedBox(
-                                    height: 30,
-                                    child: IconButton(
-                                      padding: EdgeInsets.zero,
-                                      icon: const Icon(Icons.add_shopping_cart_outlined),
-                                      iconSize: 22,
-                                      color: theme.colorScheme.secondary,
-                                      tooltip: 'Add to Cart',
-                                      onPressed: () {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(
-                                            content: Text('Added to cart (feature coming soon!)'),
-                                            duration: Duration(seconds: 2),
-                                          ),
-                                        );
-                                      },
+                                  child: Text(
+                                    'Owned',
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
                                     ),
                                   ),
-                                ],
-                              );
-                            },
+                                ),
+                            ],
                           ),
                         ),
                       ],
@@ -1267,22 +1262,36 @@ class _AvatarDetailDialogState extends ConsumerState<AvatarDetailDialog> {
                               ),
                             ],
                           ),
+                        // Show Buy button if rented (unlocked and timeLeft > 0), instead of Rented
                         if (isUnlocked && timeLeft != null && timeLeft > Duration.zero)
                           Padding(
                             padding: const EdgeInsets.symmetric(vertical: 8.0),
-                            child: ElevatedButton.icon(
-                              onPressed: null,
-                              icon: const Icon(Icons.verified, color: Colors.white),
-                              label: const Text('Rented'),
+                            child: ElevatedButton(
+                              onPressed: () async {
+                                try {
+                                  await ref.read(avatarUnlockProvider).buyAvatar(context, widget.avatar.id);
+                                  _refreshUnlockInfo();
+                                  if (widget.onAvatarBought != null) {
+                                    widget.onAvatarBought!();
+                                  }
+                                } catch (e) {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text(e.toString()), backgroundColor: theme.colorScheme.error),
+                                    );
+                                  }
+                                }
+                              },
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green.withOpacity(0.9),
-                                foregroundColor: Colors.white,
+                                backgroundColor: theme.primaryColor,
+                                foregroundColor: theme.colorScheme.onPrimary,
                                 padding: const EdgeInsets.symmetric(vertical: 12),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
-                                elevation: 0,
+                                elevation: 2,
                               ),
+                              child: Text('Buy (${widget.avatar.price} SBD)'),
                             ),
                           ),
                         if (isUnlocked && (timeLeft == null || timeLeft <= Duration.zero))
