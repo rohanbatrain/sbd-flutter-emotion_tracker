@@ -1895,7 +1895,7 @@ class BundleDetailDialog extends ConsumerWidget {
   }
 }
 
-class ThemeDetailDialog extends ConsumerWidget {
+class ThemeDetailDialog extends ConsumerStatefulWidget {
   final String themeKey;
   final ThemeData theme;
   final int price;
@@ -1916,140 +1916,242 @@ class ThemeDetailDialog extends ConsumerWidget {
   }) : super(key: key);
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final isFree = price == 0;
-    final Gradient themeGradient = _getThemeGradient(themeKey, theme);
+  _ThemeDetailDialogState createState() => _ThemeDetailDialogState();
+}
+
+class _ThemeDetailDialogState extends ConsumerState<ThemeDetailDialog> {
+  late Future<ThemeUnlockInfo> _unlockInfoFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshUnlockInfo();
+  }
+
+  void _refreshUnlockInfo() {
+    setState(() {
+      _unlockInfoFuture = ref.read(themeUnlockProvider).getThemeUnlockInfo(widget.themeKey);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = ref.watch(currentThemeProvider);
+    final isFree = widget.price == 0;
+    final Gradient themeGradient = _getThemeGradient(widget.themeKey, widget.theme);
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       elevation: 5,
       backgroundColor: theme.cardColor,
       child: Padding(
         padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              AppThemes.themeNames[themeKey] ?? 'Theme',
-              style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 20),
-            Center(
-              child: Container(
-                width: 70,
-                height: 70,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: themeGradient,
-                  boxShadow: [
-                    BoxShadow(
-                      color: theme.primaryColor.withOpacity(0.18),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
-            if (isOwned || isFree)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primary.withOpacity(0.9),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  'Owned',
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              )
-            else ...[
-              Row(
-                children: [
-                  if (adUnitId != null && adUnitId!.isNotEmpty) ...[
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () async {
-                          final themeUnlockService = ref.read(themeUnlockProvider);
-                          try {
-                            await themeUnlockService.showThemeUnlockAd(
-                              context,
-                              themeKey,
-                              onThemeUnlocked: () {
-                                if (onThemeUnlocked != null) onThemeUnlocked!();
-                              },
-                            );
-                          } catch (e) {
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text(e.toString()), backgroundColor: theme.colorScheme.error),
-                              );
-                            }
-                          }
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: theme.colorScheme.secondary.withOpacity(0.1),
-                          foregroundColor: theme.colorScheme.secondary,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          elevation: 0,
-                        ),
-                        child: const Text('Rent'),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                  ],
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () async {
-                        final themeUnlockService = ref.read(themeUnlockProvider);
-                        try {
-                          await themeUnlockService.buyTheme(context, themeKey);
-                          if (onThemeBought != null) {
-                            onThemeBought!();
-                          }
-                          Navigator.of(context).pop();
-                        } catch (e) {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text(e.toString()), backgroundColor: theme.colorScheme.error),
-                            );
-                          }
-                        }
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: theme.primaryColor,
-                        foregroundColor: theme.colorScheme.onPrimary,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        elevation: 2,
-                      ),
-                      child: Text('Buy (${price} SBD)'),
-                    ),
-                  ),
-                ],
-              ),
-              if (adUnitId != null && adUnitId!.isNotEmpty) ...[
-                const SizedBox(height: 12),
+        child: FutureBuilder<ThemeUnlockInfo>(
+          future: _unlockInfoFuture,
+          builder: (context, snapshot) {
+            final info = snapshot.data;
+            final isUnlocked = info?.isUnlocked ?? widget.isOwned;
+            final unlockTime = info?.unlockTime;
+            final now = DateTime.now().toUtc();
+            Duration? timeLeft;
+            bool isOwned = false;
+            bool isRented = false;
+            if (isUnlocked && unlockTime != null) {
+              final expiry = unlockTime.add(const Duration(hours: 1));
+              timeLeft = expiry.difference(now);
+              if (timeLeft.isNegative) timeLeft = Duration.zero;
+              isRented = timeLeft > Duration.zero;
+            }
+            isOwned = isUnlocked && (!isRented);
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
                 Text(
-                  'Watch an ad to rent this theme for 1 hour',
-                  style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
+                  AppThemes.themeNames[widget.themeKey] ?? 'Theme',
+                  style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
                   textAlign: TextAlign.center,
                 ),
+                const SizedBox(height: 20),
+                Center(
+                  child: Container(
+                    width: 70,
+                    height: 70,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: themeGradient,
+                      boxShadow: [
+                        BoxShadow(
+                          color: theme.primaryColor.withOpacity(0.18),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                if (isOwned || isFree)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary.withOpacity(0.9),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'Owned',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  )
+                else if (isRented)
+                  Column(
+                    children: [
+                      Card(
+                        color: Colors.green.withOpacity(0.12),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.verified, color: Colors.green, size: 22),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Rented',
+                                style: theme.textTheme.bodyLarge?.copyWith(color: Colors.green, fontWeight: FontWeight.bold),
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                'Time left: '
+                                '${timeLeft!.inMinutes > 0 ? '${timeLeft.inMinutes} min' : '${timeLeft.inSeconds} sec'}',
+                                style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 4.0),
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: () async {
+                              final themeUnlockService = ref.read(themeUnlockProvider);
+                              try {
+                                await themeUnlockService.buyTheme(context, widget.themeKey);
+                                _refreshUnlockInfo();
+                                if (widget.onThemeBought != null) widget.onThemeBought!();
+                                Navigator.of(context).pop();
+                              } catch (e) {
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text(e.toString()), backgroundColor: theme.colorScheme.error),
+                                  );
+                                }
+                              }
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: theme.primaryColor,
+                              foregroundColor: theme.colorScheme.onPrimary,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              elevation: 2,
+                            ),
+                            child: Text('Buy (${widget.price} SBD)', style: const TextStyle(fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  )
+                else ...[
+                  Row(
+                    children: [
+                      if (widget.adUnitId != null && widget.adUnitId!.isNotEmpty) ...[
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () async {
+                              final themeUnlockService = ref.read(themeUnlockProvider);
+                              try {
+                                await themeUnlockService.showThemeUnlockAd(
+                                  context,
+                                  widget.themeKey,
+                                  onThemeUnlocked: () {
+                                    _refreshUnlockInfo();
+                                    if (widget.onThemeUnlocked != null) widget.onThemeUnlocked!();
+                                  },
+                                );
+                              } catch (e) {
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text(e.toString()), backgroundColor: theme.colorScheme.error),
+                                  );
+                                }
+                              }
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: theme.colorScheme.secondary.withOpacity(0.1),
+                              foregroundColor: theme.colorScheme.secondary,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              elevation: 0,
+                            ),
+                            child: const Text('Rent'),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                      ],
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            final themeUnlockService = ref.read(themeUnlockProvider);
+                            try {
+                              await themeUnlockService.buyTheme(context, widget.themeKey);
+                              _refreshUnlockInfo();
+                              if (widget.onThemeBought != null) widget.onThemeBought!();
+                              Navigator.of(context).pop();
+                            } catch (e) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text(e.toString()), backgroundColor: theme.colorScheme.error),
+                                );
+                              }
+                            }
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: theme.primaryColor,
+                            foregroundColor: theme.colorScheme.onPrimary,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 2,
+                          ),
+                          child: Text('Buy (${widget.price} SBD)'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (widget.adUnitId != null && widget.adUnitId!.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      'Watch an ad to rent this theme for 1 hour',
+                      style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ],
               ],
-            ],
-          ],
+            );
+          },
         ),
       ),
     );
