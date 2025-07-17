@@ -1456,8 +1456,16 @@ class _BannerDetailDialogState extends ConsumerState<BannerDetailDialog> {
   @override
   void initState() {
     super.initState();
-    _unlockInfoFuture = ref.read(bannerUnlockProvider).getBannerUnlockInfo(widget.banner.id);
+    _refreshUnlockInfo();
     _loadBannerAd();
+  }
+
+  void _refreshUnlockInfo() {
+    // Invalidate the in-memory cache before fetching new unlock info
+    ref.read(bannerUnlockProvider).invalidateBannerCache(widget.banner.id);
+    setState(() {
+      _unlockInfoFuture = ref.read(bannerUnlockProvider).getBannerUnlockInfo(widget.banner.id);
+    });
   }
 
   void _loadBannerAd() {
@@ -1487,12 +1495,6 @@ class _BannerDetailDialogState extends ConsumerState<BannerDetailDialog> {
   void dispose() {
     _bannerAd?.dispose();
     super.dispose();
-  }
-
-  void _refreshUnlockInfo() {
-    setState(() {
-      _unlockInfoFuture = ref.read(bannerUnlockProvider).getBannerUnlockInfo(widget.banner.id);
-    });
   }
 
   @override
@@ -1730,9 +1732,6 @@ class _BannerDetailDialogState extends ConsumerState<BannerDetailDialog> {
                       );
                     },
                   ),
-                  // const SizedBox(height: 20),
-                  // const Divider(),
-                  // const SizedBox(height: 20),
                 ],
               ),
             ),
