@@ -1659,67 +1659,80 @@ class _BannerDetailDialogState extends ConsumerState<BannerDetailDialog> {
                           ],
                         );
                       }
-                      return Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      return Column(
                         children: [
-                          if (widget.banner.rewardedAdId != null && widget.banner.rewardedAdId!.isNotEmpty)
-                            Expanded(
-                              child: ElevatedButton(
-                                onPressed: () async {
-                                  await ref.read(bannerUnlockProvider).showBannerUnlockAd(
-                                    context,
-                                    widget.banner.id,
-                                    onBannerUnlocked: _refreshUnlockInfo,
-                                  );
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: theme.colorScheme.secondary.withOpacity(0.1),
-                                  foregroundColor: theme.colorScheme.secondary,
-                                  padding: const EdgeInsets.symmetric(vertical: 14),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              if (widget.banner.rewardedAdId != null && widget.banner.rewardedAdId!.isNotEmpty)
+                                Expanded(
+                                  child: ElevatedButton(
+                                    onPressed: () async {
+                                      await ref.read(bannerUnlockProvider).showBannerUnlockAd(
+                                        context,
+                                        widget.banner.id,
+                                        onBannerUnlocked: _refreshUnlockInfo,
+                                      );
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: theme.colorScheme.secondary.withOpacity(0.1),
+                                      foregroundColor: theme.colorScheme.secondary,
+                                      padding: const EdgeInsets.symmetric(vertical: 14),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      elevation: 0,
+                                    ),
+                                    child: const Text('Rent (Ad)'),
                                   ),
-                                  elevation: 0,
                                 ),
-                                child: const Text('Rent (Ad)'),
-                              ),
-                            ),
-                          if (widget.banner.rewardedAdId != null && widget.banner.rewardedAdId!.isNotEmpty)
-                            const SizedBox(width: 16),
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: () async {
-                                try {
-                                  await ref.read(bannerUnlockProvider).buyBanner(context, widget.banner.id);
-                                  _refreshUnlockInfo();
-                                } catch (e) {
-                                  if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text(e.toString()), backgroundColor: theme.colorScheme.error),
-                                    );
-                                  }
-                                }
-                              },
-                              label: Text('Buy (${widget.banner.price} SBD)'),
-                              icon: const Icon(Icons.shopping_cart_outlined),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: theme.primaryColor,
-                                foregroundColor: theme.colorScheme.onPrimary,
-                                padding: const EdgeInsets.symmetric(vertical: 14),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
+                              if (widget.banner.rewardedAdId != null && widget.banner.rewardedAdId!.isNotEmpty)
+                                const SizedBox(width: 16),
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  onPressed: () async {
+                                    try {
+                                      await ref.read(bannerUnlockProvider).buyBanner(context, widget.banner.id);
+                                      _refreshUnlockInfo();
+                                    } catch (e) {
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(content: Text(e.toString()), backgroundColor: theme.colorScheme.error),
+                                        );
+                                      }
+                                    }
+                                  },
+                                  label: Text('Buy (${widget.banner.price} SBD)'),
+                                  icon: const Icon(Icons.shopping_cart_outlined),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: theme.primaryColor,
+                                    foregroundColor: theme.colorScheme.onPrimary,
+                                    padding: const EdgeInsets.symmetric(vertical: 14),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    elevation: 2,
+                                  ),
                                 ),
-                                elevation: 2,
                               ),
-                            ),
+                            ],
                           ),
+                          if (widget.banner.rewardedAdId != null && widget.banner.rewardedAdId!.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 12.0, left: 4.0, right: 4.0),
+                              child: Text(
+                                'Watch an ad to rent this banner for 1 hour.',
+                                style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
                         ],
                       );
                     },
                   ),
-                  const SizedBox(height: 20),
-                  const Divider(),
-                  const SizedBox(height: 20),
+                  // const SizedBox(height: 20),
+                  // const Divider(),
+                  // const SizedBox(height: 20),
                 ],
               ),
             ),
