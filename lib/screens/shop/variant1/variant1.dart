@@ -100,6 +100,7 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
   Set<String> _ownedBanners = {}; // Store owned banner IDs
   bool _loadingAvatars = true;
   bool _loadingBanners = true;
+  bool _loadingThemes = true;
 
   @override
   void initState() {
@@ -116,8 +117,15 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
   }
 
   Future<void> _loadOwnedCaches() async {
+    setState(() {
+      _loadingThemes = true;
+    });
     // Simulate loading owned themes from a cache or provider
+    await Future.delayed(const Duration(milliseconds: 400)); // Optional: simulate delay
     _ownedThemes = ['theme1', 'theme2']; // Example owned themes
+    setState(() {
+      _loadingThemes = false;
+    });
   }
 
   Future<void> _fetchOwnedAvatars() async {
@@ -599,6 +607,9 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
   }
 
   Widget _buildThemesGrid(ThemeData theme) {
+    if (_loadingThemes) {
+      return const Center(child: CircularProgressIndicator());
+    }
     final lightThemes = AppThemes.allThemes.entries
         .where((entry) => entry.value.brightness == Brightness.light)
         .toList();
@@ -608,6 +619,7 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
 
     return RefreshIndicator(
       onRefresh: () async {
+        await _loadOwnedCaches();
         setState(() {});
       },
       child: ListView(
@@ -1632,7 +1644,7 @@ class _BannerDetailDialogState extends ConsumerState<BannerDetailDialog> {
                               child: SizedBox(
                                 width: double.infinity,
                                 child: ElevatedButton.icon(
-                                  icon: const Icon(Icons.shopping_cart_outlined),
+                                  // icon: const Icon(Icons.shopping_cart_outlined),
                                   label: Text('Buy (${widget.banner.price} SBD)', style: const TextStyle(fontWeight: FontWeight.bold)),
                                   onPressed: () async {
                                     try {
@@ -1705,7 +1717,7 @@ class _BannerDetailDialogState extends ConsumerState<BannerDetailDialog> {
                                     }
                                   },
                                   label: Text('Buy (${widget.banner.price} SBD)'),
-                                  icon: const Icon(Icons.shopping_cart_outlined),
+                                  // icon: const Icon(Icons.shopping_cart_outlined),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: theme.primaryColor,
                                     foregroundColor: theme.colorScheme.onPrimary,
