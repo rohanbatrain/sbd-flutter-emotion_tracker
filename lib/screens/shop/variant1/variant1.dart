@@ -861,123 +861,158 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
   }
 
   Widget _buildThemeCard(ThemeData theme, ThemeData appTheme, String themeName, int themePrice, String themeKey) {
-    final isThemeOwned = (_ownedThemes?.contains(themeKey) ?? false) || themePrice == 0;
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () async {
-          if (!isThemeOwned) {
-            await showDialog(
-              context: context,
-              barrierColor: Colors.black.withOpacity(0.5),
-              builder: (context) => ThemeDetailDialog(
-                themeKey: themeKey,
-                theme: theme,
-                price: themePrice,
-                isOwned: false,
-                adUnitId: AppThemes.themeAdUnitIds[themeKey],
-                onThemeUnlocked: () async {
-                  await _loadOwnedCaches();
-                  setState(() {});
-                },
-                onThemeBought: () async {
-                  await _loadOwnedCaches();
-                  setState(() {});
-                },
-              ),
-            );
-          } else {
-            // Show owned dialog
-            await showDialog(
-              context: context,
-              barrierColor: Colors.black.withOpacity(0.5),
-              builder: (context) => ThemeDetailDialog(
-                themeKey: themeKey,
-                theme: theme,
-                price: themePrice,
-                isOwned: true,
-              ),
-            );
-          }
-        },
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(
-              child: Container(
-                color: theme.colorScheme.onSurface.withOpacity(0.05),
-                child: Center(
-                  child: Icon(Icons.palette_rounded, size: 48, color: appTheme.primaryColor),
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
-              child: Column(
-                children: [
-                  Text(
-                    themeName,
-                    style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
+    final themeUnlockInfoFuture = ref.read(themeUnlockProvider).getThemeUnlockInfo(themeKey);
+    return FutureBuilder<ThemeUnlockInfo>(
+      future: themeUnlockInfoFuture,
+      builder: (context, snapshot) {
+        final info = snapshot.data;
+        final isUnlocked = (info?.isUnlocked ?? false) || (_ownedThemes?.contains(themeKey) ?? false) || themePrice == 0;
+        final unlockTime = info?.unlockTime;
+        final now = DateTime.now().toUtc();
+        Duration? timeLeft;
+        bool isOwned = false;
+        bool isRented = false;
+        if (isUnlocked && unlockTime != null) {
+          final expiry = unlockTime.add(const Duration(hours: 1));
+          timeLeft = expiry.difference(now);
+          if (timeLeft.isNegative) timeLeft = Duration.zero;
+          isRented = timeLeft > Duration.zero;
+        }
+        isOwned = isUnlocked && (!isRented);
+        return Card(
+          elevation: 2,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: () async {
+              if (!isOwned) {
+                await showDialog(
+                  context: context,
+                  barrierColor: Colors.black.withOpacity(0.5),
+                  builder: (context) => ThemeDetailDialog(
+                    themeKey: themeKey,
+                    theme: theme,
+                    price: themePrice,
+                    isOwned: false,
+                    adUnitId: AppThemes.themeAdUnitIds[themeKey],
+                    onThemeUnlocked: () async {
+                      await _loadOwnedCaches();
+                      setState(() {});
+                    },
+                    onThemeBought: () async {
+                      await _loadOwnedCaches();
+                      setState(() {});
+                    },
                   ),
-                  const SizedBox(height: 4),
-                  if (!isThemeOwned)
-                    Text(
-                      themePrice == 0 ? 'Free' : '$themePrice SBD',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.secondary,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      overflow: TextOverflow.ellipsis,
+                );
+              } else {
+                // Show owned dialog
+                await showDialog(
+                  context: context,
+                  barrierColor: Colors.black.withOpacity(0.5),
+                  builder: (context) => ThemeDetailDialog(
+                    themeKey: themeKey,
+                    theme: theme,
+                    price: themePrice,
+                    isOwned: true,
+                  ),
+                );
+              }
+            },
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: Container(
+                    color: theme.colorScheme.onSurface.withOpacity(0.05),
+                    child: Center(
+                      child: Icon(Icons.palette_rounded, size: 48, color: appTheme.primaryColor),
                     ),
-                  const SizedBox(height: 4),
-                  if (!isThemeOwned) // Only show Add to Cart if not owned
-                    SizedBox(
-                      height: 30,
-                      child: IconButton(
-                        padding: EdgeInsets.zero,
-                        icon: const Icon(Icons.add_shopping_cart_outlined),
-                        iconSize: 22,
-                        color: theme.colorScheme.secondary,
-                        tooltip: 'Add to Cart',
-                        onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Added to cart (feature coming soon!)'),
-                              duration: Duration(seconds: 2),
-                            ),
-                          );
-                        },
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
+                  child: Column(
+                    children: [
+                      Text(
+                        themeName,
+                        style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
                       ),
-                    ),
-                  if (isThemeOwned)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.primary.withOpacity(0.9),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        'Owned',
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
+                      const SizedBox(height: 4),
+                      if (!isOwned && !isRented)
+                        Text(
+                          themePrice == 0 ? 'Free' : '$themePrice SBD',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.secondary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                    ),
-                ],
-              ),
+                      const SizedBox(height: 4),
+                      if (!isOwned && !isRented)
+                        SizedBox(
+                          height: 30,
+                          child: IconButton(
+                            padding: EdgeInsets.zero,
+                            icon: const Icon(Icons.add_shopping_cart_outlined),
+                            iconSize: 22,
+                            color: theme.colorScheme.secondary,
+                            tooltip: 'Add to Cart',
+                            onPressed: () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Added to cart (feature coming soon!)'),
+                                  duration: Duration(seconds: 2),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      if (isOwned)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.primary.withOpacity(0.9),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            'Owned',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      if (isRented)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withOpacity(0.9),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            'Rented',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
@@ -1644,7 +1679,7 @@ class _BannerDetailDialogState extends ConsumerState<BannerDetailDialog> {
                               child: SizedBox(
                                 width: double.infinity,
                                 child: ElevatedButton.icon(
-                                  // icon: const Icon(Icons.shopping_cart_outlined),
+                                  icon: const Icon(Icons.shopping_cart_outlined),
                                   label: Text('Buy (${widget.banner.price} SBD)', style: const TextStyle(fontWeight: FontWeight.bold)),
                                   onPressed: () async {
                                     try {
@@ -1717,7 +1752,7 @@ class _BannerDetailDialogState extends ConsumerState<BannerDetailDialog> {
                                     }
                                   },
                                   label: Text('Buy (${widget.banner.price} SBD)'),
-                                  // icon: const Icon(Icons.shopping_cart_outlined),
+                                  icon: const Icon(Icons.shopping_cart_outlined),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: theme.primaryColor,
                                     foregroundColor: theme.colorScheme.onPrimary,
