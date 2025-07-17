@@ -878,6 +878,18 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
                 },
               ),
             );
+          } else {
+            // Show owned dialog
+            await showDialog(
+              context: context,
+              barrierColor: Colors.black.withOpacity(0.5),
+              builder: (context) => ThemeDetailDialog(
+                themeKey: themeKey,
+                theme: theme,
+                price: themePrice,
+                isOwned: true,
+              ),
+            );
           }
         },
         child: Column(
@@ -903,14 +915,15 @@ class _ShopScreenV1State extends ConsumerState<ShopScreenV1> with SingleTickerPr
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 4),
-                  Text(
-                    themePrice == 0 ? 'Free' : '$themePrice SBD',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.secondary,
-                      fontWeight: FontWeight.w600,
+                  if (!isThemeOwned)
+                    Text(
+                      themePrice == 0 ? 'Free' : '$themePrice SBD',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.secondary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
                   const SizedBox(height: 4),
                   if (!isThemeOwned) // Only show Add to Cart if not owned
                     SizedBox(
