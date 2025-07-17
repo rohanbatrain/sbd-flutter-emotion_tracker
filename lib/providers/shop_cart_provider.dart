@@ -57,63 +57,6 @@ class ShopCartService {
     if (itemType == 'theme' && !itemId.startsWith('emotion_tracker-')) {
       itemId = 'emotion_tracker-' + itemId;
     }
-
-    // Prevent adding single items if a bundle containing them is already in the cart
-    if (currentCart != null && bundleContents != null) {
-      // Normalize all theme IDs in bundleContents
-      final normalizedBundleContents = <String, List<String>>{};
-      bundleContents.forEach((bundleId, ids) {
-        normalizedBundleContents[bundleId] = ids.map((id) {
-          if (id.startsWith('emotion_tracker-')) return id;
-          return 'emotion_tracker-' + id;
-        }).toList();
-      });
-      final cartItemIds = <String>{};
-      final cartBundleIds = <String>{};
-      for (final item in currentCart) {
-        switch (item['type']) {
-          case 'theme':
-            var id = item['theme_id'] ?? '';
-            if (!id.startsWith('emotion_tracker-')) {
-              id = 'emotion_tracker-' + id;
-            }
-            cartItemIds.add(id);
-            break;
-          case 'avatar':
-            cartItemIds.add(item['avatar_id'] ?? '');
-            break;
-          case 'banner':
-            cartItemIds.add(item['banner_id'] ?? '');
-            break;
-          case 'bundle':
-            cartBundleIds.add(item['bundle_id'] ?? '');
-            break;
-        }
-      }
-      // If adding a bundle, check if any of its items are already in the cart
-      if (itemType == 'bundle' && normalizedBundleContents.containsKey(itemId)) {
-        final bundleItems = normalizedBundleContents[itemId]!;
-        for (final id in bundleItems) {
-          if (cartItemIds.contains(id)) {
-            throw Exception('You already have an item from this bundle in your cart. Remove it before adding the bundle to avoid wasting tokens.');
-          }
-        }
-      }
-      // If adding a single item, check if any bundle in the cart contains it
-      if (itemType != 'bundle') {
-        String normalizedId = itemId;
-        if (itemType == 'theme' && !normalizedId.startsWith('emotion_tracker-')) {
-          normalizedId = 'emotion_tracker-' + normalizedId;
-        }
-        for (final bundleId in cartBundleIds) {
-          final bundleItems = (normalizedBundleContents[bundleId] ?? []);
-          if (bundleItems.contains(normalizedId)) {
-            throw Exception('You already have a bundle in your cart that contains this item. Remove the bundle before adding the single item to avoid wasting tokens.');
-          }
-        }
-      }
-    }
-
     final accessToken = await _getAccessToken();
     final userAgent = await _getUserAgent();
     final url = _baseUri.replace(path: '/shop/cart/add');
