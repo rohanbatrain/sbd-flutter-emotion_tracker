@@ -77,7 +77,7 @@ class CustomAppBar extends ConsumerWidget implements PreferredSizeWidget {
                     Icon(Icons.error, color: Colors.red, size: 18)
                   else
                     Text(
-                      sbdState.balance?.toString() ?? '--',
+                      _formatCurrency(sbdState.balance),
                       style: TextStyle(
                         color: theme.colorScheme.onPrimary,
                         fontWeight: FontWeight.w600,
@@ -98,4 +98,15 @@ class CustomAppBar extends ConsumerWidget implements PreferredSizeWidget {
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
+
+  String _formatCurrency(num? value) {
+    if (value == null) return '--';
+    if (value >= 1000000) {
+      return (value / 1000000).toStringAsFixed(value % 1000000 == 0 ? 0 : 1) + 'M';
+    } else if (value >= 1000) {
+      return (value / 1000).toStringAsFixed(value % 1000 == 0 ? 0 : 1) + 'k';
+    } else {
+      return value.toString();
+    }
+  }
 }
