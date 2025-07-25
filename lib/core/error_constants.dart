@@ -29,6 +29,26 @@ class ErrorConstants {
   static const String connectionRefused = 'Could not connect to server.';
   static const String noInternet = 'No internet connection available.';
 
+  // WebAuthn-specific error messages (extends existing patterns)
+  static const String passkeyNotSupported =
+      'Passkeys are not supported on this device.';
+  static const String challengeExpired =
+      'Authentication session expired. Please try again.';
+  static const String userCancelled = 'Authentication was cancelled.';
+  static const String noCredentials =
+      'No passkeys found. Please set up a passkey first.';
+  static const String credentialNotFound =
+      'Passkey not recognized. Please try a different device.';
+  static const String authenticatorError =
+      'Authenticator error. Please try again.';
+  static const String registrationFailed =
+      'Failed to register passkey. Please try again.';
+  static const String authenticationFailed =
+      'Passkey authentication failed. Please try again.';
+  static const String credentialAlreadyExists =
+      'A passkey is already registered for this device.';
+  static const String invalidCredential = 'Invalid passkey data provided.';
+
   // Error Configurations
   static const Duration snackbarDuration = Duration(seconds: 4);
   static const Duration retryDelay = Duration(seconds: 2);
@@ -41,4 +61,5 @@ class ErrorConstants {
   static const String serverTitle = 'Server Error';
   static const String cloudflareTitle = 'Server Unavailable';
   static const String genericTitle = 'Error';
+  static const String webauthnTitle = 'Passkey Error';
 }

@@ -4,6 +4,8 @@ import 'package:emotion_tracker/providers/theme_provider.dart';
 import 'package:emotion_tracker/providers/app_providers.dart';
 import 'package:emotion_tracker/screens/auth/server-settings/variant1.dart';
 import 'package:emotion_tracker/providers/secure_storage_provider.dart';
+import 'package:emotion_tracker/providers/webauthn_service.dart';
+import 'package:emotion_tracker/models/webauthn_models.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:convert';
 
@@ -16,9 +18,11 @@ class LoginScreenV1 extends ConsumerStatefulWidget {
   ConsumerState<LoginScreenV1> createState() => _LoginScreenV1State();
 }
 
-class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProviderStateMixin {
+class _LoginScreenV1State extends ConsumerState<LoginScreenV1>
+    with TickerProviderStateMixin {
   bool isPasswordVisible = false;
-  final TextEditingController usernameOrEmailController = TextEditingController();
+  final TextEditingController usernameOrEmailController =
+      TextEditingController();
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
   final FocusNode passwordFocusNode = FocusNode();
@@ -42,20 +46,15 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
       duration: const Duration(milliseconds: 800),
       vsync: this,
     );
-    _fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _animationController!,
-      curve: Curves.easeInOut,
-    ));
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController!, curve: Curves.easeInOut),
+    );
     _slideAnimation = Tween<Offset>(
       begin: const Offset(0, 0.5),
       end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _animationController!,
-      curve: Curves.easeOutBack,
-    ));
+    ).animate(
+      CurvedAnimation(parent: _animationController!, curve: Curves.easeOutBack),
+    );
     _animationController!.forward();
 
     _2faAnimationController = AnimationController(
@@ -69,10 +68,9 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
     _2faSectionSlideAnimation = Tween<Offset>(
       begin: const Offset(0, -0.2),
       end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _2faAnimationController!,
-      curve: Curves.easeOut,
-    ));
+    ).animate(
+      CurvedAnimation(parent: _2faAnimationController!, curve: Curves.easeOut),
+    );
 
     // Show connectivity issue from splash screen if present
     if (widget.connectivityIssue != null) {
@@ -114,7 +112,9 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
                     Text(
                       'Welcome Back to',
                       style: theme.textTheme.headlineSmall?.copyWith(
-                        color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
+                        color: theme.textTheme.bodyMedium?.color?.withOpacity(
+                          0.7,
+                        ),
                         fontWeight: FontWeight.w300,
                       ),
                     ),
@@ -133,7 +133,9 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
                       child: Text(
                         'Please login with your Second Brain Database \n username or email.',
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.textTheme.bodySmall?.color?.withOpacity(0.7),
+                          color: theme.textTheme.bodySmall?.color?.withOpacity(
+                            0.7,
+                          ),
                         ),
                         textAlign: TextAlign.center,
                       ),
@@ -145,7 +147,10 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
                       hintText: 'Username or Email',
                       prefixIcon: Icons.person_outline,
                       keyboardType: TextInputType.text,
-                      autofillHints: [AutofillHints.username, AutofillHints.email],
+                      autofillHints: [
+                        AutofillHints.username,
+                        AutofillHints.email,
+                      ],
                       theme: theme,
                     ),
                     const SizedBox(height: 16),
@@ -156,7 +161,10 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
                       prefixIcon: Icons.lock_outline,
                       isPassword: true,
                       isPasswordVisible: isPasswordVisible,
-                      onPasswordToggle: () => setState(() => isPasswordVisible = !isPasswordVisible),
+                      onPasswordToggle:
+                          () => setState(
+                            () => isPasswordVisible = !isPasswordVisible,
+                          ),
                       autofillHints: [AutofillHints.password],
                       theme: theme,
                       keyboardType: TextInputType.text,
@@ -215,22 +223,23 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
                               ),
                             ),
                             const SizedBox(width: 8),
-                            Icon(
-                              Icons.login,
-                              color: Colors.white,
-                              size: 20,
-                            ),
+                            Icon(Icons.login, color: Colors.white, size: 20),
                           ],
                         ),
                       ),
                     ),
+                    const SizedBox(height: 16),
+                    // Passkey login button
+                    _buildPasskeyLoginButton(theme),
                     const SizedBox(height: 16),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         TextButton(
                           onPressed: () {
-                            Navigator.of(context).pushNamed('/forgot-password/v1');
+                            Navigator.of(
+                              context,
+                            ).pushNamed('/forgot-password/v1');
                           },
                           child: Text(
                             'Forgot Password?',
@@ -241,11 +250,18 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
                           ),
                         ),
                         const SizedBox(width: 12),
-                        Text('|', style: theme.textTheme.bodyMedium?.copyWith(color: theme.dividerColor)),
+                        Text(
+                          '|',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.dividerColor,
+                          ),
+                        ),
                         const SizedBox(width: 12),
                         TextButton(
                           onPressed: () {
-                            Navigator.of(context).pushNamed('/login-with-token/v1');
+                            Navigator.of(
+                              context,
+                            ).pushNamed('/login-with-token/v1');
                           },
                           child: Text(
                             'Login with Token',
@@ -263,12 +279,16 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
                       icon: Icon(
                         Icons.settings_outlined,
                         size: 18,
-                        color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
+                        color: theme.textTheme.bodyMedium?.color?.withOpacity(
+                          0.7,
+                        ),
                       ),
                       label: Text(
                         'Server Settings',
                         style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
+                          color: theme.textTheme.bodyMedium?.color?.withOpacity(
+                            0.7,
+                          ),
                           fontWeight: FontWeight.w400,
                         ),
                       ),
@@ -293,25 +313,30 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
           if (_available2faMethods.length > 1)
             DropdownButtonFormField<String>(
               value: _selected2faMethod,
-              items: _available2faMethods.map((String method) {
-                return DropdownMenuItem<String>(
-                  value: method,
-                  child: Row(
-                    children: [
-                      Icon(
-                        method == 'totp' ? Icons.shield : Icons.vpn_key,
-                        color: theme.primaryColor,
-                        size: 20,
+              items:
+                  _available2faMethods.map((String method) {
+                    return DropdownMenuItem<String>(
+                      value: method,
+                      child: Row(
+                        children: [
+                          Icon(
+                            method == 'totp' ? Icons.shield : Icons.vpn_key,
+                            color: theme.primaryColor,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            method == 'totp'
+                                ? 'Authenticator App Code'
+                                : 'Backup Code',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 8),
-                      Text(
-                        method == 'totp' ? 'Authenticator App Code' : 'Backup Code',
-                        style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
-                      ),
-                    ],
-                  ),
-                );
-              }).toList(),
+                    );
+                  }).toList(),
               onChanged: (String? newValue) {
                 setState(() {
                   _selected2faMethod = newValue;
@@ -334,7 +359,10 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
                     size: 20,
                   ),
                 ),
-                contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+                contentPadding: const EdgeInsets.symmetric(
+                  vertical: 16,
+                  horizontal: 12,
+                ),
               ),
               style: theme.textTheme.bodyLarge,
               dropdownColor: theme.cardTheme.color,
@@ -351,23 +379,37 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
               child: Row(
                 children: [
                   Icon(
-                    _available2faMethods[0] == 'totp' ? Icons.shield : Icons.vpn_key,
+                    _available2faMethods[0] == 'totp'
+                        ? Icons.shield
+                        : Icons.vpn_key,
                     color: theme.primaryColor,
                     size: 20,
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    _available2faMethods[0] == 'totp' ? 'Authenticator App Code' : 'Backup Code',
-                    style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+                    _available2faMethods[0] == 'totp'
+                        ? 'Authenticator App Code'
+                        : 'Backup Code',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                   const Spacer(),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: theme.primaryColor.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Text('Only option', style: theme.textTheme.bodySmall?.copyWith(color: theme.primaryColor)),
+                    child: Text(
+                      'Only option',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.primaryColor,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -428,10 +470,7 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(
-            color: theme.primaryColor,
-            width: 2,
-          ),
+          borderSide: BorderSide(color: theme.primaryColor, width: 2),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
@@ -449,16 +488,17 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
             size: 20,
           ),
         ),
-        suffixIcon: isPassword
-            ? IconButton(
-                onPressed: onPasswordToggle,
-                icon: Icon(
-                  isPasswordVisible ? Icons.visibility_off : Icons.visibility,
-                  color: theme.iconTheme.color?.withOpacity(0.7),
-                  size: 20,
-                ),
-              )
-            : null,
+        suffixIcon:
+            isPassword
+                ? IconButton(
+                  onPressed: onPasswordToggle,
+                  icon: Icon(
+                    isPasswordVisible ? Icons.visibility_off : Icons.visibility,
+                    color: theme.iconTheme.color?.withOpacity(0.7),
+                    size: 20,
+                  ),
+                )
+                : null,
       ),
     );
   }
@@ -488,11 +528,15 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
         // Check for special email not verified error (login failed due to unverified email)
         if (result['error'] == 'email_not_verified') {
           // Even with email not verified, check if encryption is also required
-          final needsEncryption = result['client_side_encryption'] == true || result['client_side_encryption'] == 'true';
+          final needsEncryption =
+              result['client_side_encryption'] == true ||
+              result['client_side_encryption'] == 'true';
 
           if (needsEncryption) {
             // Check if we already have an encryption key
-            final existingKey = await secureStorage.read(key: 'client_side_encryption_key');
+            final existingKey = await secureStorage.read(
+              key: 'client_side_encryption_key',
+            );
             if (existingKey != null && existingKey.isNotEmpty) {
               // Key exists, go directly to verification
               Navigator.of(context).pushReplacementNamed(
@@ -503,7 +547,10 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
               // No key, need to set up encryption first, then verification
               Navigator.of(context).pushReplacementNamed(
                 '/client-side-encryption/v1',
-                arguments: {'nextScreen': '/verify-email/v1', 'finalScreen': '/home/v1'},
+                arguments: {
+                  'nextScreen': '/verify-email/v1',
+                  'finalScreen': '/home/v1',
+                },
               );
             }
           } else {
@@ -517,12 +564,17 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
         }
 
         // Login was successful, now check what additional steps are needed
-        final needsEncryption = result['client_side_encryption'] == true || result['client_side_encryption'] == 'true';
-        final isVerified = result['is_verified'] == true || result['is_verified'] == 'true';
+        final needsEncryption =
+            result['client_side_encryption'] == true ||
+            result['client_side_encryption'] == 'true';
+        final isVerified =
+            result['is_verified'] == true || result['is_verified'] == 'true';
 
         if (needsEncryption && !isVerified) {
           // Check if we already have an encryption key
-          final existingKey = await secureStorage.read(key: 'client_side_encryption_key');
+          final existingKey = await secureStorage.read(
+            key: 'client_side_encryption_key',
+          );
           if (existingKey != null && existingKey.isNotEmpty) {
             // Key exists, go directly to verification
             Navigator.of(context).pushReplacementNamed(
@@ -533,13 +585,18 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
             // No key, need to set up encryption first, then verification
             Navigator.of(context).pushReplacementNamed(
               '/client-side-encryption/v1',
-              arguments: {'nextScreen': '/verify-email/v1', 'finalScreen': '/home/v1'},
+              arguments: {
+                'nextScreen': '/verify-email/v1',
+                'finalScreen': '/home/v1',
+              },
             );
           }
           return;
         } else if (needsEncryption && isVerified) {
           // Check if we already have an encryption key
-          final existingKey = await secureStorage.read(key: 'client_side_encryption_key');
+          final existingKey = await secureStorage.read(
+            key: 'client_side_encryption_key',
+          );
           if (existingKey != null && existingKey.isNotEmpty) {
             // Key exists and verified, go directly to home
             Navigator.of(context).pushReplacementNamed('/home/v1');
@@ -575,7 +632,8 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
         final errorMsg = e.toString();
 
         // Handle invalid TOTP code error
-        if (errorMsg.contains('Login failed: 401') && errorMsg.contains('Invalid TOTP code')) {
+        if (errorMsg.contains('Login failed: 401') &&
+            errorMsg.contains('Invalid TOTP code')) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Invalid verification code. Please try again.'),
@@ -586,10 +644,13 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
           return;
         }
         // Handle invalid or already used backup code error
-        if (errorMsg.contains('Login failed: 401') && errorMsg.contains('Invalid or already used backup code')) {
+        if (errorMsg.contains('Login failed: 401') &&
+            errorMsg.contains('Invalid or already used backup code')) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Invalid or already used backup code. Please use a valid backup code.'),
+              content: Text(
+                'Invalid or already used backup code. Please use a valid backup code.',
+              ),
               backgroundColor: Colors.red,
               duration: const Duration(seconds: 4),
             ),
@@ -599,12 +660,17 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
 
         if (errorMsg.contains('Login failed: 422')) {
           try {
-            final jsonString = errorMsg.substring(errorMsg.indexOf('{'), errorMsg.lastIndexOf('}') + 1);
+            final jsonString = errorMsg.substring(
+              errorMsg.indexOf('{'),
+              errorMsg.lastIndexOf('}') + 1,
+            );
             final errorJson = jsonDecode(jsonString);
             if (errorJson['two_fa_required'] == true) {
               setState(() {
                 _is2faRequired = true;
-                _available2faMethods = List<String>.from(errorJson['available_methods'] ?? []);
+                _available2faMethods = List<String>.from(
+                  errorJson['available_methods'] ?? [],
+                );
                 if (_available2faMethods.isNotEmpty) {
                   _selected2faMethod = _available2faMethods[0];
                 }
@@ -612,7 +678,9 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
               _2faAnimationController!.forward();
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text(errorJson['detail'] ?? '2FA authentication required.'),
+                  content: Text(
+                    errorJson['detail'] ?? '2FA authentication required.',
+                  ),
                   backgroundColor: Colors.orange,
                 ),
               );
@@ -629,29 +697,36 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
         Color? backgroundColor = Theme.of(context).colorScheme.error;
 
         if (errorMsg.contains('CLOUDFLARE_TUNNEL_DOWN:')) {
-          displayMessage = 'Cloudflare tunnel is down. Please try again later or contact support.';
+          displayMessage =
+              'Cloudflare tunnel is down. Please try again later or contact support.';
           backgroundColor = Colors.orange;
           _showServerChangeDialog();
           return;
         } else if (errorMsg.contains('NETWORK_ERROR:')) {
-          displayMessage = 'Network error. Please check your internet connection.';
+          displayMessage =
+              'Network error. Please check your internet connection.';
           backgroundColor = Colors.red;
         } else if (errorMsg.contains('domain/IP')) {
           _showServerChangeDialog();
           return;
         } else if (errorMsg.contains('Login failed: 401')) {
-          displayMessage = 'Invalid username/email or password. Please check your credentials and try again.';
-        } else if (errorMsg.contains('Login failed: 403') && errorMsg.contains('Email not verified')) {
+          displayMessage =
+              'Invalid username/email or password. Please check your credentials and try again.';
+        } else if (errorMsg.contains('Login failed: 403') &&
+            errorMsg.contains('Email not verified')) {
           // Only trigger email verification for 403 errors that specifically mention "Email not verified"
           Navigator.of(context).pushReplacementNamed(
             '/verify-email/v1',
             arguments: {'finalScreen': '/home/v1'},
           );
           return;
-        } else if (errorMsg.contains('Login failed: 403') && errorMsg.contains('Trusted IP Lockdown is enabled')) {
+        } else if (errorMsg.contains('Login failed: 403') &&
+            errorMsg.contains('Trusted IP Lockdown is enabled')) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Login not allowed from this IP. Trusted IP Lockdown is enabled.'),
+              content: Text(
+                'Login not allowed from this IP. Trusted IP Lockdown is enabled.',
+              ),
               backgroundColor: Colors.red,
               duration: const Duration(seconds: 5),
             ),
@@ -660,9 +735,11 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
         } else if (errorMsg.contains('Login failed: 403')) {
           displayMessage = 'Access denied. Please check your credentials.';
         } else if (errorMsg.contains('Login failed: 429')) {
-          displayMessage = 'Too many login attempts. Please wait and try again later.';
+          displayMessage =
+              'Too many login attempts. Please wait and try again later.';
         } else if (errorMsg.contains('Could not connect')) {
-          displayMessage = 'Could not connect to server. Please check your internet connection.';
+          displayMessage =
+              'Could not connect to server. Please check your internet connection.';
         }
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -683,7 +760,8 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
     final warningColor = theme.colorScheme.error;
 
     // Determine if this is a network connectivity issue vs server issue
-    final isNetworkIssue = connectivityIssue.toLowerCase().contains('no internet') ||
+    final isNetworkIssue =
+        connectivityIssue.toLowerCase().contains('no internet') ||
         connectivityIssue.toLowerCase().contains('network') ||
         connectivityIssue.toLowerCase().contains('unable to connect');
 
@@ -704,7 +782,9 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Icon(
-                    isNetworkIssue ? Icons.wifi_off_rounded : Icons.cloud_off_rounded,
+                    isNetworkIssue
+                        ? Icons.wifi_off_rounded
+                        : Icons.cloud_off_rounded,
                     color: warningColor.withOpacity(0.8),
                     size: 20,
                   ),
@@ -716,7 +796,9 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        isNetworkIssue ? 'Network Connection Issue' : 'Server Connection Issue',
+                        isNetworkIssue
+                            ? 'Network Connection Issue'
+                            : 'Server Connection Issue',
                         style: theme.textTheme.titleSmall?.copyWith(
                           color: theme.colorScheme.onError,
                           fontWeight: FontWeight.w600,
@@ -799,7 +881,10 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
           try {
             final Uri settingsUri = Uri.parse('android.settings.SETTINGS');
             if (await canLaunchUrl(settingsUri)) {
-              await launchUrl(settingsUri, mode: LaunchMode.externalApplication);
+              await launchUrl(
+                settingsUri,
+                mode: LaunchMode.externalApplication,
+              );
             } else {
               throw Exception('Cannot launch settings');
             }
@@ -823,7 +908,9 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
           if (mounted) {
             scaffoldMessenger.showSnackBar(
               SnackBar(
-                content: Text('Please go to Settings > Wi-Fi to check your connection'),
+                content: Text(
+                  'Please go to Settings > Wi-Fi to check your connection',
+                ),
                 backgroundColor: theme.primaryColor,
                 duration: const Duration(seconds: 3),
               ),
@@ -878,9 +965,18 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
               ),
               SizedBox(height: 12),
               _buildGuidanceItem('Go to Settings > Wi-Fi', Icons.wifi),
-              _buildGuidanceItem('Check if Wi-Fi is enabled', Icons.wifi_tethering),
-              _buildGuidanceItem('Try connecting to a network', Icons.network_wifi),
-              _buildGuidanceItem('Or enable mobile data', Icons.signal_cellular_alt),
+              _buildGuidanceItem(
+                'Check if Wi-Fi is enabled',
+                Icons.wifi_tethering,
+              ),
+              _buildGuidanceItem(
+                'Try connecting to a network',
+                Icons.network_wifi,
+              ),
+              _buildGuidanceItem(
+                'Or enable mobile data',
+                Icons.signal_cellular_alt,
+              ),
               SizedBox(height: 8),
               Text(
                 'Then try logging in again.',
@@ -894,9 +990,7 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              style: TextButton.styleFrom(
-                foregroundColor: theme.primaryColor,
-              ),
+              style: TextButton.styleFrom(foregroundColor: theme.primaryColor),
               child: Text('Got it'),
             ),
           ],
@@ -915,15 +1009,296 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1> with TickerProvid
         children: [
           Icon(icon, size: 16, color: warningColor.withOpacity(0.8)),
           SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              text,
-              style: theme.textTheme.bodySmall,
-            ),
-          ),
+          Expanded(child: Text(text, style: theme.textTheme.bodySmall)),
         ],
       ),
     );
+  }
+
+  Widget _buildPasskeyLoginButton(ThemeData theme) {
+    return FutureBuilder<bool>(
+      future: ref.read(webAuthnServiceProvider).isWebAuthnSupported(),
+      builder: (context, snapshot) {
+        final isSupported = snapshot.data ?? false;
+
+        if (!isSupported && snapshot.connectionState == ConnectionState.done) {
+          // Show fallback message for unsupported devices
+          return Container(
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+            decoration: BoxDecoration(
+              color: theme.cardTheme.color,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: theme.dividerColor.withOpacity(0.3)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.info_outline,
+                  color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6),
+                  size: 16,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Passkeys not supported on this device',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.textTheme.bodyMedium?.color?.withOpacity(0.6),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return Container(
+          width: double.infinity,
+          height: 48,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: theme.primaryColor, width: 1.5),
+            color: Colors.transparent,
+          ),
+          child: ElevatedButton.icon(
+            onPressed: isSupported ? _loginWithPasskey : null,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.transparent,
+              shadowColor: Colors.transparent,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+              ),
+            ),
+            icon: Icon(Icons.fingerprint, color: theme.primaryColor, size: 20),
+            label: Text(
+              'Login with Passkey',
+              style: theme.textTheme.titleMedium?.copyWith(
+                color: theme.primaryColor,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _loginWithPasskey() async {
+    final userInput = usernameOrEmailController.text.trim();
+
+    // Check if username/email is provided
+    if (userInput.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Please enter your username or email first'),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+      return;
+    }
+
+    try {
+      final webAuthnService = ref.read(webAuthnServiceProvider);
+
+      // Check WebAuthn support
+      final isSupported = await webAuthnService.isWebAuthnSupported();
+      if (!isSupported) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Passkeys are not supported on this device'),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
+        return;
+      }
+
+      // Show loading state
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                const Text('Authenticating with passkey...'),
+              ],
+            ),
+            backgroundColor: ref.read(currentThemeProvider).primaryColor,
+            duration: const Duration(
+              seconds: 30,
+            ), // Long duration for auth process
+          ),
+        );
+      }
+
+      // Determine if input is email or username
+      final isEmail = InputValidator.isEmail(userInput);
+
+      // Begin WebAuthn authentication
+      final beginResponse = await webAuthnService.beginAuthentication(
+        username: isEmail ? null : userInput,
+        email: isEmail ? userInput : null,
+      );
+
+      // TODO: Implement actual WebAuthn platform calls once the webauthn package
+      // is properly configured with the correct API usage.
+      // For now, we'll simulate the WebAuthn flow to demonstrate the integration.
+
+      // Simulate a delay for the authentication process
+      await Future.delayed(const Duration(seconds: 2));
+
+      // For demonstration, we'll throw an exception to show error handling
+      // In a real implementation, this would be replaced with actual WebAuthn platform calls
+      throw WebAuthnException(
+        'WebAuthn implementation is not yet complete. Please use password login.',
+        flutterCode: 'not_implemented',
+      );
+
+      // The following code shows how the complete flow would work once WebAuthn is implemented:
+      /*
+      // Create a mock complete request for demonstration
+      final completeRequest = WebAuthnAuthCompleteRequest(
+        credential: WebAuthnPublicKeyCredential(
+          id: 'mock_credential_id',
+          rawId: 'mock_raw_id',
+          response: WebAuthnAuthenticatorAssertionResponse(
+            clientDataJSON: 'mock_client_data',
+            authenticatorData: 'mock_auth_data',
+            signature: 'mock_signature',
+          ),
+          type: 'public-key',
+        ),
+        username: isEmail ? null : userInput,
+        email: isEmail ? userInput : null,
+      );
+
+      // Complete WebAuthn authentication
+      final completeResponse = await webAuthnService.completeAuthentication(completeRequest);
+
+      // Convert response to Map for auth system integration
+      final authData = completeResponse.toJson();
+
+      // Update auth state using existing patterns
+      final authNotifier = ref.read(authProvider.notifier);
+      await authNotifier.loginWithWebAuthn(authData);
+
+      // Clear loading snackbar
+      if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+      }
+
+      // Navigate to appropriate screen based on verification status
+      if (mounted) {
+        final needsEncryption = completeResponse.clientSideEncryption;
+        final isVerified = completeResponse.isVerified;
+
+        if (needsEncryption && !isVerified) {
+          // Check if we already have an encryption key
+          final secureStorage = ref.read(secureStorageProvider);
+          final existingKey = await secureStorage.read(key: 'client_side_encryption_key');
+          
+          if (existingKey != null && existingKey.isNotEmpty) {
+            // Key exists, go directly to verification
+            Navigator.of(context).pushReplacementNamed(
+              '/verify-email/v1',
+              arguments: {'finalScreen': '/home/v1'},
+            );
+          } else {
+            // No key, need to set up encryption first, then verification
+            Navigator.of(context).pushReplacementNamed(
+              '/client-side-encryption/v1',
+              arguments: {
+                'nextScreen': '/verify-email/v1',
+                'finalScreen': '/home/v1',
+              },
+            );
+          }
+        } else if (needsEncryption && isVerified) {
+          // Check if we already have an encryption key
+          final secureStorage = ref.read(secureStorageProvider);
+          final existingKey = await secureStorage.read(key: 'client_side_encryption_key');
+          
+          if (existingKey != null && existingKey.isNotEmpty) {
+            // Key exists, go to home
+            Navigator.of(context).pushReplacementNamed('/home/v1');
+          } else {
+            // No key, need to set up encryption
+            Navigator.of(context).pushReplacementNamed(
+              '/client-side-encryption/v1',
+              arguments: {'finalScreen': '/home/v1'},
+            );
+          }
+        } else if (!needsEncryption && !isVerified) {
+          // Only verification required
+          Navigator.of(context).pushReplacementNamed(
+            '/verify-email/v1',
+            arguments: {'finalScreen': '/home/v1'},
+          );
+        } else {
+          // Fully authenticated, go to home
+          Navigator.of(context).pushReplacementNamed('/home/v1');
+        }
+      }
+      */
+    } catch (e) {
+      // Clear loading snackbar
+      if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+
+        String errorMessage = 'Passkey authentication failed';
+        Color backgroundColor = Colors.red;
+
+        if (e is WebAuthnException) {
+          switch (e.flutterCode) {
+            case 'user_cancelled':
+              errorMessage = 'Authentication was cancelled';
+              backgroundColor = Colors.orange;
+              break;
+            case 'no_credentials':
+              errorMessage = 'No passkeys found. Please set up a passkey first';
+              break;
+            case 'challenge_expired':
+              errorMessage = 'Authentication session expired. Please try again';
+              break;
+            case 'credential_not_found':
+              errorMessage =
+                  'Passkey not recognized. Please try a different device';
+              break;
+            case 'not_implemented':
+              errorMessage = e.message;
+              backgroundColor = Colors.orange;
+              break;
+            default:
+              errorMessage = e.message;
+          }
+        } else if (e.toString().contains('User cancelled')) {
+          errorMessage = 'Authentication was cancelled';
+          backgroundColor = Colors.orange;
+        } else if (e.toString().contains('No credentials')) {
+          errorMessage = 'No passkeys found. Please set up a passkey first';
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: backgroundColor,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    }
   }
 
   void _showServerChangeDialog() {

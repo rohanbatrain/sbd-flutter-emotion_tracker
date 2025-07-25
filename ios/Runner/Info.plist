@@ -45,5 +45,13 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<!-- Face ID usage description for WebAuthn -->
+	<key>NSFaceIDUsageDescription</key>
+	<string>Use Face ID to authenticate with your passkey</string>
+	<!-- Associated domains for WebAuthn -->
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>webcredentials:yourdomain.com</string>
+	</array>
 </dict>
 </plist>

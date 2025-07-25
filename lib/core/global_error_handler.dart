@@ -5,8 +5,9 @@ import 'package:emotion_tracker/core/error_state.dart';
 import 'package:emotion_tracker/core/session_manager.dart';
 import 'package:emotion_tracker/providers/api_token_service.dart'
     show ApiException, UnauthorizedException, RateLimitException;
+import 'package:emotion_tracker/models/webauthn_models.dart'
+    show WebAuthnException;
 import 'package:emotion_tracker/utils/http_util.dart';
-import 'package:emotion_tracker/providers/app_providers.dart' show authProvider;
 
 /// Global error handler service that processes and categorizes all application errors
 class GlobalErrorHandler {
@@ -16,6 +17,8 @@ class GlobalErrorHandler {
       return _createUnauthorizedError(error);
     } else if (error is RateLimitException) {
       return _createRateLimitError(error);
+    } else if (error is WebAuthnException) {
+      return _createWebAuthnError(error);
     } else if (error is CloudflareTunnelException) {
       return _createCloudflareError(error);
     } else if (error is NetworkException) {
@@ -49,6 +52,26 @@ class GlobalErrorHandler {
       message:
           error.message.isNotEmpty ? error.message : ErrorConstants.rateLimited,
       metadata: {'originalError': error},
+    );
+  }
+
+  /// Creates an ErrorState for WebAuthnException
+  static ErrorState _createWebAuthnError(WebAuthnException error) {
+    final config = ErrorConfigs.getConfig(ErrorType.webauthn);
+
+    // Map WebAuthn-specific error codes to user-friendly messages
+    String message = _getWebAuthnErrorMessage(error);
+
+    return ErrorState.fromConfig(
+      type: ErrorType.webauthn,
+      config: config,
+      title: ErrorConstants.webauthnTitle,
+      message: message,
+      metadata: {
+        'originalError': error,
+        'statusCode': error.statusCode,
+        'flutterCode': error.flutterCode,
+      },
     );
   }
 
@@ -185,6 +208,70 @@ class GlobalErrorHandler {
     }
   }
 
+  /// Maps WebAuthn-specific error codes to user-friendly messages
+  static String _getWebAuthnErrorMessage(WebAuthnException error) {
+    // Check for specific flutter codes first
+    if (error.flutterCode != null) {
+      switch (error.flutterCode) {
+        case 'NOT_SUPPORTED':
+          return ErrorConstants.passkeyNotSupported;
+        case 'USER_CANCELLED':
+          return ErrorConstants.userCancelled;
+        case 'CHALLENGE_EXPIRED':
+          return ErrorConstants.challengeExpired;
+        case 'NO_CREDENTIALS':
+          return ErrorConstants.noCredentials;
+        case 'CREDENTIAL_NOT_FOUND':
+          return ErrorConstants.credentialNotFound;
+        case 'AUTHENTICATOR_ERROR':
+          return ErrorConstants.authenticatorError;
+        case 'CREDENTIAL_ALREADY_EXISTS':
+          return ErrorConstants.credentialAlreadyExists;
+        case 'INVALID_CREDENTIAL':
+          return ErrorConstants.invalidCredential;
+      }
+    }
+
+    // Check for specific status codes
+    if (error.statusCode != null) {
+      switch (error.statusCode) {
+        case 404:
+          return ErrorConstants.credentialNotFound;
+        case 409:
+          return ErrorConstants.credentialAlreadyExists;
+        case 422:
+          return ErrorConstants.invalidCredential;
+      }
+    }
+
+    // Check if the error message contains specific keywords
+    final message = error.message.toLowerCase();
+    if (message.contains('not supported')) {
+      return ErrorConstants.passkeyNotSupported;
+    } else if (message.contains('cancelled') || message.contains('canceled')) {
+      return ErrorConstants.userCancelled;
+    } else if (message.contains('expired')) {
+      return ErrorConstants.challengeExpired;
+    } else if (message.contains('no credentials') ||
+        message.contains('no passkeys')) {
+      return ErrorConstants.noCredentials;
+    } else if (message.contains('not found') ||
+        message.contains('not recognized')) {
+      return ErrorConstants.credentialNotFound;
+    } else if (message.contains('authenticator')) {
+      return ErrorConstants.authenticatorError;
+    } else if (message.contains('registration')) {
+      return ErrorConstants.registrationFailed;
+    } else if (message.contains('authentication')) {
+      return ErrorConstants.authenticationFailed;
+    }
+
+    // Fallback to original message or generic error
+    return error.message.isNotEmpty
+        ? error.message
+        : ErrorConstants.authenticationFailed;
+  }
+
   /// Handles unauthorized errors by delegating to SessionManager
   /// Uses the new SessionManager for consistent session handling
   static Future<void> handleUnauthorized(
@@ -226,6 +313,9 @@ class GlobalErrorHandler {
     switch (errorState.type) {
       case ErrorType.unauthorized:
         return false; // Don't retry unauthorized errors
+      case ErrorType.webauthn:
+        // WebAuthn errors are generally not retryable as they require user interaction
+        return false;
       case ErrorType.rateLimited:
       case ErrorType.networkError:
       case ErrorType.serverError:
@@ -246,7 +336,11 @@ class GlobalErrorHandler {
       case ErrorType.cloudflareError:
         // Exponential backoff for other retryable errors
         return Duration(seconds: (1 << retryCount).clamp(1, 30));
-      default:
+      case ErrorType.unauthorized:
+      case ErrorType.webauthn:
+        // These errors are not retryable, but return default delay just in case
+        return ErrorConstants.retryDelay;
+      case ErrorType.generic:
         return ErrorConstants.retryDelay;
     }
   }

@@ -7,6 +7,7 @@ enum ErrorType {
   networkError,
   serverError,
   cloudflareError,
+  webauthn,
   generic,
 }
 
@@ -162,6 +163,12 @@ class ErrorConfigs {
       color: Colors.red,
       showRetry: true,
       showInfo: true,
+    ),
+    ErrorType.webauthn: ErrorConfig(
+      icon: Icons.fingerprint,
+      color: Colors.orange,
+      showRetry: true,
+      showInfo: false,
     ),
     ErrorType.generic: ErrorConfig(
       icon: Icons.error_outline,

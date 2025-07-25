@@ -9,41 +9,51 @@ import 'package:emotion_tracker/screens/settings/account/enable-2fa/2fa_status_s
 import 'package:emotion_tracker/screens/settings/account/trusted-ip/trusted_ip_status_screen.dart';
 import 'package:emotion_tracker/screens/settings/account/login_history_screen.dart';
 import 'package:emotion_tracker/screens/settings/account/api-tokens/api_tokens_screen.dart';
+import 'package:emotion_tracker/screens/settings/account/passkeys/passkey_management_screen.dart';
 import 'package:emotion_tracker/widgets/custom_app_bar.dart';
 
 class AccountSettingsScreenV1 extends ConsumerWidget {
   const AccountSettingsScreenV1({Key? key}) : super(key: key);
 
-  Future<bool> _authenticate(BuildContext context, {String? reason, bool allowSkip = false, VoidCallback? onSkip}) async {
+  Future<bool> _authenticate(
+    BuildContext context, {
+    String? reason,
+    bool allowSkip = false,
+    VoidCallback? onSkip,
+  }) async {
     final LocalAuthentication auth = LocalAuthentication();
     try {
       final bool didAuthenticate = await auth.authenticate(
         localizedReason: reason ?? 'Please authenticate',
-        options: const AuthenticationOptions(biometricOnly: false, stickyAuth: true),
+        options: const AuthenticationOptions(
+          biometricOnly: false,
+          stickyAuth: true,
+        ),
       );
       return didAuthenticate;
     } on PlatformException catch (e) {
       if (e.code == 'NotAvailable' && allowSkip) {
         final proceed = await showDialog<bool>(
           context: context,
-          builder: (context) => AlertDialog(
-            title: Text('Device Security Not Enabled'),
-            content: Text(
-              'No device security (PIN, password, or biometrics) is enabled.\n\n'
-              'Enabling 2FA without device protection is less secure.\n\n'
-              'Would you like to continue anyway?'
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: Text('Cancel'),
+          builder:
+              (context) => AlertDialog(
+                title: Text('Device Security Not Enabled'),
+                content: Text(
+                  'No device security (PIN, password, or biometrics) is enabled.\n\n'
+                  'Enabling 2FA without device protection is less secure.\n\n'
+                  'Would you like to continue anyway?',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(false),
+                    child: Text('Cancel'),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(true),
+                    child: Text('Continue Anyway'),
+                  ),
+                ],
               ),
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                child: Text('Continue Anyway'),
-              ),
-            ],
-          ),
         );
         if (proceed == true) {
           if (onSkip != null) onSkip();
@@ -51,7 +61,9 @@ class AccountSettingsScreenV1 extends ConsumerWidget {
         }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Authentication error: ${e.message ?? e.code}')),
+          SnackBar(
+            content: Text('Authentication error: ${e.message ?? e.code}'),
+          ),
         );
       }
       return false;
@@ -92,9 +104,7 @@ class AccountSettingsScreenV1 extends ConsumerWidget {
               title: Text('Profile'),
               onTap: () {
                 Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const ProfileScreenV1(),
-                  ),
+                  MaterialPageRoute(builder: (_) => const ProfileScreenV1()),
                 );
               },
             ),
@@ -103,7 +113,10 @@ class AccountSettingsScreenV1 extends ConsumerWidget {
               leading: Icon(Icons.lock, color: theme.primaryColor),
               title: Text('Change Password'),
               onTap: () async {
-                final authenticated = await _authenticate(context, reason: 'Please authenticate to change your password');
+                final authenticated = await _authenticate(
+                  context,
+                  reason: 'Please authenticate to change your password',
+                );
                 if (authenticated) {
                   Navigator.of(context).push(
                     MaterialPageRoute(
@@ -128,6 +141,25 @@ class AccountSettingsScreenV1 extends ConsumerWidget {
                   Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => const TwoFAStatusScreen(),
+                    ),
+                  );
+                }
+              },
+            ),
+            SizedBox(height: 14),
+            ListTile(
+              leading: Icon(Icons.fingerprint, color: theme.primaryColor),
+              title: Text('Manage Passkeys'),
+              subtitle: Text('Set up passwordless authentication'),
+              onTap: () async {
+                final authenticated = await _authenticate(
+                  context,
+                  reason: 'Please authenticate to access passkey settings',
+                );
+                if (authenticated) {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const PasskeyManagementScreen(),
                     ),
                   );
                 }
@@ -162,9 +194,7 @@ class AccountSettingsScreenV1 extends ConsumerWidget {
                 );
                 if (authenticated) {
                   Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const ApiTokensScreen(),
-                    ),
+                    MaterialPageRoute(builder: (_) => const ApiTokensScreen()),
                   );
                 }
               },
@@ -175,9 +205,7 @@ class AccountSettingsScreenV1 extends ConsumerWidget {
               title: Text('Recent Login(s)'),
               onTap: () {
                 Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const LoginHistoryScreen(),
-                  ),
+                  MaterialPageRoute(builder: (_) => const LoginHistoryScreen()),
                 );
               },
             ),

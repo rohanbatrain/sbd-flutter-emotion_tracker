@@ -395,6 +395,8 @@ class ErrorStateWidget extends ConsumerWidget {
         return '• Wait a few minutes and try again\n• Check if other features work\n• Contact support if problem persists';
       case ErrorType.cloudflareError:
         return '• Wait for the server to come back online\n• Try again in a few minutes\n• Check server status if available';
+      case ErrorType.webauthn:
+        return '• Try using a different device or browser\n• Ensure your device supports passkeys\n• Check if your passkey is still registered\n• Contact support if the issue persists';
       case ErrorType.generic:
         return '• Try the operation again\n• Restart the app if problem persists\n• Contact support with error details';
     }

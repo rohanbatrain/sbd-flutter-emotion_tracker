@@ -42,12 +42,10 @@ class NavigationService {
     return Future.value(null);
   }
 
-  Future<T?> navigateAndReplaceWithTransition<T extends Object?, TO extends Object?>(
-    Widget page, {
-    TransitionConfig? config,
-    String? routeName,
-    TO? result,
-  }) {
+  Future<T?> navigateAndReplaceWithTransition<
+    T extends Object?,
+    TO extends Object?
+  >(Widget page, {TransitionConfig? config, String? routeName, TO? result}) {
     if (navigatorKey.currentState != null) {
       return navigatorKey.currentState!.pushReplacementWithTransition<T, TO>(
         page,
@@ -96,13 +94,15 @@ class _ApiErrorHandler {
       return Exception('CLOUDFLARE_TUNNEL_DOWN: ${error.message}');
     } else if (error is NetworkException) {
       return Exception('NETWORK_ERROR: ${error.message}');
-    } else if (error.toString().contains('Login failed:') || 
-               error.toString().contains('Registration failed:') ||
-               error.toString().contains('Failed to resend verification email:')) {
+    } else if (error.toString().contains('Login failed:') ||
+        error.toString().contains('Registration failed:') ||
+        error.toString().contains('Failed to resend verification email:')) {
       // Re-throw authentication/API errors as-is (don't wrap them)
       return error as Exception;
     }
-    return Exception('Could not connect to the server. Please check your domain/IP and try again.');
+    return Exception(
+      'Could not connect to the server. Please check your domain/IP and try again.',
+    );
   }
 }
 
@@ -121,51 +121,66 @@ class _ApiHeaders {
 // Common utility for storing auth data
 class _AuthDataStorage {
   static Future<void> storeAuthData(
-    WidgetRef ref, 
+    WidgetRef ref,
     Map<String, dynamic> result, {
     String? loginEmail,
   }) async {
     final secureStorage = ref.read(secureStorageProvider);
-    
+
     // Define what goes to secure storage vs shared preferences
     final secureData = {
       'access_token': result['access_token'] ?? '',
       'token_type': result['token_type'] ?? '',
-      'client_side_encryption': result['client_side_encryption']?.toString() ?? 'false',
+      'client_side_encryption':
+          result['client_side_encryption']?.toString() ?? 'false',
       'user_role': result['role'] ?? 'user',
     };
-    
+
     final userData = {
       'user_username': result['username'],
       'user_first_name': result['first_name'],
       'user_last_name': result['last_name'],
     };
-    
+
     final prefsData = {
       'issued_at': result['issued_at']?.toString() ?? '',
       'expires_at': result['expires_at']?.toString() ?? '',
       'is_verified': result['is_verified'] ?? false,
     };
-    
+
     // Store secure data
-    final secureStoreFutures = secureData.entries
-        .map((entry) => secureStorage.write(key: entry.key, value: entry.value))
-        .toList();
-    
+    final secureStoreFutures =
+        secureData.entries
+            .map(
+              (entry) =>
+                  secureStorage.write(key: entry.key, value: entry.value),
+            )
+            .toList();
+
     // Store user data (only if not empty)
     for (final entry in userData.entries) {
       if (entry.value != null && entry.value.toString().isNotEmpty) {
-        secureStoreFutures.add(secureStorage.write(key: entry.key, value: entry.value.toString()));
+        secureStoreFutures.add(
+          secureStorage.write(key: entry.key, value: entry.value.toString()),
+        );
       }
     }
-    
+
     // Handle email storage
     if (loginEmail != null && loginEmail.isNotEmpty) {
-      secureStoreFutures.add(secureStorage.write(key: 'user_email', value: loginEmail));
-    } else if (result['email'] != null && result['email'].toString().isNotEmpty) {
-      secureStoreFutures.add(secureStorage.write(key: 'user_email', value: result['email'].toString()));
+      secureStoreFutures.add(
+        secureStorage.write(key: 'user_email', value: loginEmail),
+      );
+    } else if (result['email'] != null &&
+        result['email'].toString().isNotEmpty) {
+      secureStoreFutures.add(
+        secureStorage.write(
+          key: 'user_email',
+          value: result['email'].toString(),
+        ),
+      );
     }
-    
+
     // Store preferences data
     final prefs = await SharedPreferences.getInstance();
     final prefsFutures = [
@@ -173,7 +188,7 @@ class _AuthDataStorage {
       prefs.setString('expires_at', prefsData['expires_at']!),
       prefs.setBool('is_verified', prefsData['is_verified']!),
     ];
-    
+
     // Execute all storage operations in parallel
     await Future.wait([
       ...secureStoreFutures,
@@ -185,15 +200,23 @@ class _AuthDataStorage {
 
 // Common utility for API response validation
 class _ApiResponseValidator {
-  static Map<String, dynamic> validateAndParseResponse(http.Response response, String operation) {
+  static Map<String, dynamic> validateAndParseResponse(
+    http.Response response,
+    String operation,
+  ) {
     if (response.statusCode == 200) {
       return jsonDecode(response.body) as Map<String, dynamic>;
     } else {
-      throw Exception('$operation failed: ${response.statusCode} ${response.body}');
+      throw Exception(
+        '$operation failed: ${response.statusCode} ${response.body}',
+      );
     }
   }
-  
-  static bool validateAvailabilityResponse(http.Response response, String field) {
+
+  static bool validateAvailabilityResponse(
+    http.Response response,
+    String field,
+  ) {
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       return data['available'] == true;
@@ -206,48 +229,64 @@ class _ApiResponseValidator {
 // Common utility for input validation
 class InputValidator {
   // Email validation patterns
-  static final RegExp _emailRegExp = RegExp(r'^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$');
-  static final RegExp _emailRegExpCaseInsensitive = RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
-  
+  static final RegExp _emailRegExp = RegExp(
+    r'^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$',
+  );
+  static final RegExp _emailRegExpCaseInsensitive = RegExp(
+    r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
+  );
+
   // Username validation pattern
   static final RegExp _usernameRegExp = RegExp(r'^[a-z0-9_-]{3,50}$');
   static final RegExp _usernamePatternRegExp = RegExp(r'^[a-z0-9_-]+$');
-  
+
   // Domain validation pattern
   static final RegExp _domainRegExp = RegExp(r'^[a-zA-Z0-9.-]+(:[0-9]{1,5})?$');
-  
+
   // Password strength patterns
   static final RegExp _upperCaseRegExp = RegExp(r'[A-Z]');
   static final RegExp _lowerCaseRegExp = RegExp(r'[a-z]');
   static final RegExp _digitRegExp = RegExp(r'\d');
-  static final RegExp _specialCharRegExp = RegExp(r'[!@#\$&*~%^()_\-+=\[\]{}|;:,.<>?/]');
-  
-  static bool isEmail(String input) => _emailRegExp.hasMatch(input.toLowerCase());
-  
-  static bool isEmailCaseInsensitive(String input) => _emailRegExpCaseInsensitive.hasMatch(input);
-  
-  static bool isValidUsername(String username) => _usernameRegExp.hasMatch(username.toLowerCase());
-  
-  static bool hasValidUsernamePattern(String username) => _usernamePatternRegExp.hasMatch(username.toLowerCase());
-  
-  static bool isValidDomain(String domain) => _domainRegExp.hasMatch(domain) && domain.isNotEmpty;
-  
+  static final RegExp _specialCharRegExp = RegExp(
+    r'[!@#\$&*~%^()_\-+=\[\]{}|;:,.<>?/]',
+  );
+
+  static bool isEmail(String input) =>
+      _emailRegExp.hasMatch(input.toLowerCase());
+
+  static bool isEmailCaseInsensitive(String input) =>
+      _emailRegExpCaseInsensitive.hasMatch(input);
+
+  static bool isValidUsername(String username) =>
+      _usernameRegExp.hasMatch(username.toLowerCase());
+
+  static bool hasValidUsernamePattern(String username) =>
+      _usernamePatternRegExp.hasMatch(username.toLowerCase());
+
+  static bool isValidDomain(String domain) =>
+      _domainRegExp.hasMatch(domain) && domain.isNotEmpty;
+
   static bool isPasswordStrong(String password) {
     final lengthCheck = password.length >= 8;
     final upperCheck = _upperCaseRegExp.hasMatch(password);
     final lowerCheck = _lowerCaseRegExp.hasMatch(password);
     final digitCheck = _digitRegExp.hasMatch(password);
     final specialCheck = _specialCharRegExp.hasMatch(password);
-    return lengthCheck && upperCheck && lowerCheck && digitCheck && specialCheck;
+    return lengthCheck &&
+        upperCheck &&
+        lowerCheck &&
+        digitCheck &&
+        specialCheck;
   }
-  
+
   // Validation with detailed error messages
   static String? validateEmail(String email, {bool caseSensitive = false}) {
     if (email.isEmpty) return 'Email cannot be empty';
-    final isValid = caseSensitive ? isEmailCaseInsensitive(email) : isEmail(email);
+    final isValid =
+        caseSensitive ? isEmailCaseInsensitive(email) : isEmail(email);
     return isValid ? null : 'Please enter a valid email address';
   }
-  
+
   static String? validateUsername(String username) {
     if (username.isEmpty) return 'Username cannot be empty';
     if (username.length < 3) return 'Username must be at least 3 characters';
@@ -257,17 +296,21 @@ class InputValidator {
     }
     return null;
   }
-  
+
   static String? validatePassword(String password) {
     if (password.isEmpty) return 'Password cannot be empty';
     if (password.length < 8) return 'Password must be at least 8 characters';
-    if (!_upperCaseRegExp.hasMatch(password)) return 'Password must contain an uppercase letter';
-    if (!_lowerCaseRegExp.hasMatch(password)) return 'Password must contain a lowercase letter';
-    if (!_digitRegExp.hasMatch(password)) return 'Password must contain a digit';
-    if (!_specialCharRegExp.hasMatch(password)) return 'Password must contain a special character';
+    if (!_upperCaseRegExp.hasMatch(password))
+      return 'Password must contain an uppercase letter';
+    if (!_lowerCaseRegExp.hasMatch(password))
+      return 'Password must contain a lowercase letter';
+    if (!_digitRegExp.hasMatch(password))
+      return 'Password must contain a digit';
+    if (!_specialCharRegExp.hasMatch(password))
+      return 'Password must contain a special character';
     return null;
   }
-  
+
   static String? validateDomain(String domain) {
     if (domain.isEmpty) return 'Please enter a domain or IP';
     if (!isValidDomain(domain)) {
@@ -279,7 +322,11 @@ class InputValidator {
 
 // Common utility for UI feedback
 class UIHelper {
-  static void showErrorSnackBar(BuildContext context, String message, {Color? backgroundColor}) {
+  static void showErrorSnackBar(
+    BuildContext context,
+    String message, {
+    Color? backgroundColor,
+  }) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
@@ -288,7 +335,7 @@ class UIHelper {
       ),
     );
   }
-  
+
   static void showSuccessSnackBar(BuildContext context, String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -298,8 +345,12 @@ class UIHelper {
       ),
     );
   }
-  
-  static void showInfoSnackBar(BuildContext context, String message, {Color? backgroundColor}) {
+
+  static void showInfoSnackBar(
+    BuildContext context,
+    String message, {
+    Color? backgroundColor,
+  }) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
@@ -339,6 +390,36 @@ class AuthState {
   }
 }
 
+/// Helper function to convert WebAuthnAuthCompleteResponse to auth data format
+Map<String, dynamic> convertWebAuthnResponseToAuthData(
+  Map<String, dynamic> webAuthnResponse,
+) {
+  // Convert WebAuthnAuthCompleteResponse format to the format expected by _AuthDataStorage
+  return {
+    'access_token':
+        webAuthnResponse['accessToken'] ?? webAuthnResponse['access_token'],
+    'token_type':
+        webAuthnResponse['tokenType'] ??
+        webAuthnResponse['token_type'] ??
+        'Bearer',
+    'client_side_encryption':
+        webAuthnResponse['clientSideEncryption'] ??
+        webAuthnResponse['client_side_encryption'],
+    'issued_at': webAuthnResponse['issuedAt'] ?? webAuthnResponse['issued_at'],
+    'expires_at':
+        webAuthnResponse['expiresAt'] ?? webAuthnResponse['expires_at'],
+    'is_verified':
+        webAuthnResponse['isVerified'] ?? webAuthnResponse['is_verified'],
+    'role': webAuthnResponse['role'],
+    'username': webAuthnResponse['username'],
+    'email': webAuthnResponse['email'],
+    'authentication_method':
+        webAuthnResponse['authenticationMethod'] ??
+        webAuthnResponse['authentication_method'] ??
+        'webauthn',
+  };
+}
+
 /// Function to call backend /auth/logout endpoint
 Future<void> logoutFromBackend(WidgetRef ref, String? accessToken) async {
   if (accessToken == null || accessToken.isEmpty) return;
@@ -347,10 +428,7 @@ Future<void> logoutFromBackend(WidgetRef ref, String? accessToken) async {
   try {
     final headers = await _ApiHeaders.getCommonHeaders();
     headers['Authorization'] = 'Bearer $accessToken';
-    final response = await HttpUtil.post(
-      url,
-      headers: headers,
-    );
+    final response = await HttpUtil.post(url, headers: headers);
     // Accept 200 or 204 as success, ignore errors (token may be expired)
   } catch (e) {
     // Ignore errors during logout, proceed to clear local state
@@ -359,9 +437,10 @@ Future<void> logoutFromBackend(WidgetRef ref, String? accessToken) async {
 
 class AuthNotifier extends StateNotifier<AuthState> {
   final FlutterSecureStorage _secureStorage;
+  final Ref _ref;
   late final SharedPreferences _prefs;
 
-  AuthNotifier(this._secureStorage) : super(const AuthState()) {
+  AuthNotifier(this._secureStorage, this._ref) : super(const AuthState()) {
     _initializeAuth();
   }
 
@@ -374,15 +453,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
         _secureStorage.read(key: 'access_token'),
         _secureStorage.read(key: 'user_email'),
       ]);
-      
+
       _prefs = futures[0] as SharedPreferences;
       final accessToken = futures[1] as String?;
       final userEmail = futures[2] as String?;
-      
+
       // Read remaining data from SharedPreferences (these are fast local reads)
       final isVerified = _prefs.getBool('is_verified') ?? false;
       final expiresAtString = _prefs.getString('expires_at');
-      
+
       // Check if token exists and is not expired
       bool isValidToken = false;
       if (accessToken != null && accessToken.isNotEmpty) {
@@ -401,7 +480,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
           isValidToken = true;
         }
       }
-      
+
       if (isValidToken && isVerified) {
         // User has valid authentication, restore session
         state = state.copyWith(
@@ -426,11 +505,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> login(String usernameOrEmail) async {
     // This method is called after successful API login
     // The actual API call happens in the login screen
-    
+
     // Get the latest user data from secure storage
     final userEmail = await _secureStorage.read(key: 'user_email');
     final accessToken = await _secureStorage.read(key: 'access_token');
-    
+
     state = state.copyWith(
       isLoggedIn: true,
       userEmail: userEmail ?? usernameOrEmail,
@@ -438,7 +517,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
     );
   }
 
-  Future<Map<String, dynamic>> loginWithToken(WidgetRef ref, String token) async {
+  Future<Map<String, dynamic>> loginWithToken(
+    WidgetRef ref,
+    String token,
+  ) async {
     final result = await loginWithTokenApi(ref, token);
     // Update state if login was successful
     if (result['access_token'] != null) {
@@ -457,12 +539,33 @@ class AuthNotifier extends StateNotifier<AuthState> {
     return result;
   }
 
+  Future<void> loginWithWebAuthn(Map<String, dynamic> webAuthnResult) async {
+    // This method is called after successful WebAuthn authentication
+    // The webAuthnResult contains the WebAuthnAuthCompleteResponse data
+
+    // Convert WebAuthn response format to the format expected by existing auth system
+    final authData = convertWebAuthnResponseToAuthData(webAuthnResult);
+
+    // Store WebAuthn authentication data using existing patterns
+    // Note: We need to create a WidgetRef-compatible method for this
+    await _storeWebAuthnAuthData(authData);
+
+    final userEmail = authData['email'] ?? authData['username'];
+    final accessToken = authData['access_token'];
+
+    state = state.copyWith(
+      isLoggedIn: true,
+      userEmail: userEmail,
+      accessToken: accessToken,
+    );
+  }
+
   Future<void> signup(String username, String email, String password) async {
     // This method is called after successful API signup
     // The actual API call happens in the signup screen
-    
+
     final accessToken = await _secureStorage.read(key: 'access_token');
-    
+
     state = state.copyWith(
       isLoggedIn: true,
       userEmail: email,
@@ -494,10 +597,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
             final url = Uri.parse('$apiBaseUrl/auth/logout');
             final headers = await _ApiHeaders.getCommonHeaders();
             headers['Authorization'] = 'Bearer $accessToken';
-            await HttpUtil.post(
-              url,
-              headers: headers,
-            );
+            await HttpUtil.post(url, headers: headers);
           } catch (e) {
             // Optionally log error
           }
@@ -514,19 +614,79 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<void> _clearStoredAuth() async {
     try {
-      // Clear secure storage
+      // Clear secure storage (this includes WebAuthn tokens and any WebAuthn-related data)
       await _secureStorage.deleteAll();
-      
+
       // Clear shared preferences auth-related data
       await _prefs.remove('issued_at');
       await _prefs.remove('expires_at');
       await _prefs.remove('is_verified');
-      
+
+      // Clear any WebAuthn-specific preferences if they exist
+      // (Currently WebAuthn data is stored in secure storage, but this ensures future compatibility)
+      await _prefs.remove('webauthn_last_used');
+      await _prefs.remove('webauthn_device_name');
+
       // You might want to keep some non-sensitive settings like theme preferences
       // So we're not calling _prefs.clear() here
     } catch (e) {
       // Error clearing storage, but continue with logout
     }
+  }
+
+  // Helper method to store WebAuthn auth data without requiring WidgetRef
+  Future<void> _storeWebAuthnAuthData(Map<String, dynamic> authData) async {
+    // Define what goes to secure storage vs shared preferences
+    final secureData = {
+      'access_token': authData['access_token'] ?? '',
+      'token_type': authData['token_type'] ?? '',
+      'client_side_encryption':
+          authData['client_side_encryption']?.toString() ?? 'false',
+      'user_role': authData['role'] ?? 'user',
+    };
+
+    final userData = {
+      'user_username': authData['username'],
+      'user_email': authData['email'],
+    };
+
+    final prefsData = {
+      'issued_at': authData['issued_at']?.toString() ?? '',
+      'expires_at': authData['expires_at']?.toString() ?? '',
+      'is_verified': authData['is_verified'] ?? false,
+    };
+
+    // Store secure data
+    final secureStoreFutures =
+        secureData.entries
+            .map(
+              (entry) =>
+                  _secureStorage.write(key: entry.key, value: entry.value),
+            )
+            .toList();
+
+    // Store user data (only if not empty)
+    for (final entry in userData.entries) {
+      if (entry.value != null && entry.value.toString().isNotEmpty) {
+        secureStoreFutures.add(
+          _secureStorage.write(key: entry.key, value: entry.value.toString()),
+        );
+      }
+    }
+
+    // Store preferences data
+    final prefsFutures = [
+      _prefs.setString('issued_at', prefsData['issued_at']!),
+      _prefs.setString('expires_at', prefsData['expires_at']!),
+      _prefs.setBool('is_verified', prefsData['is_verified']!),
+    ];
+
+    // Execute all storage operations in parallel
+    await Future.wait([
+      ...secureStoreFutures,
+      ...prefsFutures,
+      _secureStorage.delete(key: 'temp_user_password'), // Cleanup
+    ]);
   }
 
   // Method to refresh token if needed
@@ -536,10 +696,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
       if (expiresAtString != null) {
         final expiresAt = DateTime.parse(expiresAtString);
         final now = DateTime.now();
-        
+
         // If token expires in less than 5 minutes, consider refreshing
         final shouldRefresh = expiresAt.difference(now).inMinutes < 5;
-        
+
         if (shouldRefresh) {
           // Here you would implement token refresh logic
           // For now, we'll just return false to indicate refresh is needed
@@ -555,7 +715,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
   final secureStorage = ref.read(secureStorageProvider);
-  return AuthNotifier(secureStorage);
+  return AuthNotifier(secureStorage, ref);
 });
 
 /// Provides the full API base URL (e.g., https://dev-app-sbd.rohanbatra.in)
@@ -601,25 +761,39 @@ Future<Map<String, dynamic>> loginWithApi(
       body: jsonEncode(body),
     );
     if (response.statusCode == 200) {
-      final result = _ApiResponseValidator.validateAndParseResponse(response, 'Login');
-      await _AuthDataStorage.storeAuthData(ref, result, loginEmail: isEmail ? usernameOrEmail : null);
+      final result = _ApiResponseValidator.validateAndParseResponse(
+        response,
+        'Login',
+      );
+      await _AuthDataStorage.storeAuthData(
+        ref,
+        result,
+        loginEmail: isEmail ? usernameOrEmail : null,
+      );
       return result;
-    } else if (response.statusCode == 403 && response.body.contains('Email not verified')) {
+    } else if (response.statusCode == 403 &&
+        response.body.contains('Email not verified')) {
       // Special case: email not verified
       // Server should respond with: raise HTTPException(status_code=403, detail="Email not verified")
       // This ensures we only trigger email verification for actual unverified emails, not wrong passwords
       final responseBody = jsonDecode(response.body) as Map<String, dynamic>;
       final secureStorage = ref.read(secureStorageProvider);
       if (responseBody['email'] != null) {
-        await secureStorage.write(key: 'user_email', value: responseBody['email']);
+        await secureStorage.write(
+          key: 'user_email',
+          value: responseBody['email'],
+        );
       }
       if (responseBody['username'] != null) {
-        await secureStorage.write(key: 'user_username', value: responseBody['username']);
+        await secureStorage.write(
+          key: 'user_username',
+          value: responseBody['username'],
+        );
       }
       await secureStorage.write(key: 'temp_user_password', value: password);
       return {'error': 'email_not_verified', ...responseBody};
     } else {
-throw Exception('Login failed: ${response.statusCode} ${response.body}');
+      throw Exception('Login failed: ${response.statusCode} ${response.body}');
     }
   } catch (e) {
     // Only catch network and Cloudflare errors here, let authentication errors pass through
@@ -647,18 +821,27 @@ Future<Map<String, dynamic>> loginWithTokenApi(
       // Store login data using the same logic as normal login
       await _AuthDataStorage.storeAuthData(ref, data);
       return data;
-    } else if (response.statusCode == 403 && response.body.contains('Email not verified')) {
+    } else if (response.statusCode == 403 &&
+        response.body.contains('Email not verified')) {
       final responseBody = jsonDecode(response.body) as Map<String, dynamic>;
       final secureStorage = ref.read(secureStorageProvider);
       if (responseBody['email'] != null) {
-        await secureStorage.write(key: 'user_email', value: responseBody['email']);
+        await secureStorage.write(
+          key: 'user_email',
+          value: responseBody['email'],
+        );
       }
       if (responseBody['username'] != null) {
-        await secureStorage.write(key: 'user_username', value: responseBody['username']);
+        await secureStorage.write(
+          key: 'user_username',
+          value: responseBody['username'],
+        );
       }
       return {'error': 'email_not_verified', ...responseBody};
     } else {
-      throw Exception('Token Login failed: ${response.statusCode} ${response.body}');
+      throw Exception(
+        'Token Login failed: ${response.statusCode} ${response.body}',
+      );
     }
   } catch (e) {
     throw _ApiErrorHandler.handleError(e);
@@ -670,11 +853,13 @@ Future<Map<String, dynamic>> registerWithApi(
   WidgetRef ref,
   String username,
   String email,
-  String password,
-  {bool? clientSideEncryption}
-) async {
+  String password, {
+  bool? clientSideEncryption,
+}) async {
   if (!InputValidator.isPasswordStrong(password)) {
-    throw Exception('Password must be at least 8 characters long and contain uppercase, lowercase, digit, and special character.');
+    throw Exception(
+      'Password must be at least 8 characters long and contain uppercase, lowercase, digit, and special character.',
+    );
   }
   final baseUrl = ref.read(apiBaseUrlProvider);
   final url = Uri.parse('$baseUrl/auth/register');
@@ -694,7 +879,10 @@ Future<Map<String, dynamic>> registerWithApi(
       headers: headers,
       body: jsonEncode(body),
     );
-    final result = _ApiResponseValidator.validateAndParseResponse(response, 'Registration');
+    final result = _ApiResponseValidator.validateAndParseResponse(
+      response,
+      'Registration',
+    );
     await _AuthDataStorage.storeAuthData(ref, result, loginEmail: email);
     return result;
   } catch (e) {
@@ -708,8 +896,11 @@ Future<void> resendVerificationEmail(WidgetRef ref) async {
   final email = await storage.read(key: 'user_email');
   final username = await storage.read(key: 'user_username');
 
-  if ((email == null || email.isEmpty) && (username == null || username.isEmpty)) {
-    throw Exception('Could not find your email or username to resend verification.');
+  if ((email == null || email.isEmpty) &&
+      (username == null || username.isEmpty)) {
+    throw Exception(
+      'Could not find your email or username to resend verification.',
+    );
   }
 
   final baseUrl = ref.read(apiBaseUrlProvider);
@@ -732,7 +923,9 @@ Future<void> resendVerificationEmail(WidgetRef ref) async {
 
     // Validate response - 200 means success for this endpoint
     if (response.statusCode != 200) {
-      throw Exception('Failed to resend verification email: ${response.statusCode} ${response.body}');
+      throw Exception(
+        'Failed to resend verification email: ${response.statusCode} ${response.body}',
+      );
     }
   } catch (e) {
     throw _ApiErrorHandler.handleError(e);
@@ -745,11 +938,11 @@ Future<bool> checkUsernameAvailability(WidgetRef ref, String username) async {
   final url = Uri.parse('$baseUrl/auth/check-username?username=$username');
   try {
     final headers = await _ApiHeaders.getCommonHeaders();
-    final response = await HttpUtil.get(
-      url,
-      headers: headers,
+    final response = await HttpUtil.get(url, headers: headers);
+    return _ApiResponseValidator.validateAvailabilityResponse(
+      response,
+      'username',
     );
-    return _ApiResponseValidator.validateAvailabilityResponse(response, 'username');
   } catch (e) {
     throw _ApiErrorHandler.handleError(e);
   }
@@ -761,11 +954,11 @@ Future<bool> checkEmailAvailability(WidgetRef ref, String email) async {
   final url = Uri.parse('$baseUrl/auth/check-email?email=$email');
   try {
     final headers = await _ApiHeaders.getCommonHeaders();
-    final response = await HttpUtil.get(
-      url,
-      headers: headers,
+    final response = await HttpUtil.get(url, headers: headers);
+    return _ApiResponseValidator.validateAvailabilityResponse(
+      response,
+      'email',
     );
-    return _ApiResponseValidator.validateAvailabilityResponse(response, 'email');
   } catch (e) {
     throw _ApiErrorHandler.handleError(e);
   }
@@ -778,22 +971,34 @@ Future<bool> validateAccessToken(WidgetRef ref, String accessToken) async {
   try {
     final headers = await _ApiHeaders.getCommonHeaders();
     headers['Authorization'] = 'Bearer $accessToken';
-    final response = await HttpUtil.get(
-      url,
-      headers: headers,
-    );
+    final response = await HttpUtil.get(url, headers: headers);
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       // Always overwrite these fields on each login
       final secureStorage = ref.read(secureStorageProvider);
       final prefs = await SharedPreferences.getInstance();
-      await secureStorage.write(key: 'client_side_encryption', value: data['client_side_encryption']?.toString() ?? '');
-      await secureStorage.write(key: 'user_role', value: data['role']?.toString() ?? '');
-      await secureStorage.write(key: 'user_username', value: data['username']?.toString() ?? '');
-      await secureStorage.write(key: 'user_email', value: data['email']?.toString() ?? '');
+      await secureStorage.write(
+        key: 'client_side_encryption',
+        value: data['client_side_encryption']?.toString() ?? '',
+      );
+      await secureStorage.write(
+        key: 'user_role',
+        value: data['role']?.toString() ?? '',
+      );
+      await secureStorage.write(
+        key: 'user_username',
+        value: data['username']?.toString() ?? '',
+      );
+      await secureStorage.write(
+        key: 'user_email',
+        value: data['email']?.toString() ?? '',
+      );
       await prefs.setString('issued_at', data['issued_at']?.toString() ?? '');
       await prefs.setString('expires_at', data['expires_at']?.toString() ?? '');
-      await prefs.setBool('is_verified', data['is_verified'] == true || data['is_verified'] == 'true');
+      await prefs.setBool(
+        'is_verified',
+        data['is_verified'] == true || data['is_verified'] == 'true',
+      );
       return data['token'] == 'valid';
     }
     return false;
@@ -825,7 +1030,9 @@ Future<void> sendForgotPasswordResetLink(WidgetRef ref, String email) async {
     } catch (_) {}
     throw RateLimitException(message);
   } else {
-    throw Exception('Failed to send reset link: \\${response.statusCode} \\${response.body}');
+    throw Exception(
+      'Failed to send reset link: \\${response.statusCode} \\${response.body}',
+    );
   }
 }
 
@@ -851,7 +1058,9 @@ Future<void> resendForgotPasswordResetLink(WidgetRef ref, String email) async {
     } catch (_) {}
     throw RateLimitException(message);
   } else {
-    throw Exception('Failed to resend reset link: \\${response.statusCode} \\${response.body}');
+    throw Exception(
+      'Failed to resend reset link: \\${response.statusCode} \\${response.body}',
+    );
   }
 }
 

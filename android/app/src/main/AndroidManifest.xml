@@ -1,4 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- WebAuthn permissions -->
+    <uses-permission android:name="android.permission.USE_FINGERPRINT" />
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+    
     <application
         android:label="emotion_tracker"
         android:name="${applicationName}"
@@ -35,6 +39,10 @@
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
             android:value="ca-app-pub-2845453539708646~1575877879"/>
+        <!-- Enable hardware security key support -->
+        <meta-data
+            android:name="android.hardware.fido.uaf"
+            android:value="true" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
