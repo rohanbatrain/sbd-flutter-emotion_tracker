@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:emotion_tracker/providers/theme_provider.dart';
 
 class DashboardScreenV1 extends ConsumerWidget {
-  const DashboardScreenV1({Key? key}) : super(key: key);
+  const DashboardScreenV1({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -12,11 +12,7 @@ class DashboardScreenV1 extends ConsumerWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.dashboard_rounded,
-            size: 64,
-            color: theme.primaryColor,
-          ),
+          Icon(Icons.dashboard_rounded, size: 64, color: theme.primaryColor),
           SizedBox(height: 16),
           Text(
             'Welcome to Dashboard',

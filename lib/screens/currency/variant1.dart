@@ -4,6 +4,9 @@ import 'package:emotion_tracker/providers/theme_provider.dart';
 import 'package:emotion_tracker/providers/sbd_tokens_provider.dart';
 import 'package:emotion_tracker/providers/ad_provider.dart';
 import 'package:emotion_tracker/widgets/custom_app_bar.dart';
+import 'package:emotion_tracker/widgets/error_state_widget.dart';
+import 'package:emotion_tracker/widgets/loading_state_widget.dart';
+import 'package:emotion_tracker/core/global_error_handler.dart';
 import 'package:emotion_tracker/providers/secure_storage_provider.dart';
 import 'package:emotion_tracker/providers/shared_prefs_provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -89,18 +92,16 @@ class _CurrencyScreenV1State extends ConsumerState<CurrencyScreenV1>
       duration: Duration(milliseconds: 800),
       vsync: this,
     );
-    _coinBounceAnimation = Tween<double>(
-      begin: 0.8,
-      end: 1.2,
-    ).animate(CurvedAnimation(
-      parent: _coinBounceController,
-      curve: Curves.elasticOut,
-    ));
+    _coinBounceAnimation = Tween<double>(begin: 0.8, end: 1.2).animate(
+      CurvedAnimation(parent: _coinBounceController, curve: Curves.elasticOut),
+    );
 
     // Initialize ad provider and load rewarded ad with SSV
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       _adNotifier = ref.read(adProvider.notifier);
-      await _adNotifier?.loadRewardedAd(ref: ref); // Pass ref to ensure username is loaded from secure storage
+      await _adNotifier?.loadRewardedAd(
+        ref: ref,
+      ); // Pass ref to ensure username is loaded from secure storage
       _startCooldownTimerIfNeeded();
       setState(() {
         _isLoadingUsername = true;
@@ -130,7 +131,8 @@ class _CurrencyScreenV1State extends ConsumerState<CurrencyScreenV1>
       _cooldownTimer = Timer.periodic(Duration(seconds: 1), (timer) {
         setState(() {
           _cooldownRemaining = _cooldownRemaining - Duration(seconds: 1);
-          if (_cooldownRemaining.isNegative || _cooldownRemaining == Duration.zero) {
+          if (_cooldownRemaining.isNegative ||
+              _cooldownRemaining == Duration.zero) {
             _cooldownTimer?.cancel();
             _cooldownRemaining = Duration.zero;
           }
@@ -177,7 +179,9 @@ class _CurrencyScreenV1State extends ConsumerState<CurrencyScreenV1>
     await _adNotifier?.showRewardedAd(
       onUserEarnedReward: (_) {}, // No-op, SSV handles reward
       onAdClosed: () async {
-        await _adNotifier?.loadRewardedAd(ref: ref); // Pass ref to reload with username
+        await _adNotifier?.loadRewardedAd(
+          ref: ref,
+        ); // Pass ref to reload with username
       },
       onRewardCallback: (username) async {
         _handleAdReward();
@@ -192,7 +196,9 @@ class _CurrencyScreenV1State extends ConsumerState<CurrencyScreenV1>
     });
     // Instead of addTokens, just refresh the balance and transactions
     await ref.read(sbdTokensProvider.notifier).fetchBalance();
-    await ref.read(sbdTokensProvider.notifier).fetchTransactions(); // Refresh transactions after reward
+    await ref
+        .read(sbdTokensProvider.notifier)
+        .fetchTransactions(); // Refresh transactions after reward
     _startCooldownTimerIfNeeded();
     _confettiController.forward();
     _coinBounceController.forward();
@@ -202,23 +208,24 @@ class _CurrencyScreenV1State extends ConsumerState<CurrencyScreenV1>
     final theme = ref.read(currentThemeProvider);
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: theme.cardColor,
-        title: Text('Ad Not Ready', style: theme.textTheme.titleLarge),
-        content: Text(
-          'The ad is still loading. Please try again in a moment.',
-          style: theme.textTheme.bodyMedium,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () async {
-              Navigator.of(context).pop();
-              await _adNotifier?.loadRewardedAd(ref: ref);
-            },
-            child: Text('OK', style: TextStyle(color: theme.primaryColor)),
+      builder:
+          (context) => AlertDialog(
+            backgroundColor: theme.cardColor,
+            title: Text('Ad Not Ready', style: theme.textTheme.titleLarge),
+            content: Text(
+              'The ad is still loading. Please try again in a moment.',
+              style: theme.textTheme.bodyMedium,
+            ),
+            actions: [
+              TextButton(
+                onPressed: () async {
+                  Navigator.of(context).pop();
+                  await _adNotifier?.loadRewardedAd(ref: ref);
+                },
+                child: Text('OK', style: TextStyle(color: theme.primaryColor)),
+              ),
+            ],
           ),
-        ],
-      ),
     );
   }
 
@@ -226,71 +233,80 @@ class _CurrencyScreenV1State extends ConsumerState<CurrencyScreenV1>
     final theme = ref.read(currentThemeProvider);
     showDialog(
       context: context,
-      builder: (context) => Dialog(
-        backgroundColor: theme.cardColor,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Wallet QR Code',
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: theme.primaryColor,
-                ),
-              ),
-              const SizedBox(height: 20),
-              Container(
-                decoration: BoxDecoration(
-                  color: theme.scaffoldBackgroundColor,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: theme.shadowColor.withOpacity(0.08),
-                      blurRadius: 12,
-                      offset: Offset(0, 4),
+      builder:
+          (context) => Dialog(
+            backgroundColor: theme.cardColor,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Wallet QR Code',
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: theme.primaryColor,
                     ),
-                  ],
-                ),
-                padding: const EdgeInsets.all(16),
-                child: QrImageView(
-                  data: username,
-                  version: QrVersions.auto,
-                  size: 200,
-                  backgroundColor: Colors.white,
-                  foregroundColor: Colors.black,
-                ),
-              ),
-              const SizedBox(height: 20),
-              Text(
-                username,
-                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Scan this QR to receive tokens to your wallet username.',
-                style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: theme.primaryColor,
-                    foregroundColor: theme.colorScheme.onPrimary,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
-                  child: Text('Close'),
-                ),
+                  const SizedBox(height: 20),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: theme.scaffoldBackgroundColor,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: theme.shadowColor.withOpacity(0.08),
+                          blurRadius: 12,
+                          offset: Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    padding: const EdgeInsets.all(16),
+                    child: QrImageView(
+                      data: username,
+                      version: QrVersions.auto,
+                      size: 200,
+                      backgroundColor: Colors.white,
+                      foregroundColor: Colors.black,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    username,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Scan this QR to receive tokens to your wallet username.',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.hintColor,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: theme.primaryColor,
+                        foregroundColor: theme.colorScheme.onPrimary,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: Text('Close'),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
-      ),
     );
   }
 
@@ -298,64 +314,77 @@ class _CurrencyScreenV1State extends ConsumerState<CurrencyScreenV1>
     final theme = ref.read(currentThemeProvider);
     showDialog(
       context: context,
-      builder: (context) => Dialog(
-        backgroundColor: theme.cardColor,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        child: SizedBox(
-          width: 320,
-          height: 420,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Text(
-                  'Scan Wallet QR',
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: theme.primaryColor,
-                  ),
-                ),
-              ),
-              Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: MobileScanner(
-                    controller: MobileScannerController(formats: [BarcodeFormat.qrCode]),
-                    fit: BoxFit.cover,
-                    onDetect: (capture) {
-                      final barcode = capture.barcodes.first;
-                      final String? code = barcode.rawValue;
-                      if (code != null && code.length <= 50 && RegExp(r'^[a-zA-Z0-9._-]{1,50} **$').hasMatch(code)) {
-                        Navigator.of(context).pop();
-                        _recipientController.text = code;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Username scanned: ' + code)),
-                        );
-                      }
-                    },
-                  ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: theme.primaryColor,
-                      foregroundColor: theme.colorScheme.onPrimary,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      builder:
+          (context) => Dialog(
+            backgroundColor: theme.cardColor,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: SizedBox(
+              width: 320,
+              height: 420,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Text(
+                      'Scan Wallet QR',
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: theme.primaryColor,
+                      ),
                     ),
-                    child: Text('Cancel'),
                   ),
-                ),
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: MobileScanner(
+                        controller: MobileScannerController(
+                          formats: [BarcodeFormat.qrCode],
+                        ),
+                        fit: BoxFit.cover,
+                        onDetect: (capture) {
+                          final barcode = capture.barcodes.first;
+                          final String? code = barcode.rawValue;
+                          if (code != null &&
+                              code.length <= 50 &&
+                              RegExp(
+                                r'^[a-zA-Z0-9._-]{1,50} **$',
+                              ).hasMatch(code)) {
+                            Navigator.of(context).pop();
+                            _recipientController.text = code;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Username scanned: ' + code),
+                              ),
+                            );
+                          }
+                        },
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: theme.primaryColor,
+                          foregroundColor: theme.colorScheme.onPrimary,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: Text('Cancel'),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
-      ),
     );
   }
 
@@ -380,7 +409,12 @@ class _CurrencyScreenV1State extends ConsumerState<CurrencyScreenV1>
           if (!sbdState.isLoading && sbdState.error == null)
             SingleChildScrollView(
               child: Padding(
-                padding: EdgeInsets.fromLTRB(20, 24, 20, 32 + MediaQuery.of(context).padding.bottom), // Add extra bottom padding for nav bar
+                padding: EdgeInsets.fromLTRB(
+                  20,
+                  24,
+                  20,
+                  32 + MediaQuery.of(context).padding.bottom,
+                ), // Add extra bottom padding for nav bar
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -405,7 +439,9 @@ class _CurrencyScreenV1State extends ConsumerState<CurrencyScreenV1>
                                     height: 120,
                                     decoration: const BoxDecoration(
                                       image: DecorationImage(
-                                        image: AssetImage('assets/wallet_card_bg.jpg'),
+                                        image: AssetImage(
+                                          'assets/wallet_card_bg.jpg',
+                                        ),
                                         fit: BoxFit.cover,
                                       ),
                                     ),
@@ -432,14 +468,28 @@ class _CurrencyScreenV1State extends ConsumerState<CurrencyScreenV1>
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text('Total Balance', style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor)),
+                                Text(
+                                  'Total Balance',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: theme.hintColor,
+                                  ),
+                                ),
                                 const SizedBox(height: 6),
                                 Text(
                                   sbdState.balance?.toString() ?? '--',
-                                  style: theme.textTheme.headlineSmall?.copyWith(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold),
+                                  style: theme.textTheme.headlineSmall
+                                      ?.copyWith(
+                                        color: theme.colorScheme.onSurface,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                 ),
                                 const SizedBox(height: 12),
-                                Text('Available Balance', style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor)),
+                                Text(
+                                  'Available Balance',
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: theme.hintColor,
+                                  ),
+                                ),
                               ],
                             ),
                           ),
@@ -448,7 +498,13 @@ class _CurrencyScreenV1State extends ConsumerState<CurrencyScreenV1>
                     ),
                     const SizedBox(height: 32),
                     // Send Tokens
-                    Text('Send Tokens', style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
+                    Text(
+                      'Send Tokens',
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.onSurface,
+                      ),
+                    ),
                     const SizedBox(height: 16),
                     Row(
                       children: [
@@ -460,16 +516,26 @@ class _CurrencyScreenV1State extends ConsumerState<CurrencyScreenV1>
                               hintText: 'Recipient Username',
                               filled: true,
                               fillColor: theme.cardColor,
-                              hintStyle: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
-                              contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                              hintStyle: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.hintColor,
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                vertical: 16,
+                                horizontal: 16,
+                              ),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                                 borderSide: BorderSide.none,
                               ),
-                              prefixIcon: Icon(Icons.person_outline, color: theme.primaryColor),
+                              prefixIcon: Icon(
+                                Icons.person_outline,
+                                color: theme.primaryColor,
+                              ),
                               counterText: '',
                             ),
-                            style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurface),
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: theme.colorScheme.onSurface,
+                            ),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -480,17 +546,29 @@ class _CurrencyScreenV1State extends ConsumerState<CurrencyScreenV1>
                               hintText: 'Amount',
                               filled: true,
                               fillColor: theme.cardColor,
-                              hintStyle: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
-                              contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                              hintStyle: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.hintColor,
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                vertical: 16,
+                                horizontal: 16,
+                              ),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                                 borderSide: BorderSide.none,
                               ),
-                              prefixIcon: Icon(Icons.sports_esports, color: theme.primaryColor),
+                              prefixIcon: Icon(
+                                Icons.sports_esports,
+                                color: theme.primaryColor,
+                              ),
                             ),
-                            style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurface),
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: theme.colorScheme.onSurface,
+                            ),
                             keyboardType: TextInputType.number,
-                            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                            ],
                           ),
                         ),
                       ],
@@ -500,123 +578,250 @@ class _CurrencyScreenV1State extends ConsumerState<CurrencyScreenV1>
                       children: [
                         Expanded(
                           child: ElevatedButton(
-                            onPressed: _isSending
-                                ? null
-                                : () async {
-                                    final toUser = _recipientController.text.trim();
-                                    final amountText = _amountController.text.trim();
-                                    if (toUser.isEmpty || amountText.isEmpty) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(content: Text('Please enter a recipient and amount.')),
-                                      );
-                                      return;
-                                    }
-                                    final amount = int.tryParse(amountText);
-                                    if (amount == null || amount <= 0) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(content: Text('Please enter a valid amount greater than 0.')),
-                                      );
-                                      return;
-                                    }
-                                    if (sbdState.balance != null && amount > (sbdState.balance ?? 0)) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(content: Text('You cannot send more than your available balance.')),
-                                      );
-                                      return;
-                                    }
-                                    final didAuth = await _authenticateForSend();
-                                    if (!didAuth) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(content: Text('Authentication failed. Cannot send tokens.')),
-                                      );
-                                      return;
-                                    }
-                                    setState(() => _isSending = true);
-                                    final success = await ref.read(sbdTokensProvider.notifier).sendTokens(toUser: toUser, amount: amount);
-                                    setState(() => _isSending = false);
-                                    if (success) {
-                                      _amountController.clear();
-                                      _recipientController.clear();
-                                      if (!mounted) return;
-                                      await showDialog(
-                                        context: context,
-                                        barrierDismissible: false,
-                                        builder: (context) {
-                                          final theme = Theme.of(context);
-                                          return Dialog(
-                                            backgroundColor: Colors.transparent,
-                                            insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-                                            child: Center(
-                                              child: Container(
-                                                margin: const EdgeInsets.all(0),
-                                                padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
-                                                decoration: BoxDecoration(
-                                                  color: theme.cardColor,
-                                                  borderRadius: BorderRadius.circular(24),
-                                                  boxShadow: [
-                                                    BoxShadow(
-                                                      color: theme.shadowColor.withOpacity(0.08),
-                                                      blurRadius: 16,
-                                                      offset: const Offset(0, 4),
-                                                    ),
-                                                  ],
-                                                ),
-                                                child: Column(
-                                                  mainAxisSize: MainAxisSize.min,
-                                                  mainAxisAlignment: MainAxisAlignment.center,
-                                                  children: [
-                                                    Icon(Icons.check_circle, color: theme.primaryColor, size: 48),
-                                                    const SizedBox(height: 18),
-                                                    Text('Sent!', style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
-                                                    const SizedBox(height: 10),
-                                                    Text('You sent $amount SBD to $toUser.', textAlign: TextAlign.center, style: theme.textTheme.bodyLarge),
-                                                    const SizedBox(height: 28),
-                                                    SizedBox(
-                                                      width: double.infinity,
-                                                      child: ElevatedButton(
-                                                        style: ElevatedButton.styleFrom(
-                                                          backgroundColor: theme.primaryColor,
-                                                          foregroundColor: theme.colorScheme.onPrimary,
-                                                          padding: const EdgeInsets.symmetric(vertical: 16),
-                                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                                                        ),
-                                                        onPressed: () {
-                                                          Navigator.of(context).pop(); // Just close dialog, no loading
-                                                        },
-                                                        child: const Text('Go to Wallet'),
+                            onPressed:
+                                _isSending
+                                    ? null
+                                    : () async {
+                                      final toUser =
+                                          _recipientController.text.trim();
+                                      final amountText =
+                                          _amountController.text.trim();
+                                      if (toUser.isEmpty ||
+                                          amountText.isEmpty) {
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              'Please enter a recipient and amount.',
+                                            ),
+                                          ),
+                                        );
+                                        return;
+                                      }
+                                      final amount = int.tryParse(amountText);
+                                      if (amount == null || amount <= 0) {
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              'Please enter a valid amount greater than 0.',
+                                            ),
+                                          ),
+                                        );
+                                        return;
+                                      }
+                                      if (sbdState.balance != null &&
+                                          amount > (sbdState.balance ?? 0)) {
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              'You cannot send more than your available balance.',
+                                            ),
+                                          ),
+                                        );
+                                        return;
+                                      }
+                                      final didAuth =
+                                          await _authenticateForSend();
+                                      if (!didAuth) {
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              'Authentication failed. Cannot send tokens.',
+                                            ),
+                                          ),
+                                        );
+                                        return;
+                                      }
+                                      setState(() => _isSending = true);
+                                      final success = await ref
+                                          .read(sbdTokensProvider.notifier)
+                                          .sendTokens(
+                                            toUser: toUser,
+                                            amount: amount,
+                                          );
+                                      setState(() => _isSending = false);
+                                      if (success) {
+                                        _amountController.clear();
+                                        _recipientController.clear();
+                                        if (!mounted) return;
+                                        await showDialog(
+                                          context: context,
+                                          barrierDismissible: false,
+                                          builder: (context) {
+                                            final theme = Theme.of(context);
+                                            return Dialog(
+                                              backgroundColor:
+                                                  Colors.transparent,
+                                              insetPadding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 24,
+                                                    vertical: 24,
+                                                  ),
+                                              child: Center(
+                                                child: Container(
+                                                  margin: const EdgeInsets.all(
+                                                    0,
+                                                  ),
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        vertical: 32,
+                                                        horizontal: 24,
                                                       ),
-                                                    ),
-                                                  ],
+                                                  decoration: BoxDecoration(
+                                                    color: theme.cardColor,
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          24,
+                                                        ),
+                                                    boxShadow: [
+                                                      BoxShadow(
+                                                        color: theme.shadowColor
+                                                            .withOpacity(0.08),
+                                                        blurRadius: 16,
+                                                        offset: const Offset(
+                                                          0,
+                                                          4,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  child: Column(
+                                                    mainAxisSize:
+                                                        MainAxisSize.min,
+                                                    mainAxisAlignment:
+                                                        MainAxisAlignment
+                                                            .center,
+                                                    children: [
+                                                      Icon(
+                                                        Icons.check_circle,
+                                                        color:
+                                                            theme.primaryColor,
+                                                        size: 48,
+                                                      ),
+                                                      const SizedBox(
+                                                        height: 18,
+                                                      ),
+                                                      Text(
+                                                        'Sent!',
+                                                        style: theme
+                                                            .textTheme
+                                                            .headlineSmall
+                                                            ?.copyWith(
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .bold,
+                                                            ),
+                                                      ),
+                                                      const SizedBox(
+                                                        height: 10,
+                                                      ),
+                                                      Text(
+                                                        'You sent $amount SBD to $toUser.',
+                                                        textAlign:
+                                                            TextAlign.center,
+                                                        style:
+                                                            theme
+                                                                .textTheme
+                                                                .bodyLarge,
+                                                      ),
+                                                      const SizedBox(
+                                                        height: 28,
+                                                      ),
+                                                      SizedBox(
+                                                        width: double.infinity,
+                                                        child: ElevatedButton(
+                                                          style: ElevatedButton.styleFrom(
+                                                            backgroundColor:
+                                                                theme
+                                                                    .primaryColor,
+                                                            foregroundColor:
+                                                                theme
+                                                                    .colorScheme
+                                                                    .onPrimary,
+                                                            padding:
+                                                                const EdgeInsets.symmetric(
+                                                                  vertical: 16,
+                                                                ),
+                                                            shape: RoundedRectangleBorder(
+                                                              borderRadius:
+                                                                  BorderRadius.circular(
+                                                                    14,
+                                                                  ),
+                                                            ),
+                                                          ),
+                                                          onPressed: () {
+                                                            Navigator.of(
+                                                              context,
+                                                            ).pop(); // Just close dialog, no loading
+                                                          },
+                                                          child: const Text(
+                                                            'Go to Wallet',
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
                                                 ),
                                               ),
+                                            );
+                                          },
+                                        );
+                                        // After dialog closes, refresh balance and transactions (no loading spinner)
+                                        await ref
+                                            .read(sbdTokensProvider.notifier)
+                                            .fetchBalance();
+                                        await ref
+                                            .read(sbdTokensProvider.notifier)
+                                            .fetchTransactions();
+                                      } else {
+                                        final err =
+                                            ref.read(sbdTokensProvider).error;
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              'Failed: ${err ?? 'Unknown error'}',
                                             ),
-                                          );
-                                        },
-                                      );
-                                      // After dialog closes, refresh balance and transactions (no loading spinner)
-                                      await ref.read(sbdTokensProvider.notifier).fetchBalance();
-                                      await ref.read(sbdTokensProvider.notifier).fetchTransactions();
-                                    } else {
-                                      final err = ref.read(sbdTokensProvider).error;
-                                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: ${err ?? 'Unknown error'}')));
-                                    }
-                                  },
+                                          ),
+                                        );
+                                      }
+                                    },
                             style: ElevatedButton.styleFrom(
                               padding: const EdgeInsets.symmetric(vertical: 16),
                               backgroundColor: theme.primaryColor,
                               foregroundColor: theme.colorScheme.onPrimary,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                             ),
-                            child: _isSending
-                                ? SizedBox(
-                                    width: 22,
-                                    height: 22,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2.5,
-                                      valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.onPrimary),
+                            child:
+                                _isSending
+                                    ? SizedBox(
+                                      width: 22,
+                                      height: 22,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2.5,
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                              theme.colorScheme.onPrimary,
+                                            ),
+                                      ),
+                                    )
+                                    : Text(
+                                      'Send',
+                                      style: theme.textTheme.labelLarge
+                                          ?.copyWith(
+                                            color: theme.colorScheme.onPrimary,
+                                          ),
                                     ),
-                                  )
-                                : Text('Send', style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onPrimary)),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -627,19 +832,35 @@ class _CurrencyScreenV1State extends ConsumerState<CurrencyScreenV1>
                               padding: const EdgeInsets.symmetric(vertical: 16),
                               backgroundColor: theme.cardColor,
                               foregroundColor: theme.colorScheme.onSurface,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                             ),
-                            child: Text('Scan QR', style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onSurface)),
+                            child: Text(
+                              'Scan QR',
+                              style: theme.textTheme.labelLarge?.copyWith(
+                                color: theme.colorScheme.onSurface,
+                              ),
+                            ),
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 36),
                     // Receive Tokens
-                    Text('Receive Tokens', style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
+                    Text(
+                      'Receive Tokens',
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.onSurface,
+                      ),
+                    ),
                     const SizedBox(height: 16),
                     Container(
-                      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 16,
+                        horizontal: 16,
+                      ),
                       decoration: BoxDecoration(
                         color: theme.cardColor,
                         borderRadius: BorderRadius.circular(12),
@@ -653,7 +874,11 @@ class _CurrencyScreenV1State extends ConsumerState<CurrencyScreenV1>
                               color: theme.primaryColor.withOpacity(0.15),
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: Icon(Icons.person, color: theme.colorScheme.onSurface, size: 32),
+                            child: Icon(
+                              Icons.person,
+                              color: theme.colorScheme.onSurface,
+                              size: 32,
+                            ),
                           ),
                           Expanded(
                             child: Column(
@@ -664,13 +889,24 @@ class _CurrencyScreenV1State extends ConsumerState<CurrencyScreenV1>
                                     height: 18,
                                     width: 80,
                                     child: Container(
-                                      color: theme.dividerColor.withOpacity(0.2),
+                                      color: theme.dividerColor.withOpacity(
+                                        0.2,
+                                      ),
                                     ),
                                   )
                                 else
-                                  Text(_walletUsername, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                                  Text(
+                                    _walletUsername,
+                                    style: theme.textTheme.titleMedium
+                                        ?.copyWith(fontWeight: FontWeight.bold),
+                                  ),
                                 const SizedBox(height: 2),
-                                Text('Your Wallet Username', style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor)),
+                                Text(
+                                  'Your Wallet Username',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: theme.hintColor,
+                                  ),
+                                ),
                               ],
                             ),
                           ),
@@ -679,13 +915,26 @@ class _CurrencyScreenV1State extends ConsumerState<CurrencyScreenV1>
                             onPressed: () {
                               _showQrCodeDialog(_walletUsername);
                             },
-                            icon: Icon(Icons.qr_code, color: theme.colorScheme.onPrimary),
-                            label: Text('My QR', style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onPrimary)),
+                            icon: Icon(
+                              Icons.qr_code,
+                              color: theme.colorScheme.onPrimary,
+                            ),
+                            label: Text(
+                              'My QR',
+                              style: theme.textTheme.labelLarge?.copyWith(
+                                color: theme.colorScheme.onPrimary,
+                              ),
+                            ),
                             style: ElevatedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 12,
+                                horizontal: 16,
+                              ),
                               backgroundColor: theme.primaryColor,
                               foregroundColor: theme.colorScheme.onPrimary,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                             ),
                           ),
                         ],
@@ -693,10 +942,19 @@ class _CurrencyScreenV1State extends ConsumerState<CurrencyScreenV1>
                     ),
                     const SizedBox(height: 36),
                     // Earn Section
-                    Text('Earn', style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
+                    Text(
+                      'Earn',
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.onSurface,
+                      ),
+                    ),
                     const SizedBox(height: 16),
                     Container(
-                      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 20,
+                        horizontal: 16,
+                      ),
                       decoration: BoxDecoration(
                         color: theme.cardColor,
                         borderRadius: BorderRadius.circular(16),
@@ -729,15 +987,33 @@ class _CurrencyScreenV1State extends ConsumerState<CurrencyScreenV1>
                                   width: 120,
                                   child: ElevatedButton.icon(
                                     onPressed: _watchAd,
-                                    icon: Icon(Icons.play_arrow, color: theme.colorScheme.onPrimary, size: 18),
-                                    label: Text('Watch Ad', style: theme.textTheme.labelMedium?.copyWith(color: theme.colorScheme.onPrimary, fontSize: 12)),
+                                    icon: Icon(
+                                      Icons.play_arrow,
+                                      color: theme.colorScheme.onPrimary,
+                                      size: 18,
+                                    ),
+                                    label: Text(
+                                      'Watch Ad',
+                                      style: theme.textTheme.labelMedium
+                                          ?.copyWith(
+                                            color: theme.colorScheme.onPrimary,
+                                            fontSize: 12,
+                                          ),
+                                    ),
                                     style: ElevatedButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 10,
+                                        horizontal: 10,
+                                      ),
                                       backgroundColor: theme.primaryColor,
-                                      foregroundColor: theme.colorScheme.onPrimary,
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                      foregroundColor:
+                                          theme.colorScheme.onPrimary,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
                                       minimumSize: const Size(0, 32),
-                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                      tapTargetSize:
+                                          MaterialTapTargetSize.shrinkWrap,
                                     ),
                                   ),
                                 ),
@@ -753,7 +1029,9 @@ class _CurrencyScreenV1State extends ConsumerState<CurrencyScreenV1>
                                 height: 120,
                                 decoration: const BoxDecoration(
                                   image: DecorationImage(
-                                    image: AssetImage('assets/earn_section_bg.jpg'),
+                                    image: AssetImage(
+                                      'assets/earn_section_bg.jpg',
+                                    ),
                                     fit: BoxFit.cover,
                                   ),
                                 ),
@@ -768,20 +1046,35 @@ class _CurrencyScreenV1State extends ConsumerState<CurrencyScreenV1>
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('Transactions', style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
-                        if (sbdState.transactions != null && sbdState.transactions!.length > 0)
+                        Text(
+                          'Transactions',
+                          style: theme.textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: theme.colorScheme.onSurface,
+                          ),
+                        ),
+                        if (sbdState.transactions != null &&
+                            sbdState.transactions!.length > 0)
                           TextButton(
                             onPressed: () {
                               Navigator.of(context).push(
-                                MaterialPageRoute(builder: (_) => const TransactionsScreenV1()),
+                                MaterialPageRoute(
+                                  builder: (_) => const TransactionsScreenV1(),
+                                ),
                               );
                             },
-                            child: Text('See more', style: theme.textTheme.labelLarge?.copyWith(color: theme.primaryColor)),
+                            child: Text(
+                              'See more',
+                              style: theme.textTheme.labelLarge?.copyWith(
+                                color: theme.primaryColor,
+                              ),
+                            ),
                           ),
                       ],
                     ),
                     const SizedBox(height: 16),
-                    if (sbdState.transactions != null && sbdState.transactions!.isNotEmpty)
+                    if (sbdState.transactions != null &&
+                        sbdState.transactions!.isNotEmpty)
                       ...sbdState.transactions!.take(5).map((tx) {
                         return MinimalTransactionCard(
                           tx: tx,
@@ -789,29 +1082,38 @@ class _CurrencyScreenV1State extends ConsumerState<CurrencyScreenV1>
                           onTap: () async {
                             await showDialog(
                               context: context,
-                              builder: (context) => TransactionDetailsDialog(
-                                tx: tx,
-                                theme: theme,
-                                onNoteSaved: (note) async {
-                                  setState(() {
-                                    tx['note'] = note;
-                                  });
-                                  if (tx['transaction_id'] != null && note.isNotEmpty) {
-                                    await ref.read(sbdTokensProvider.notifier).updateTransactionNote(
-                                      transactionId: tx['transaction_id'],
-                                      note: note,
-                                    );
-                                  }
-                                },
-                              ),
+                              builder:
+                                  (context) => TransactionDetailsDialog(
+                                    tx: tx,
+                                    theme: theme,
+                                    onNoteSaved: (note) async {
+                                      setState(() {
+                                        tx['note'] = note;
+                                      });
+                                      if (tx['transaction_id'] != null &&
+                                          note.isNotEmpty) {
+                                        await ref
+                                            .read(sbdTokensProvider.notifier)
+                                            .updateTransactionNote(
+                                              transactionId:
+                                                  tx['transaction_id'],
+                                              note: note,
+                                            );
+                                      }
+                                    },
+                                  ),
                             );
                           },
                         );
                       }).toList(),
-                    if (sbdState.transactions != null && sbdState.transactions!.isEmpty)
+                    if (sbdState.transactions != null &&
+                        sbdState.transactions!.isEmpty)
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: 16),
-                        child: Text('No transactions found.', style: theme.textTheme.bodyMedium),
+                        child: Text(
+                          'No transactions found.',
+                          style: theme.textTheme.bodyMedium,
+                        ),
                       ),
                   ],
                 ),
@@ -840,7 +1142,10 @@ class _CurrencyScreenV1State extends ConsumerState<CurrencyScreenV1>
                 offset: Offset(0, 12),
               ),
             ],
-            border: Border.all(color: theme.primaryColor.withOpacity(0.18), width: 2),
+            border: Border.all(
+              color: theme.primaryColor.withOpacity(0.18),
+              width: 2,
+            ),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -848,7 +1153,10 @@ class _CurrencyScreenV1State extends ConsumerState<CurrencyScreenV1>
               Container(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [theme.primaryColor.withOpacity(0.18), theme.primaryColor.withOpacity(0.05)],
+                    colors: [
+                      theme.primaryColor.withOpacity(0.18),
+                      theme.primaryColor.withOpacity(0.05),
+                    ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
@@ -914,11 +1222,16 @@ class _CurrencyScreenV1State extends ConsumerState<CurrencyScreenV1>
                       style: OutlinedButton.styleFrom(
                         side: BorderSide(color: theme.primaryColor, width: 1.5),
                         padding: EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                       label: Text(
                         'Watch Again',
-                        style: TextStyle(color: theme.primaryColor, fontWeight: FontWeight.w600),
+                        style: TextStyle(
+                          color: theme.primaryColor,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ),
@@ -930,14 +1243,22 @@ class _CurrencyScreenV1State extends ConsumerState<CurrencyScreenV1>
                           _showRewardSuccess = false;
                         });
                       },
-                      icon: Icon(Icons.check_circle, color: theme.colorScheme.onPrimary),
+                      icon: Icon(
+                        Icons.check_circle,
+                        color: theme.colorScheme.onPrimary,
+                      ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: theme.primaryColor,
                         foregroundColor: theme.colorScheme.onPrimary,
                         padding: EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
-                      label: Text('Continue', style: TextStyle(fontWeight: FontWeight.w600)),
+                      label: Text(
+                        'Continue',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
                     ),
                   ),
                 ],
@@ -954,13 +1275,19 @@ class TransactionDetailsDialog extends ConsumerStatefulWidget {
   final Map<String, dynamic> tx;
   final ThemeData theme;
   final void Function(String note) onNoteSaved;
-  const TransactionDetailsDialog({required this.tx, required this.theme, required this.onNoteSaved});
+  const TransactionDetailsDialog({
+    required this.tx,
+    required this.theme,
+    required this.onNoteSaved,
+  });
 
   @override
-  ConsumerState<TransactionDetailsDialog> createState() => TransactionDetailsDialogState();
+  ConsumerState<TransactionDetailsDialog> createState() =>
+      TransactionDetailsDialogState();
 }
 
-class TransactionDetailsDialogState extends ConsumerState<TransactionDetailsDialog> {
+class TransactionDetailsDialogState
+    extends ConsumerState<TransactionDetailsDialog> {
   late TextEditingController _noteController;
   bool _isEditing = false;
   String? _originalNote;
@@ -971,11 +1298,13 @@ class TransactionDetailsDialogState extends ConsumerState<TransactionDetailsDial
     _originalNote = widget.tx['note'] ?? '';
     _noteController = TextEditingController(text: _originalNote);
   }
+
   @override
   void dispose() {
     _noteController.dispose();
     super.dispose();
   }
+
   @override
   Widget build(BuildContext context) {
     final tx = widget.tx;
@@ -989,7 +1318,9 @@ class TransactionDetailsDialogState extends ConsumerState<TransactionDetailsDial
     final tzString = ref.watch(timezoneProvider);
     final formattedTimestamp = formatTransactionTimestamp(timestamp, tzString);
     return Dialog(
-      backgroundColor: Colors.transparent, // Make dialog background transparent for card effect
+      backgroundColor:
+          Colors
+              .transparent, // Make dialog background transparent for card effect
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       child: Center(
         child: Container(
@@ -1004,7 +1335,10 @@ class TransactionDetailsDialogState extends ConsumerState<TransactionDetailsDial
                 offset: const Offset(0, 12),
               ),
             ],
-            border: Border.all(color: theme.primaryColor.withOpacity(0.13), width: 1.5),
+            border: Border.all(
+              color: theme.primaryColor.withOpacity(0.13),
+              width: 1.5,
+            ),
           ),
           padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 24),
           child: SingleChildScrollView(
@@ -1016,12 +1350,17 @@ class TransactionDetailsDialogState extends ConsumerState<TransactionDetailsDial
                   children: [
                     Container(
                       decoration: BoxDecoration(
-                        color: isSend ? Colors.redAccent.withOpacity(0.12) : Colors.green.withOpacity(0.12),
+                        color:
+                            isSend
+                                ? Colors.redAccent.withOpacity(0.12)
+                                : Colors.green.withOpacity(0.12),
                         shape: BoxShape.circle,
                       ),
                       padding: const EdgeInsets.all(10),
                       child: Icon(
-                        isSend ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
+                        isSend
+                            ? Icons.arrow_upward_rounded
+                            : Icons.arrow_downward_rounded,
                         color: isSend ? Colors.redAccent : Colors.green,
                         size: 28,
                       ),
@@ -1029,38 +1368,76 @@ class TransactionDetailsDialogState extends ConsumerState<TransactionDetailsDial
                     const SizedBox(width: 14),
                     Text(
                       isSend ? 'Sent' : 'Received',
-                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: 20),
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 20,
+                      ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 18),
                 Row(
                   children: [
-                    Icon(Icons.account_balance_wallet_rounded, color: theme.primaryColor, size: 22),
+                    Icon(
+                      Icons.account_balance_wallet_rounded,
+                      color: theme.primaryColor,
+                      size: 22,
+                    ),
                     const SizedBox(width: 8),
-                    Text('Amount:', style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+                    Text(
+                      'Amount:',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                     const SizedBox(width: 6),
-                    Text('$amount SBD', style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold)),
+                    Text(
+                      '$amount SBD',
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 10),
                 Row(
                   children: [
-                    Icon(Icons.person_outline, color: theme.primaryColor, size: 20),
+                    Icon(
+                      Icons.person_outline,
+                      color: theme.primaryColor,
+                      size: 20,
+                    ),
                     const SizedBox(width: 8),
-                    Text(isSend ? 'To:' : 'From:', style: theme.textTheme.bodyMedium),
+                    Text(
+                      isSend ? 'To:' : 'From:',
+                      style: theme.textTheme.bodyMedium,
+                    ),
                     const SizedBox(width: 6),
-                    Text(otherUser, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+                    Text(
+                      otherUser,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 10),
                 Row(
                   children: [
-                    Icon(Icons.access_time, color: theme.primaryColor, size: 20),
+                    Icon(
+                      Icons.access_time,
+                      color: theme.primaryColor,
+                      size: 20,
+                    ),
                     const SizedBox(width: 8),
                     Text('Time:', style: theme.textTheme.bodyMedium),
                     const SizedBox(width: 6),
-                    Text(formattedTimestamp, style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor)),
+                    Text(
+                      formattedTimestamp,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.hintColor,
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 10),
@@ -1071,15 +1448,28 @@ class TransactionDetailsDialogState extends ConsumerState<TransactionDetailsDial
                     Text('Transaction ID:', style: theme.textTheme.bodyMedium),
                     const SizedBox(width: 6),
                     Flexible(
-                      child: Text(transactionId, style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor), overflow: TextOverflow.ellipsis),
+                      child: Text(
+                        transactionId,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.hintColor,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                     IconButton(
-                      icon: Icon(Icons.copy, size: 18, color: theme.primaryColor),
+                      icon: Icon(
+                        Icons.copy,
+                        size: 18,
+                        color: theme.primaryColor,
+                      ),
                       tooltip: 'Copy Transaction ID',
                       onPressed: () {
                         Clipboard.setData(ClipboardData(text: transactionId));
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Transaction ID copied!'), duration: Duration(seconds: 1)),
+                          SnackBar(
+                            content: Text('Transaction ID copied!'),
+                            duration: Duration(seconds: 1),
+                          ),
                         );
                       },
                     ),
@@ -1089,11 +1479,16 @@ class TransactionDetailsDialogState extends ConsumerState<TransactionDetailsDial
                 // Note box with improved structure
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 12,
+                    horizontal: 14,
+                  ),
                   decoration: BoxDecoration(
                     color: theme.primaryColor.withOpacity(0.07),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: theme.primaryColor.withOpacity(0.18)),
+                    border: Border.all(
+                      color: theme.primaryColor.withOpacity(0.18),
+                    ),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1101,10 +1496,19 @@ class TransactionDetailsDialogState extends ConsumerState<TransactionDetailsDial
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('Note', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+                          Text(
+                            'Note',
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                           if (!_isEditing)
                             IconButton(
-                              icon: Icon(Icons.edit, color: theme.primaryColor, size: 20),
+                              icon: Icon(
+                                Icons.edit,
+                                color: theme.primaryColor,
+                                size: 20,
+                              ),
                               tooltip: 'Edit Note',
                               onPressed: () {
                                 setState(() {
@@ -1117,64 +1521,75 @@ class TransactionDetailsDialogState extends ConsumerState<TransactionDetailsDial
                       const SizedBox(height: 4),
                       _isEditing
                           ? Column(
-                              children: [
-                                TextField(
-                                  controller: _noteController,
-                                  decoration: InputDecoration(
-                                    hintText: 'Add a note to this transaction',
-                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                                    isDense: true,
-                                    contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                            children: [
+                              TextField(
+                                controller: _noteController,
+                                decoration: InputDecoration(
+                                  hintText: 'Add a note to this transaction',
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
                                   ),
-                                  maxLines: 2,
-                                  autofocus: true,
+                                  isDense: true,
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    vertical: 10,
+                                    horizontal: 12,
+                                  ),
                                 ),
-                                const SizedBox(height: 8),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: ElevatedButton(
-                                        onPressed: () {
-                                          widget.onNoteSaved(_noteController.text.trim());
-                                          setState(() {
-                                            _isEditing = false;
-                                            _originalNote = _noteController.text.trim();
-                                          });
-                                          Navigator.of(context).pop();
-                                        },
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: theme.primaryColor,
-                                          foregroundColor: theme.colorScheme.onPrimary,
-                                        ),
-                                        child: const Text('Save'),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: OutlinedButton(
-                                        onPressed: () {
-                                          setState(() {
-                                            _noteController.text = _originalNote ?? '';
-                                            _isEditing = false;
-                                          });
-                                        },
-                                        child: const Text('Cancel'),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            )
-                          : Text(
-                              (_originalNote?.isNotEmpty ?? false)
-                                  ? _originalNote!
-                                  : 'No note added.',
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: (_originalNote?.isNotEmpty ?? false)
-                                    ? theme.colorScheme.onSurface
-                                    : theme.hintColor,
+                                maxLines: 2,
+                                autofocus: true,
                               ),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: ElevatedButton(
+                                      onPressed: () {
+                                        widget.onNoteSaved(
+                                          _noteController.text.trim(),
+                                        );
+                                        setState(() {
+                                          _isEditing = false;
+                                          _originalNote =
+                                              _noteController.text.trim();
+                                        });
+                                        Navigator.of(context).pop();
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: theme.primaryColor,
+                                        foregroundColor:
+                                            theme.colorScheme.onPrimary,
+                                      ),
+                                      child: const Text('Save'),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: OutlinedButton(
+                                      onPressed: () {
+                                        setState(() {
+                                          _noteController.text =
+                                              _originalNote ?? '';
+                                          _isEditing = false;
+                                        });
+                                      },
+                                      child: const Text('Cancel'),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          )
+                          : Text(
+                            (_originalNote?.isNotEmpty ?? false)
+                                ? _originalNote!
+                                : 'No note added.',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color:
+                                  (_originalNote?.isNotEmpty ?? false)
+                                      ? theme.colorScheme.onSurface
+                                      : theme.hintColor,
                             ),
+                          ),
                     ],
                   ),
                 ),
