@@ -9,7 +9,6 @@ import 'package:emotion_tracker/screens/settings/account/enable-2fa/2fa_status_s
 import 'package:emotion_tracker/screens/settings/account/trusted-ip/trusted_ip_status_screen.dart';
 import 'package:emotion_tracker/screens/settings/account/login_history_screen.dart';
 import 'package:emotion_tracker/screens/settings/account/api-tokens/api_tokens_screen.dart';
-import 'package:emotion_tracker/screens/settings/account/passkeys/passkey_management_screen.dart';
 import 'package:emotion_tracker/widgets/custom_app_bar.dart';
 
 class AccountSettingsScreenV1 extends ConsumerWidget {
@@ -141,25 +140,6 @@ class AccountSettingsScreenV1 extends ConsumerWidget {
                   Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => const TwoFAStatusScreen(),
-                    ),
-                  );
-                }
-              },
-            ),
-            SizedBox(height: 14),
-            ListTile(
-              leading: Icon(Icons.fingerprint, color: theme.primaryColor),
-              title: Text('Manage Passkeys'),
-              subtitle: Text('Set up passwordless authentication'),
-              onTap: () async {
-                final authenticated = await _authenticate(
-                  context,
-                  reason: 'Please authenticate to access passkey settings',
-                );
-                if (authenticated) {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const PasskeyManagementScreen(),
                     ),
                   );
                 }

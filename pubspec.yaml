@@ -52,9 +52,7 @@ dependencies:
   mobile_scanner: ^7.0.1
   qr_flutter: ^4.1.0
   timezone: ^0.10.1
-  # WebAuthn support
-  webauthn: ^0.2.0
-  # JSON handling for WebAuthn models
+  # JSON handling
   json_annotation: ^4.8.1
 
 dev_dependencies:

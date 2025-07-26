@@ -102,8 +102,6 @@ class ErrorUtils {
           return ErrorSeverity.error;
         case ErrorType.cloudflareError:
           return ErrorSeverity.critical;
-        case ErrorType.webauthn:
-          return ErrorSeverity.warning;
         case ErrorType.generic:
           return ErrorSeverity.error;
       }
@@ -418,8 +416,6 @@ class ErrorUtils {
         return 'The server is temporarily unavailable. Please try again later.';
       case ErrorType.unauthorized:
         return 'Please log in again to continue.';
-      case ErrorType.webauthn:
-        return 'Please try using a different device or ensure your passkey is properly set up.';
       case ErrorType.generic:
         return 'Please try again. If the problem persists, contact support.';
     }
