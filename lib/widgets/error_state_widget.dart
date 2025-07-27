@@ -238,10 +238,10 @@ class ErrorStateWidget extends ConsumerWidget {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.blue.withValues(alpha: 0.1),
+                      color: Colors.blue.withAlpha(25),
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
-                        color: Colors.blue.withValues(alpha: 0.3),
+                        color: Colors.blue.withAlpha(75),
                       ),
                     ),
                     child: Column(
@@ -270,10 +270,10 @@ class ErrorStateWidget extends ConsumerWidget {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.green.withValues(alpha: 0.1),
+                    color: Colors.green.withAlpha(25),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
-                      color: Colors.green.withValues(alpha: 0.3),
+                      color: Colors.green.withAlpha(75),
                     ),
                   ),
                   child: Text(
@@ -331,10 +331,10 @@ class ErrorStateWidget extends ConsumerWidget {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: errorState.color.withValues(alpha: 0.1),
+                    color: errorState.color.withAlpha(25),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
-                      color: errorState.color.withValues(alpha: 0.3),
+                      color: errorState.color.withAlpha(75),
                     ),
                   ),
                   child: Column(
@@ -352,7 +352,7 @@ class ErrorStateWidget extends ConsumerWidget {
                             'What you can do:',
                             style: theme.textTheme.bodySmall?.copyWith(
                               fontWeight: FontWeight.bold,
-                              color: errorState.color.withValues(alpha: 0.8),
+                              color: errorState.color.withAlpha(200),
                             ),
                           ),
                         ],
@@ -361,7 +361,7 @@ class ErrorStateWidget extends ConsumerWidget {
                       Text(
                         _getErrorAdvice(errorState.type),
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: errorState.color.withValues(alpha: 0.7),
+                          color: errorState.color.withAlpha(180),
                         ),
                       ),
                     ],

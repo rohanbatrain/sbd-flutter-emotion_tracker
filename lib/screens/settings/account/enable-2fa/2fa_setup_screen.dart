@@ -5,6 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:emotion_tracker/providers/two_fa_service.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:emotion_tracker/widgets/error_state_widget.dart';
+import 'package:emotion_tracker/widgets/loading_state_widget.dart';
+import 'package:emotion_tracker/core/session_manager.dart';
+import 'package:emotion_tracker/core/exceptions.dart' as core_exceptions;
 
 /// Screen to start 2FA setup (shows QR, secret, provisioning URI, input for TOTP code)
 class TwoFASetupScreen extends ConsumerStatefulWidget {
@@ -19,7 +23,7 @@ class _TwoFASetupScreenState extends ConsumerState<TwoFASetupScreen> {
   String? provisioningUri;
   String? totpSecret;
   bool isLoading = true;
-  String? error;
+  dynamic error;
   final TextEditingController codeController = TextEditingController();
 
   @override
@@ -33,21 +37,18 @@ class _TwoFASetupScreenState extends ConsumerState<TwoFASetupScreen> {
     try {
       final data = await ref.read(twoFAServiceProvider).setup2FA();
       setState(() {
-        qrCodeUrl = data['qr_code_data']; // changed from 'qr_code_url' to 'qr_code_data'
+        qrCodeUrl = data['qr_code_data'];
         provisioningUri = data['provisioning_uri'];
         totpSecret = data['totp_secret'];
         isLoading = false;
       });
-    } on UnauthorizedException catch (_) {
+    } on core_exceptions.UnauthorizedException catch (_) {
       if (mounted) {
-        setState(() {
-          error = '__unauthorized_redirect__';
-          isLoading = false;
-        });
-        Navigator.of(context).pushNamedAndRemoveUntil('auth/login/v1', (route) => false);
+        setState(() { error = '__unauthorized_redirect__'; isLoading = false; });
+        SessionManager.redirectToLogin(context, message: 'Session expired. Please log in again.');
       }
     } catch (e) {
-      setState(() { error = e.toString(); isLoading = false; });
+      setState(() { error = e; isLoading = false; });
     }
   }
 
@@ -65,26 +66,21 @@ class _TwoFASetupScreenState extends ConsumerState<TwoFASetupScreen> {
     try {
       final result = await ref.read(twoFAServiceProvider).verify2FA(code);
       if (result['backup_codes'] != null) {
-        // Show backup codes screen
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (_) => TwoFABackupCodesScreen(backupCodes: List<String>.from(result['backup_codes'])))
         );
       } else {
-        // Go to enabled screen
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (_) => const TwoFAEnabledScreen())
         );
       }
-    } on UnauthorizedException catch (_) {
+    } on core_exceptions.UnauthorizedException catch (_) {
       if (mounted) {
-        setState(() {
-          error = '__unauthorized_redirect__';
-          isLoading = false;
-        });
-        Navigator.of(context).pushNamedAndRemoveUntil('auth/login/v1', (route) => false);
+        setState(() { error = '__unauthorized_redirect__'; isLoading = false; });
+        SessionManager.redirectToLogin(context, message: 'Session expired. Please log in again.');
       }
     } catch (e) {
-      setState(() { error = e.toString(); isLoading = false; });
+      setState(() { error = e; isLoading = false; });
     }
   }
 
@@ -92,27 +88,19 @@ class _TwoFASetupScreenState extends ConsumerState<TwoFASetupScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     if (isLoading) {
-      // If session expired, don't show spinner
+      return const LoadingStateWidget(message: 'Setting up 2FA...');
+    }
+    if (error != null) {
       if (error == '__unauthorized_redirect__') {
         return Scaffold(
           backgroundColor: theme.scaffoldBackgroundColor,
           body: Center(child: Text('Session expired. Redirecting to login...')),
         );
       }
-      return Scaffold(
-        backgroundColor: theme.scaffoldBackgroundColor,
-        appBar: AppBar(
-          title: const Text('Two-Factor Authentication'),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => Navigator.of(context).pop(),
-          ),
-        ),
-        body: Center(
-          child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.primary),
-          ),
-        ),
+      return ErrorStateWidget(
+        error: error,
+        onRetry: _startSetup,
+        customMessage: 'Unable to set up 2FA. Please try again.',
       );
     }
     return Scaffold(
@@ -128,10 +116,7 @@ class _TwoFASetupScreenState extends ConsumerState<TwoFASetupScreen> {
             icon: const Icon(Icons.refresh),
             tooltip: 'Refresh',
             onPressed: () {
-              setState(() {
-                isLoading = true;
-                error = null;
-              });
+              setState(() { isLoading = true; error = null; });
               _startSetup();
             },
           ),
@@ -148,13 +133,6 @@ class _TwoFASetupScreenState extends ConsumerState<TwoFASetupScreen> {
                 style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
-              if (error != null) ...[
-                Text(
-                  error!,
-                  style: TextStyle(color: theme.colorScheme.error),
-                ),
-                const SizedBox(height: 16),
-              ],
               const SizedBox(height: 16),
               if (qrCodeUrl != null)
                 Center(

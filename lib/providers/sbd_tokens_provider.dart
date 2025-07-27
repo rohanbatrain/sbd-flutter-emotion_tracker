@@ -3,7 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:emotion_tracker/providers/secure_storage_provider.dart';
 import 'package:emotion_tracker/providers/shared_prefs_provider.dart';
-import 'package:emotion_tracker/utils/http_util.dart';
+import 'package:emotion_tracker/utils/http_util.dart' as http_util;
+import 'package:emotion_tracker/core/exceptions.dart';
 
 class SbdTokensState {
   final int? balance;
@@ -80,7 +81,7 @@ class SbdTokensNotifier extends StateNotifier<SbdTokensState> {
       if (token == null) throw Exception('Not authenticated');
       final baseUrl = _getBaseUrl();
       final url = Uri.parse('$baseUrl/sbd_tokens/send');
-      final res = await HttpUtil.post(
+      final res = await http_util.HttpUtil.post(
         url,
         headers: {
           'Authorization': 'Bearer $token',
@@ -100,10 +101,10 @@ class SbdTokensNotifier extends StateNotifier<SbdTokensState> {
         state = state.copyWith(isLoading: false, error: err['detail']?.toString() ?? 'Failed to send tokens');
         return false;
       }
-    } on CloudflareTunnelException catch (e) {
+    } on http_util.CloudflareTunnelException catch (e) {
       state = state.copyWith(isLoading: false, error: e.message);
       return false;
-    } on NetworkException catch (e) {
+    } on http_util.NetworkException catch (e) {
       state = state.copyWith(isLoading: false, error: e.message);
       return false;
     } catch (e) {
@@ -113,16 +114,15 @@ class SbdTokensNotifier extends StateNotifier<SbdTokensState> {
   }
 
   Future<void> fetchTransactions({String? username, int skip = 0, int limit = 5}) async {
-    // Delay provider modification to after build phase
     await Future(() async {
       state = state.copyWith(isLoading: true, error: null);
       try {
         final token = await _getToken();
-        if (token == null) throw Exception('Not authenticated');
+        if (token == null) throw UnauthorizedException('Not authenticated');
         final baseUrl = _getBaseUrl();
         final userPath = username != null && username.isNotEmpty ? '/$username' : '';
         final url = Uri.parse('$baseUrl/sbd_tokens/transactions$userPath?skip=$skip&limit=$limit');
-        final res = await http.get(url, headers: {
+        final res = await http_util.HttpUtil.get(url, headers: {
           'Authorization': 'Bearer $token',
         });
         if (res.statusCode == 200) {
@@ -130,6 +130,12 @@ class SbdTokensNotifier extends StateNotifier<SbdTokensState> {
           state = state.copyWith(transactions: data['transactions'], isLoading: false, error: null);
         } else if (res.statusCode == 404) {
           state = state.copyWith(transactions: [], isLoading: false, error: null);
+        } else if (res.statusCode == 401) {
+          throw UnauthorizedException('Session expired. Please log in again.');
+        } else if (res.statusCode == 429) {
+          throw RateLimitException('Too many requests. Please wait before trying again.');
+        } else if (res.statusCode >= 500 && res.statusCode < 600) {
+          throw ApiException('Server error (${res.statusCode}). Please try again later.', res.statusCode);
         } else {
           String errorMsg = 'Failed to fetch transactions';
           try {
@@ -138,10 +144,26 @@ class SbdTokensNotifier extends StateNotifier<SbdTokensState> {
           } catch (_) {
             if (res.statusCode == 502) errorMsg = 'Server unavailable (502)';
           }
-          state = state.copyWith(isLoading: false, error: errorMsg);
+          throw ApiException(errorMsg, res.statusCode);
         }
+      } on UnauthorizedException catch (e) {
+        state = state.copyWith(isLoading: false, error: e.message);
+        rethrow;
+      } on RateLimitException catch (e) {
+        state = state.copyWith(isLoading: false, error: e.message);
+        rethrow;
+      } on ApiException catch (e) {
+        state = state.copyWith(isLoading: false, error: e.message);
+        rethrow;
+      } on http_util.CloudflareTunnelException catch (e) {
+        state = state.copyWith(isLoading: false, error: e.message);
+        rethrow;
+      } on http_util.NetworkException catch (e) {
+        state = state.copyWith(isLoading: false, error: e.message);
+        rethrow;
       } catch (e) {
         state = state.copyWith(isLoading: false, error: e.toString());
+        rethrow;
       }
     });
   }

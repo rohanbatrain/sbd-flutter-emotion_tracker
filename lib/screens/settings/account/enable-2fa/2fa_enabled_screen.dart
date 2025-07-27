@@ -5,6 +5,12 @@ import 'package:url_launcher/url_launcher.dart';
 import '2fa_setup_screen.dart';
 import 'package:emotion_tracker/providers/two_fa_service.dart';
 import 'package:emotion_tracker/providers/transition_provider.dart';
+import 'package:emotion_tracker/core/global_error_handler.dart';
+import 'package:emotion_tracker/widgets/error_state_widget.dart';
+import 'package:emotion_tracker/widgets/loading_state_widget.dart';
+import 'package:emotion_tracker/core/session_manager.dart';
+import 'package:emotion_tracker/core/exceptions.dart' as core_exceptions;
+import 'package:emotion_tracker/core/error_state.dart';
 
 /// Screen shown when 2FA is enabled.
 class TwoFAEnabledScreen extends ConsumerWidget {
@@ -33,9 +39,14 @@ class TwoFAEnabledScreen extends ConsumerWidget {
           );
         }
       } catch (e) {
+        final errorState = GlobalErrorHandler.processError(e);
+        if (e is core_exceptions.UnauthorizedException) {
+          SessionManager.redirectToLogin(context, message: 'Session expired. Please log in again.');
+          return;
+        }
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to disable 2FA: $e')),
+            SnackBar(content: Text(errorState.message)),
           );
         }
       }

@@ -4,6 +4,11 @@ import 'package:emotion_tracker/providers/theme_provider.dart';
 import 'package:emotion_tracker/widgets/custom_app_bar.dart';
 import 'package:emotion_tracker/providers/theme_unlock_provider.dart';
 import 'package:emotion_tracker/screens/shop/variant1/variant1.dart';
+import 'package:emotion_tracker/core/session_manager.dart';
+import 'package:emotion_tracker/core/global_error_handler.dart';
+import 'package:emotion_tracker/core/error_state.dart';
+import 'package:emotion_tracker/widgets/error_state_widget.dart';
+import 'package:emotion_tracker/widgets/loading_state_widget.dart';
 
 class ThemeSelectionScreenV1 extends ConsumerStatefulWidget {
   const ThemeSelectionScreenV1({Key? key}) : super(key: key);
@@ -130,39 +135,25 @@ class _ThemeSelectionScreenV1State extends ConsumerState<ThemeSelectionScreenV1>
                   future: ref.read(themeUnlockProvider).getMergedUnlockedThemes(),
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
-                      return Center(child: CircularProgressIndicator());
+                      return const LoadingStateWidget(message: 'Loading available themes...');
                     }
                     if (snapshot.hasError) {
-                      final errorStr = snapshot.error?.toString() ?? '';
-                      if (errorStr.contains('401')) {
-                        // Redirect to login
+                      final errorState = GlobalErrorHandler.processError(snapshot.error);
+                      if (errorState.autoRedirect && errorState.type == ErrorType.unauthorized) {
                         WidgetsBinding.instance.addPostFrameCallback((_) {
-                          Navigator.of(context).pushNamedAndRemoveUntil('/auth/v1', (route) => false);
+                          SessionManager.redirectToLogin(context, message: errorState.message);
                         });
-                        return Center(child: CircularProgressIndicator());
+                        return const LoadingStateWidget(message: 'Session expired. Redirecting to login...');
                       }
-                      return Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.error_outline, color: Colors.red, size: 32),
-                            SizedBox(height: 12),
-                            Text('Failed to load theme unlocks.', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
-                            SizedBox(height: 8),
-                            ElevatedButton.icon(
-                              icon: Icon(Icons.refresh),
-                              label: Text('Retry'),
-                              onPressed: () {
-                                if (mounted) setState(() {});
-                              },
-                            ),
-                          ],
-                        ),
+                      return ErrorStateWidget(
+                        error: snapshot.error,
+                        onRetry: () => setState(() {}),
+                        customMessage: errorState.message,
                       );
                     }
                     final unlockedThemes = snapshot.data ?? {};
                     return GridView.builder(
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: 2,
                         crossAxisSpacing: 12,
                         mainAxisSpacing: 12,

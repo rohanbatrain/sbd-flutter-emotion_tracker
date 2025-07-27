@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:emotion_tracker/providers/trusted_ip_lockdown_service.dart';
 import 'trusted_ip_setup_screen.dart';
+import 'package:emotion_tracker/widgets/error_state_widget.dart';
+import 'package:emotion_tracker/widgets/loading_state_widget.dart';
+import 'package:emotion_tracker/core/session_manager.dart';
+import 'package:emotion_tracker/core/exceptions.dart' as core_exceptions;
 
 /// TrustedIpStatusScreen
 /// 
@@ -106,73 +110,23 @@ class TrustedIpStatusScreen extends ConsumerWidget {
           ),
         );
       },
-      loading: () => Scaffold(
-        backgroundColor: theme.scaffoldBackgroundColor,
-        appBar: AppBar(
-          title: const Text('Trusted IP Lockdown'),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () {
-              if (onBackToSettings != null) {
-                onBackToSettings!();
-              } else {
-                Navigator.of(context).pop();
-              }
-            },
-          ),
-          centerTitle: true,
-          elevation: 0,
-          backgroundColor: theme.scaffoldBackgroundColor,
-        ),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              SizedBox(width: 64, height: 64, child: CircularProgressIndicator()),
-              const SizedBox(height: 32),
-              Text('Loading your Trusted IP status...'),
-            ],
-          ),
-        ),
-      ),
-      error: (err, stack) => Scaffold(
-        appBar: AppBar(
-          title: const Text('Trusted IP Lockdown'),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () {
-              if (onBackToSettings != null) {
-                onBackToSettings!();
-              } else {
-                Navigator.of(context).pop();
-              }
-            },
-          ),
-          centerTitle: true,
-          elevation: 0,
-        ),
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.error_outline, color: theme.colorScheme.error, size: 48),
-                const SizedBox(height: 16),
-                Text('Failed to load status', style: theme.textTheme.titleMedium),
-                const SizedBox(height: 8),
-                Text(err.toString(), style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.error)),
-                const SizedBox(height: 24),
-                ElevatedButton.icon(
-                  icon: const Icon(Icons.refresh),
-                  onPressed: () => ref.invalidate(_trustedIpStatusProvider),
-                  label: const Text('Retry'),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+      loading: () => const LoadingStateWidget(message: 'Loading your Trusted IP status...'),
+      error: (err, stack) {
+        if (err is core_exceptions.UnauthorizedException) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            SessionManager.redirectToLogin(context, message: 'Your session has expired. Please log in again.');
+          });
+          return Scaffold(
+            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+            body: Center(child: Text('Session expired. Redirecting to login...')),
+          );
+        }
+        return ErrorStateWidget(
+          error: err,
+          onRetry: () => ref.invalidate(_trustedIpStatusProvider),
+          customMessage: 'Unable to load Trusted IP status. Please try again.',
+        );
+      },
     );
   }
 }

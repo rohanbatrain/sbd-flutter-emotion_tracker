@@ -248,207 +248,213 @@ class _LoginHistoryScreenState extends ConsumerState<LoginHistoryScreen> with Ro
 
   @override
   Widget build(BuildContext context) {
-    final asyncLogins = ref.watch(loginHistoryMigratedProvider);
-    final userTz = ref.watch(timezoneProvider);
-    final theme = ref.watch(currentThemeProvider);
-    final textTheme = theme.textTheme;
-    final colorScheme = theme.colorScheme;
+    final theme = Theme.of(context);
+    final loginHistoryAsync = ref.watch(loginHistoryMigratedProvider);
+    return loginHistoryAsync.when(
+      data: (items) {
+        final userTz = ref.watch(timezoneProvider);
+        final theme = ref.watch(currentThemeProvider);
+        final textTheme = theme.textTheme;
+        final colorScheme = theme.colorScheme;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Recent Login(s)'),
-        backgroundColor: colorScheme.primary,
-        foregroundColor: colorScheme.onPrimary,
-        elevation: 1,
-      ),
-      backgroundColor: colorScheme.surface,
-      body: RefreshIndicator(
-        onRefresh: () async => ref.invalidate(loginHistoryMigratedProvider),
-        child: asyncLogins.when(
-          loading: () => const LoadingStateWidget(message: 'Loading recent logins...'),
-          error: (error, stackTrace) {
-            // Handle 401 Unauthorized: redirect to /auth/v1
-            final errorState = GlobalErrorHandler.processError(error);
-            if (errorState.type == ErrorType.unauthorized) {
-              WidgetsBinding.instance.addPostFrameCallback((_) async {
-                await SessionManager.handleSessionExpiry(context, ref);
-                Navigator.of(context).pushReplacementNamed('/auth/v1');
-              });
-              return const SizedBox.shrink();
-            }
-            return ErrorStateWidget(
-              error: error,
-              onRetry: _handleRetry,
-              onInfo: () => _showErrorInfo(error),
-              customMessage: 'Unable to load login history. Please try again.',
-            );
-          },
-          data: (logins) {
-            final items = logins.where((e) => e['outcome'] == 'success').toList();
-            if (items.isEmpty) {
-              return Center(child: Text('No recent logins found.', style: textTheme.bodyLarge));
-            }
+        final successfulLogins = items.where((e) => e['outcome'] == 'success').toList();
+        if (successfulLogins.isEmpty) {
+          return Scaffold(
+            appBar: AppBar(
+              title: const Text('Recent Login(s)'),
+              backgroundColor: colorScheme.primary,
+              foregroundColor: colorScheme.onPrimary,
+              elevation: 1,
+            ),
+            backgroundColor: colorScheme.surface,
+            body: Center(child: Text('No recent logins found.', style: textTheme.bodyLarge)),
+          );
+        }
 
-            // Show only the 10 most recent successful logins
-            final recentItems = items.take(10).toList();
+        final recentItems = successfulLogins.take(10).toList();
 
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
-                  decoration: BoxDecoration(
-                    color: colorScheme.primary.withOpacity(0.08),
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(18),
-                      topRight: Radius.circular(18),
-                    ),
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text('Recent Login(s)'),
+            backgroundColor: colorScheme.primary,
+            foregroundColor: colorScheme.onPrimary,
+            elevation: 1,
+          ),
+          backgroundColor: colorScheme.surface,
+          body: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
+                decoration: BoxDecoration(
+                  color: colorScheme.primary.withOpacity(0.08),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(18),
+                    topRight: Radius.circular(18),
                   ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(Icons.lock_clock, color: colorScheme.primary, size: 26),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Text(
-                          '10 most recent logins for your Second Brain Database account',
-                          style: textTheme.titleMedium?.copyWith(
-                            color: colorScheme.onSurface,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 0.1,
-                          ),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.lock_clock, color: colorScheme.primary, size: 26),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Text(
+                        '10 most recent logins for your Second Brain Database account',
+                        style: textTheme.titleMedium?.copyWith(
+                          color: colorScheme.onSurface,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.1,
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-                Expanded(
-                  child: SafeArea(
-                    top: false,
-                    left: false,
-                    right: false,
-                    bottom: true,
-                    child: ListView.separated(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      padding: const EdgeInsets.all(16),
-                      separatorBuilder: (_, __) => const SizedBox(height: 12),
-                      itemCount: recentItems.length,
-                      itemBuilder: (ctx, i) {
-                        final l = recentItems[i];
-                        final color = _statusColor(l['outcome']);
-                        final formattedDate = _formatTimestamp(l['timestamp'] ?? '', userTz);
-                        final device = _shortUserAgent(l['user_agent'] ?? '');
-                        final ip = l['ip_address'] ?? '';
-                        final mfa = (l['mfa_status'] ?? false) as bool;
+              ),
+              Expanded(
+                child: SafeArea(
+                  top: false,
+                  left: false,
+                  right: false,
+                  bottom: true,
+                  child: ListView.separated(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.all(16),
+                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    itemCount: recentItems.length,
+                    itemBuilder: (ctx, i) {
+                      final l = recentItems[i];
+                      final color = _statusColor(l['outcome']);
+                      final formattedDate = _formatTimestamp(l['timestamp'] ?? '', userTz);
+                      final device = _shortUserAgent(l['user_agent'] ?? '');
+                      final ip = l['ip_address'] ?? '';
+                      final mfa = (l['mfa_status'] ?? false) as bool;
 
-                        return Card(
-                          elevation: 2,
-                          color: colorScheme.surface,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12)),
-                          child: ListTile(
-                            leading: Tooltip(
-                              message: _platformFromUserAgent(l['user_agent'] ?? ''),
-                              child: CircleAvatar(
-                                backgroundColor: color,
-                                child: _buildPlatformIcon(l['user_agent'] ?? '', color),
-                              ),
+                      return Card(
+                        elevation: 2,
+                        color: colorScheme.surface,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                        child: ListTile(
+                          leading: Tooltip(
+                            message: _platformFromUserAgent(l['user_agent'] ?? ''),
+                            child: CircleAvatar(
+                              backgroundColor: color,
+                              child: _buildPlatformIcon(l['user_agent'] ?? '', color),
                             ),
-                            title: Text(
-                              formattedDate,
-                              style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-                            ),
-                            subtitle: Padding(
-                              padding: const EdgeInsets.only(top: 4),
-                              child: Wrap(
-                                spacing: 8,
-                                runSpacing: -8,
-                                children: [
-                                  Tooltip(
-                                    message: l['user_agent'] ?? '',
-                                    child: Chip(
-                                      label: Text(device, style: textTheme.labelMedium),
-                                      avatar: const Icon(Icons.devices_other, size: 16),
-                                      backgroundColor: colorScheme.primary.withOpacity(0.08),
-                                      shape: StadiumBorder(),
-                                    ),
-                                  ),
-                                  Chip(
-                                    label: Text(_platformFromUserAgent(l['user_agent'] ?? ''), style: textTheme.labelMedium),
-                                    avatar: const Icon(Icons.computer, size: 16),
-                                    backgroundColor: colorScheme.secondary.withOpacity(0.08),
+                          ),
+                          title: Text(
+                            formattedDate,
+                            style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                          ),
+                          subtitle: Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Wrap(
+                              spacing: 8,
+                              runSpacing: -8,
+                              children: [
+                                Tooltip(
+                                  message: l['user_agent'] ?? '',
+                                  child: Chip(
+                                    label: Text(device, style: textTheme.labelMedium),
+                                    avatar: const Icon(Icons.devices_other, size: 16),
+                                    backgroundColor: colorScheme.primary.withOpacity(0.08),
                                     shape: StadiumBorder(),
                                   ),
-                                  Tooltip(
-                                    message: 'Copy IP',
-                                    child: InkWell(
-                                      borderRadius: BorderRadius.circular(20),
-                                      onTap: () async {
-                                        await Clipboard.setData(ClipboardData(text: ip));
-                                        if (context.mounted) {
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            SnackBar(
-                                              content: Text('IP address copied!'),
-                                              duration: const Duration(seconds: 2),
-                                            ),
-                                          );
-                                        }
-                                      },
-                                      child: Chip(
-                                        label: Text(ip, style: textTheme.labelMedium),
-                                        avatar: const Icon(Icons.public, size: 16),
-                                        backgroundColor: colorScheme.tertiaryContainer.withOpacity(0.08),
-                                        shape: StadiumBorder(),
-                                      ),
-                                    ),
-                                  ),
-                                  if (mfa)
-                                    Chip(
-                                      label: const Text('MFA'),
-                                      avatar: const Icon(Icons.security, size: 16),
-                                      backgroundColor: colorScheme.error.withOpacity(0.08),
+                                ),
+                                Chip(
+                                  label: Text(_platformFromUserAgent(l['user_agent'] ?? ''), style: textTheme.labelMedium),
+                                  avatar: const Icon(Icons.computer, size: 16),
+                                  backgroundColor: colorScheme.secondary.withOpacity(0.08),
+                                  shape: StadiumBorder(),
+                                ),
+                                Tooltip(
+                                  message: 'Copy IP',
+                                  child: InkWell(
+                                    borderRadius: BorderRadius.circular(20),
+                                    onTap: () async {
+                                      await Clipboard.setData(ClipboardData(text: ip));
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            content: Text('IP address copied!'),
+                                            duration: const Duration(seconds: 2),
+                                          ),
+                                        );
+                                      }
+                                    },
+                                    child: Chip(
+                                      label: Text(ip, style: textTheme.labelMedium),
+                                      avatar: const Icon(Icons.public, size: 16),
+                                      backgroundColor: colorScheme.tertiaryContainer.withOpacity(0.08),
                                       shape: StadiumBorder(),
                                     ),
-                                ],
-                              ),
-                            ),
-                            trailing: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: color.withOpacity(.12),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                l['outcome'],
-                                style: textTheme.labelLarge?.copyWith(
-                                  color: color, fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                            onTap: () {
-                              showModalBottomSheet(
-                                context: context,
-                                builder: (_) => _LoginDetailsSheet(
-                                  login: l,
-                                  bannerAd: _bannerLoaded ? _preloadedBannerAd : null,
+                                  ),
                                 ),
-                                backgroundColor: colorScheme.surface,
-                                shape: const RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
-                                ),
-                              );
-                            },
+                                if (mfa)
+                                  Chip(
+                                    label: const Text('MFA'),
+                                    avatar: const Icon(Icons.security, size: 16),
+                                    backgroundColor: colorScheme.error.withOpacity(0.08),
+                                    shape: StadiumBorder(),
+                                  ),
+                              ],
+                            ),
                           ),
-                        );
-                      },
-                    ),
+                          trailing: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: color.withOpacity(.12),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              l['outcome'],
+                              style: textTheme.labelLarge?.copyWith(
+                                color: color, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                          onTap: () {
+                            showModalBottomSheet(
+                              context: context,
+                              builder: (_) => _LoginDetailsSheet(
+                                login: l,
+                                bannerAd: _bannerLoaded ? _preloadedBannerAd : null,
+                              ),
+                              backgroundColor: colorScheme.surface,
+                              shape: const RoundedRectangleBorder(
+                                borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+                              ),
+                            );
+                          },
+                        ),
+                      );
+                    },
                   ),
                 ),
-              ],
-            );
-          },
-        ),
-      ),
+              ),
+            ],
+          ),
+        );
+      },
+      loading: () => const LoadingStateWidget(message: 'Loading your login history...'),
+      error: (error, stackTrace) {
+        if (error is UnauthorizedException) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            SessionManager.redirectToLogin(context, message: 'Your session has expired. Please log in again.');
+          });
+          return Scaffold(
+            backgroundColor: theme.scaffoldBackgroundColor,
+            body: Center(child: Text('Session expired. Redirecting to login...')),
+          );
+        }
+        return ErrorStateWidget(
+          error: error,
+          onRetry: _handleRetry,
+          onInfo: () => _showErrorInfo(error),
+          customMessage: 'Unable to load login history. Please try again.',
+        );
+      },
     );
   }
 }

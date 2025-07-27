@@ -10,6 +10,10 @@ import 'package:emotion_tracker/providers/banner_unlock_provider.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:emotion_tracker/providers/user_agent_util.dart';
+import 'package:emotion_tracker/widgets/error_state_widget.dart';
+import 'package:emotion_tracker/widgets/loading_state_widget.dart';
+import 'package:emotion_tracker/core/session_manager.dart';
+import 'package:emotion_tracker/core/exceptions.dart' as core_exceptions;
 
 class ProfileScreenV1 extends ConsumerStatefulWidget {
   const ProfileScreenV1({Key? key}) : super(key: key);
@@ -26,6 +30,7 @@ class _ProfileScreenV1State extends ConsumerState<ProfileScreenV1> {
   String selectedAvatarId = 'person'; // Default avatar
   String selectedBannerId = 'default-dark'; // Default banner FOR DARK THEMES
   bool isLoading = true;
+  dynamic error;
 
   final TextEditingController firstNameController = TextEditingController();
   final TextEditingController lastNameController = TextEditingController();
@@ -48,6 +53,10 @@ class _ProfileScreenV1State extends ConsumerState<ProfileScreenV1> {
   }
 
   Future<void> _loadUserData() async {
+    setState(() {
+      isLoading = true;
+      error = null;
+    });
     try {
       final theme = ref.read(currentThemeProvider);
       final secureStorage = ref.read(secureStorageProvider);
@@ -74,17 +83,30 @@ class _ProfileScreenV1State extends ConsumerState<ProfileScreenV1> {
         emailController.text = email;
         isLoading = false;
       });
+    } on core_exceptions.UnauthorizedException catch (_) {
+      if (mounted) {
+        setState(() {
+          error = '__unauthorized_redirect__';
+          isLoading = false;
+        });
+        SessionManager.redirectToLogin(context, message: 'Session expired. Please log in again.');
+      }
     } catch (e) {
       setState(() {
+        error = e;
         isLoading = false;
       });
     }
   }
 
   Future<void> _saveUserData() async {
+    setState(() {
+      isLoading = true;
+      error = null;
+    });
     try {
       final secureStorage = ref.read(secureStorageProvider);
-      
+
       // Save to secure storage (sensitive data)
       await secureStorage.write(key: 'user_first_name', value: firstNameController.text);
       await secureStorage.write(key: 'user_last_name', value: lastNameController.text);
@@ -92,30 +114,41 @@ class _ProfileScreenV1State extends ConsumerState<ProfileScreenV1> {
       await secureStorage.write(key: 'user_email', value: emailController.text);
       await secureStorage.write(key: 'user_avatar_id', value: selectedAvatarId);
       await secureStorage.write(key: 'user_banner_id', value: selectedBannerId);
-      
+
       // Update local state
       setState(() {
         firstName = firstNameController.text;
         lastName = lastNameController.text;
         username = usernameController.text;
         userEmail = emailController.text;
+        isLoading = false;
       });
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Profile updated successfully!'),
-            backgroundColor: Theme.of(context).colorScheme.secondary,
             duration: const Duration(seconds: 2),
           ),
         );
       }
+    } on core_exceptions.UnauthorizedException catch (_) {
+      if (mounted) {
+        setState(() {
+          error = '__unauthorized_redirect__';
+          isLoading = false;
+        });
+        SessionManager.redirectToLogin(context, message: 'Session expired. Please log in again.');
+      }
     } catch (e) {
+      setState(() {
+        error = e;
+        isLoading = false;
+      });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error saving profile: ${e.toString()}'),
-            backgroundColor: Theme.of(context).colorScheme.error,
+            content: const Text('Failed to update profile.'),
             duration: const Duration(seconds: 3),
           ),
         );
@@ -344,7 +377,7 @@ class _ProfileScreenV1State extends ConsumerState<ProfileScreenV1> {
     int? maxLength,
   }) async {
     controller.text = currentValue;
-    
+
     return showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -361,8 +394,8 @@ class _ProfileScreenV1State extends ConsumerState<ProfileScreenV1> {
                 maxLength: maxLength,
                 decoration: InputDecoration(
                   labelText: title,
-                  hintText: fieldName == 'user_username' 
-                      ? 'Enter username (3-50 chars, a-z, 0-9, _, -)' 
+                  hintText: fieldName == 'user_username'
+                      ? 'Enter username (3-50 chars, a-z, 0-9, _, -)'
                       : fieldName == 'user_email'
                           ? 'Enter your email address'
                           : 'Enter your $title',
@@ -414,7 +447,7 @@ class _ProfileScreenV1State extends ConsumerState<ProfileScreenV1> {
                 // Use centralized validation
                 String value = controller.text.trim();
                 String? error;
-                
+
                 if (fieldName == 'user_username') {
                   error = InputValidator.validateUsername(value);
                 } else if (fieldName == 'user_email') {
@@ -426,7 +459,7 @@ class _ProfileScreenV1State extends ConsumerState<ProfileScreenV1> {
                     error = '$title cannot exceed 50 characters';
                   }
                 }
-                
+
                 if (error != null) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
@@ -437,7 +470,7 @@ class _ProfileScreenV1State extends ConsumerState<ProfileScreenV1> {
                   );
                   return;
                 }
-                
+
                 controller.text = value;
                 Navigator.of(context).pop();
                 await _saveUserData();
@@ -464,17 +497,21 @@ class _ProfileScreenV1State extends ConsumerState<ProfileScreenV1> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = ref.watch(currentThemeProvider);
-
+    final theme = Theme.of(context);
     if (isLoading) {
-      return Scaffold(
-        appBar: AppBar(
-          backgroundColor: theme.primaryColor,
-          foregroundColor: theme.colorScheme.onPrimary,
-          title: const Text('Profile', style: TextStyle(fontWeight: FontWeight.bold)),
-          centerTitle: true,
-        ),
-        body: const Center(child: CircularProgressIndicator()),
+      return const LoadingStateWidget(message: 'Loading profile...');
+    }
+    if (error != null) {
+      if (error == '__unauthorized_redirect__') {
+        return Scaffold(
+          backgroundColor: theme.scaffoldBackgroundColor,
+          body: Center(child: Text('Session expired. Redirecting to login...')),
+        );
+      }
+      return ErrorStateWidget(
+        error: error,
+        onRetry: _loadUserData,
+        customMessage: 'Unable to load your profile. Please try again.',
       );
     }
 

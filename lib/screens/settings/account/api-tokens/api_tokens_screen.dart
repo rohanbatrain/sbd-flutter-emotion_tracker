@@ -5,6 +5,9 @@ import 'package:emotion_tracker/widgets/custom_app_bar.dart';
 import 'package:emotion_tracker/widgets/error_state_widget.dart';
 import 'package:emotion_tracker/widgets/loading_state_widget.dart';
 import 'package:emotion_tracker/core/global_error_handler.dart';
+import 'package:emotion_tracker/core/session_manager.dart';
+import 'package:emotion_tracker/core/exceptions.dart' as core_ex;
+import 'package:emotion_tracker/core/error_state.dart';
 import 'create_token_dialog.dart';
 import 'token_display_dialog.dart';
 
@@ -16,6 +19,56 @@ final apiTokensProvider = FutureProvider<List<ApiToken>>((ref) async {
 
 class ApiTokensScreen extends ConsumerWidget {
   const ApiTokensScreen({super.key});
+
+  void _showErrorInfo(BuildContext context, dynamic error) {
+    final errorState = GlobalErrorHandler.processError(error);
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(errorState.icon, color: errorState.color),
+            const SizedBox(width: 8),
+            const Text('API Token Error Help'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Unable to load your API tokens.'),
+            const SizedBox(height: 8),
+            Text(errorState.message),
+            const SizedBox(height: 16),
+            const Text('Troubleshooting steps:', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Text(_getTroubleshootingSteps(errorState.type)),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _getTroubleshootingSteps(ErrorType errorType) {
+    switch (errorType) {
+      case ErrorType.unauthorized:
+        return '• Check if you are still logged in\n• Try logging out and back in\n• Contact support if issue persists';
+      case ErrorType.networkError:
+        return '• Check your internet connection\n• Try switching networks\n• Wait and try again';
+      case ErrorType.serverError:
+        return '• Server may be temporarily down\n• Try again in a few minutes\n• Check server status';
+      case ErrorType.rateLimited:
+        return '• You are making requests too quickly\n• Wait a few minutes\n• Try again later';
+      default:
+        return '• Try refreshing the page\n• Check your connection\n• Contact support if needed';
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -31,14 +84,19 @@ class ApiTokensScreen extends ConsumerWidget {
       body: RefreshIndicator(
         onRefresh: () async => ref.invalidate(apiTokensProvider),
         child: asyncTokens.when(
-          loading:
-              () => const LoadingStateWidget(
-                message: 'Loading your API tokens...',
-              ),
+          loading: () => const LoadingStateWidget(
+            message: 'Loading your API tokens...',
+          ),
           error: (error, stackTrace) {
+            final errorState = GlobalErrorHandler.processError(error);
+            if (error is core_ex.UnauthorizedException) {
+              SessionManager.redirectToLogin(context, message: 'Session expired. Please log in again.');
+            }
             return ErrorStateWidget(
-              error: error,
+              error: errorState,
               onRetry: () => ref.invalidate(apiTokensProvider),
+              onInfo: () => _showErrorInfo(context, error),
+              customMessage: 'Unable to load API tokens. Please try again.',
             );
           },
           data: (tokens) {
@@ -79,7 +137,7 @@ class ApiTokensScreen extends ConsumerWidget {
                   elevation: 2,
                   color:
                       token.revoked
-                          ? theme.cardColor.withValues(alpha: 0.6)
+                          ? theme.cardColor.withAlpha(153)
                           : theme.cardColor,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -138,9 +196,7 @@ class ApiTokensScreen extends ConsumerWidget {
                                 vertical: 2,
                               ),
                               decoration: BoxDecoration(
-                                color: theme.colorScheme.error.withValues(
-                                  alpha: 0.12,
-                                ),
+                                color: theme.colorScheme.error.withAlpha(30),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
@@ -203,6 +259,7 @@ class ApiTokensScreen extends ConsumerWidget {
     WidgetRef ref,
     ApiToken token,
   ) async {
+    final theme = Theme.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder:
@@ -233,10 +290,10 @@ class ApiTokensScreen extends ConsumerWidget {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.red.withValues(alpha: 0.1),
+                    color: Colors.red.withAlpha(25),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
-                      color: Colors.red.withValues(alpha: 0.3),
+                      color: Colors.red.withAlpha(77),
                     ),
                   ),
                   child: Row(
@@ -283,119 +340,37 @@ class ApiTokensScreen extends ConsumerWidget {
         await service.revokeToken(token.tokenId);
 
         if (context.mounted) {
-          // Refresh the token list to reflect the revocation
           ref.invalidate(apiTokensProvider);
-
-          // Show success message
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Row(
-                children: [
-                  Icon(Icons.check_circle, color: Colors.white, size: 20),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Token "${token.description}" has been revoked',
-                    ),
-                  ),
-                ],
-              ),
-              backgroundColor: Colors.green[600],
               duration: const Duration(seconds: 4),
+              content: Text('Token revoked successfully.'),
             ),
           );
         }
       } catch (e) {
         if (context.mounted) {
           final errorState = GlobalErrorHandler.processError(e);
-
-          // Handle session expiry specially using the new system
-          if (e is UnauthorizedException) {
-            await GlobalErrorHandler.handleUnauthorized(context, ref);
+          if (e is core_ex.UnauthorizedException) {
+            SessionManager.redirectToLogin(context, message: 'Session expired. Please log in again.');
             return;
           }
-
-          // Show error snackbar with retry action for retryable errors
-          if (GlobalErrorHandler.isRetryable(errorState)) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Row(
-                  children: [
-                    Icon(errorState.icon, color: Colors.white, size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(child: Text(_getRevokeErrorMessage(e))),
-                  ],
-                ),
-                backgroundColor: errorState.color,
-                duration: const Duration(seconds: 4),
-                action: SnackBarAction(
-                  label: 'Retry',
-                  textColor: Colors.white,
-                  onPressed: () => _showRevokeDialog(context, ref, token),
-                ),
-              ),
-            );
-          } else {
-            // Show error snackbar without retry for non-retryable errors
-            GlobalErrorHandler.showErrorSnackbar(
-              context,
-              _getRevokeErrorMessage(e),
-              errorState.type,
-            );
-          }
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              duration: const Duration(seconds: 4),
+              content: Text(errorState.message),
+              backgroundColor: theme.colorScheme.error,
+              action: errorState.showRetry
+                  ? SnackBarAction(
+                      label: 'Retry',
+                      textColor: Colors.white,
+                      onPressed: () => ref.invalidate(apiTokensProvider),
+                    )
+                  : null,
+            ),
+          );
         }
       }
     }
-  }
-
-  String _getRevokeErrorMessage(dynamic error) {
-    if (error is UnauthorizedException) {
-      return 'Your session has expired. Please log in again.';
-    }
-
-    if (error is RateLimitException) {
-      return error.message;
-    }
-
-    if (error is ApiException) {
-      switch (error.statusCode) {
-        case 404:
-          return 'Token not found. It may have already been revoked.';
-        case 403:
-          return 'You do not have permission to revoke this token.';
-        case 409:
-          return 'Token is already revoked or in an invalid state.';
-        case 429:
-          return 'Too many requests. Please wait before trying again.';
-        case 500:
-        case 502:
-        case 503:
-        case 504:
-          return 'Server error occurred. Please try again later.';
-        default:
-          return error.message.isNotEmpty
-              ? error.message
-              : 'Failed to revoke token. Please try again.';
-      }
-    }
-
-    // Handle network and tunnel errors
-    if (error.toString().contains('CLOUDFLARE_TUNNEL_DOWN') ||
-        error.toString().contains('Server tunnel is down')) {
-      return 'Server is temporarily unavailable. Please try again later.';
-    }
-
-    if (error.toString().contains('NETWORK_ERROR') ||
-        error.toString().contains('Network error')) {
-      return 'Network connection problem. Please check your internet connection.';
-    }
-
-    if (error.toString().contains('timeout') ||
-        error.toString().contains('timed out')) {
-      return 'Request timed out. Please try again.';
-    }
-
-    // Generic error message
-    return 'Failed to revoke token. Please try again.';
   }
 }

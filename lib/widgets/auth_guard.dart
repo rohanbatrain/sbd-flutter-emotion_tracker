@@ -5,6 +5,7 @@ import 'package:emotion_tracker/screens/auth/variant1.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:emotion_tracker/screens/auth/verify-email/variant1.dart';
 import 'package:emotion_tracker/screens/splash/variant1.dart';
+import 'package:emotion_tracker/core/session_manager.dart';
 
 class AuthGuard extends ConsumerWidget {
   final Widget child;
@@ -39,6 +40,13 @@ class AuthGuard extends ConsumerWidget {
         
         // If user is logged in (has valid token), show the protected content
         if (authState.isLoggedIn) {
+          // Check for session validity
+          if (!SessionManager.isSessionValid(ref)) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              SessionManager.redirectToLogin(context, message: 'Session expired. Please log in again.');
+            });
+            return const SizedBox.shrink();
+          }
           return child;
         } else {
           // Not logged in, show auth screen

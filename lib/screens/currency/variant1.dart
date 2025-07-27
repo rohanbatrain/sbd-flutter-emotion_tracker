@@ -17,6 +17,9 @@ import 'package:timezone/timezone.dart' as tz;
 import 'package:local_auth/local_auth.dart';
 import 'package:emotion_tracker/screens/currency/transactions/variant1.dart';
 import 'package:emotion_tracker/widgets/transaction_card.dart';
+import 'package:emotion_tracker/core/session_manager.dart';
+import 'package:emotion_tracker/core/exceptions.dart';
+import 'package:emotion_tracker/core/error_state.dart';
 import 'dart:async';
 
 // Timezone abbreviation to IANA map (from login_history_screen.dart)
@@ -80,6 +83,7 @@ class _CurrencyScreenV1State extends ConsumerState<CurrencyScreenV1>
   final TextEditingController _recipientController = TextEditingController();
   final TextEditingController _amountController = TextEditingController();
   bool _isSending = false;
+  ErrorState? _errorState;
 
   @override
   void initState() {
@@ -110,8 +114,7 @@ class _CurrencyScreenV1State extends ConsumerState<CurrencyScreenV1>
       setState(() {
         _isLoadingUsername = false;
       });
-      ref.read(sbdTokensProvider.notifier).fetchBalance();
-      ref.read(sbdTokensProvider.notifier).fetchTransactions();
+      _refreshWalletData();
     });
   }
 
@@ -141,6 +144,83 @@ class _CurrencyScreenV1State extends ConsumerState<CurrencyScreenV1>
     } else {
       _cooldownRemaining = Duration.zero;
       _cooldownTimer?.cancel();
+    }
+  }
+
+  Future<void> _refreshWalletData() async {
+    setState(() {
+      _errorState = null;
+    });
+    try {
+      await ref.read(sbdTokensProvider.notifier).fetchBalance();
+      await ref.read(sbdTokensProvider.notifier).fetchTransactions();
+    } catch (e) {
+      final errorState = GlobalErrorHandler.processError(e);
+      setState(() {
+        _errorState = errorState;
+      });
+      if (e is UnauthorizedException) {
+        SessionManager.redirectToLogin(context, message: 'Session expired. Please log in again.');
+      }
+    }
+  }
+
+  void _handleRetry() {
+    _refreshWalletData();
+    GlobalErrorHandler.showErrorSnackbar(
+      context,
+      'Retrying request...',
+      ErrorType.generic,
+    );
+  }
+
+  void _showErrorInfo(dynamic error) {
+    final errorState = GlobalErrorHandler.processError(error);
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(errorState.icon, color: errorState.color),
+            const SizedBox(width: 8),
+            const Text('Wallet Error Help'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Unable to load your wallet data.'),
+            const SizedBox(height: 8),
+            Text(errorState.message),
+            const SizedBox(height: 16),
+            const Text('Troubleshooting steps:', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Text(_getTroubleshootingSteps(errorState.type)),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _getTroubleshootingSteps(ErrorType errorType) {
+    switch (errorType) {
+      case ErrorType.unauthorized:
+        return '• Check if you are still logged in\n• Try logging out and back in\n• Contact support if issue persists';
+      case ErrorType.networkError:
+        return '• Check your internet connection\n• Try switching networks\n• Wait and try again';
+      case ErrorType.serverError:
+        return '• Server may be temporarily down\n• Try again in a few minutes\n• Check server status';
+      case ErrorType.rateLimited:
+        return '• You are making requests too quickly\n• Wait a few minutes\n• Try again later';
+      default:
+        return '• Try refreshing the page\n• Check your connection\n• Contact support if needed';
     }
   }
 
@@ -402,11 +482,16 @@ class _CurrencyScreenV1State extends ConsumerState<CurrencyScreenV1>
       ),
       body: Stack(
         children: [
-          if (sbdState.isLoading)
-            const Center(child: CircularProgressIndicator()),
-          if (sbdState.error != null)
-            Center(child: Text('Error: ' + sbdState.error!)),
-          if (!sbdState.isLoading && sbdState.error == null)
+          if (_errorState != null)
+            ErrorStateWidget(
+              error: _errorState!,
+              onRetry: _handleRetry,
+              onInfo: () => _showErrorInfo(_errorState),
+              customMessage: 'Unable to load wallet data. Please try again.',
+            ),
+          if (sbdState.isLoading && _errorState == null)
+            const LoadingStateWidget(message: 'Loading your wallet...'),
+          if (_errorState == null && !sbdState.isLoading && sbdState.error == null)
             SingleChildScrollView(
               child: Padding(
                 padding: EdgeInsets.fromLTRB(

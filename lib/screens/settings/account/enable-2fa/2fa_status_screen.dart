@@ -3,6 +3,10 @@ import 'package:emotion_tracker/screens/settings/account/enable-2fa/2fa_setup_sc
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:emotion_tracker/providers/two_fa_service.dart';
+import 'package:emotion_tracker/widgets/error_state_widget.dart';
+import 'package:emotion_tracker/widgets/loading_state_widget.dart';
+import 'package:emotion_tracker/core/session_manager.dart';
+import 'package:emotion_tracker/core/exceptions.dart' as core_exceptions;
 
 /// Entry point for 2FA settings. Decides which screen to show based on /2fa/status.
 class TwoFAStatusScreen extends ConsumerWidget {
@@ -16,71 +20,24 @@ class TwoFAStatusScreen extends ConsumerWidget {
       future: ref.read(twoFAServiceProvider).get2FAStatus(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          final theme = Theme.of(context);
-          // If UnauthorizedException, show message and redirect
           final error = snapshot.error;
-          if (error is UnauthorizedException) {
-            // Show a dialog/snackbar and redirect to login
+          if (error is core_exceptions.UnauthorizedException) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Your session has expired. Please log in again.')),
-              );
-              Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+              SessionManager.redirectToLogin(context, message: 'Your session has expired. Please log in again.');
             });
             return Scaffold(
-              backgroundColor: theme.scaffoldBackgroundColor,
+              backgroundColor: Theme.of(context).scaffoldBackgroundColor,
               body: Center(child: Text('Session expired. Redirecting to login...')),
             );
           }
-          // Other errors
-          return Center(child: Text('Error: ${snapshot.error}'));
+          return ErrorStateWidget(
+            error: error,
+            onRetry: () => ref.invalidate(twoFAServiceProvider),
+            customMessage: 'Unable to load your 2FA status. Please try again.',
+          );
         }
         if (!snapshot.hasData) {
-          final theme = Theme.of(context);
-          return Scaffold(
-            backgroundColor: theme.scaffoldBackgroundColor,
-            appBar: AppBar(
-              title: const Text('Two-Factor Authentication'),
-              leading: IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: () {
-                  if (onBackToSettings != null) {
-                    onBackToSettings!();
-                  } else {
-                    Navigator.of(context).pop();
-                  }
-                },
-              ),
-              centerTitle: true,
-              elevation: 0,
-              backgroundColor: theme.scaffoldBackgroundColor,
-            ),
-            body: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  SizedBox(
-                    width: 64,
-                    height: 64,
-                    child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.primary),
-                      strokeWidth: 5,
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-                  Text(
-                    'Loading your 2FA status...',
-                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Please wait while we securely check your account.',
-                    style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
-                  ),
-                ],
-              ),
-            ),
-          );
+          return const LoadingStateWidget(message: 'Loading your 2FA status...');
         }
         final data = snapshot.data as Map<String, dynamic>;
         final enabled = data['enabled'] == true;

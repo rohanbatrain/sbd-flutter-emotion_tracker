@@ -3,6 +3,8 @@ import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'package:emotion_tracker/core/global_error_handler.dart';
 import 'package:emotion_tracker/core/error_state.dart';
+import 'package:emotion_tracker/core/session_manager.dart';
+import 'package:emotion_tracker/core/exceptions.dart' as core_exceptions;
 
 /// HTTP utility class that wraps all HTTP requests with Cloudflare tunnel error detection
 class HttpUtil {
@@ -392,6 +394,10 @@ class HttpUtil {
   /// This method integrates with the centralized error handling system
   /// while working with existing CloudflareTunnelException and NetworkException
   static ErrorState processHttpError(dynamic error) {
+    if (error is core_exceptions.UnauthorizedException) {
+      // Optionally trigger redirect here if needed
+      // SessionManager.redirectToLogin(context, message: 'Session expired. Please log in again.');
+    }
     return GlobalErrorHandler.processError(error);
   }
 
@@ -399,6 +405,11 @@ class HttpUtil {
   /// This method integrates the existing showCloudflareErrorDialog functionality
   /// into the centralized system while maintaining backward compatibility
   static void showHttpErrorDialog(BuildContext context, dynamic error) {
+    if (error is core_exceptions.UnauthorizedException) {
+      SessionManager.redirectToLogin(context, message: 'Session expired. Please log in again.');
+      return;
+    }
+
     // Handle CloudflareTunnelException with existing detailed dialog
     if (error is CloudflareTunnelException) {
       showCloudflareErrorDialog(context, error);
