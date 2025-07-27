@@ -9,27 +9,48 @@ import 'dart:convert';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:flutter/services.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:emotion_tracker/core/error_state.dart';
+import 'package:emotion_tracker/core/global_error_handler.dart';
+import 'package:emotion_tracker/core/session_manager.dart';
+import 'package:emotion_tracker/providers/api_token_service.dart';
+import 'package:emotion_tracker/widgets/error_state_widget.dart';
+import 'package:emotion_tracker/widgets/loading_state_widget.dart';
 
-final loginHistoryProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
-  final storage = ref.read(secureStorageProvider);
-  final token = await storage.read(key: 'access_token');
-  if (token == null) throw Exception('Not authenticated');
+final loginHistoryMigratedProvider = FutureProvider<List<Map<String, dynamic>>>(
+  (ref) async {
+    try {
+      final storage = ref.read(secureStorageProvider);
+      final token = await storage.read(key: 'access_token');
+      if (token == null) {
+        throw UnauthorizedException('Authentication token not found');
+      }
 
-  final protocol = ref.read(serverProtocolProvider);
-  final domain = ref.read(serverDomainProvider);
-  final url = Uri.parse('$protocol://$domain/auth/recent-logins');
+      final protocol = ref.read(serverProtocolProvider);
+      final domain = ref.read(serverDomainProvider);
+      final url = Uri.parse('$protocol://$domain/auth/recent-logins');
 
-  final response = await http.get(
-    url,
-    headers: {'Authorization': 'Bearer $token'},
-  );
-  if (response.statusCode == 200) {
-    final data = json.decode(response.body);
-    return List<Map<String, dynamic>>.from(data['logins']);
-  } else {
-    throw Exception('Failed to load login history');
-  }
-});
+      final response = await http.get(
+        url,
+        headers: {'Authorization': 'Bearer $token'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return List<Map<String, dynamic>>.from(data['logins']);
+      } else if (response.statusCode == 401) {
+        throw UnauthorizedException('Session expired. Please log in again.');
+      } else if (response.statusCode == 429) {
+        throw RateLimitException('Too many requests. Please wait before trying again.');
+      } else if (response.statusCode >= 500) {
+        throw ApiException('Server error occurred. Please try again later.', response.statusCode);
+      } else {
+        throw ApiException('Failed to load login history: ${response.statusCode}', response.statusCode);
+      }
+    } catch (e) {
+      rethrow;
+    }
+  },
+);
 
 const _tzAbbreviationMap = {
   'IST': 'Asia/Kolkata',
@@ -66,7 +87,7 @@ class _LoginHistoryScreenState extends ConsumerState<LoginHistoryScreen> with Ro
   void initState() {
     super.initState();
     // Always refresh on first load
-    Future.microtask(() => ref.invalidate(loginHistoryProvider));
+    Future.microtask(() => ref.invalidate(loginHistoryMigratedProvider));
     // Preload the banner ad
     _preloadedBannerAd = BannerAd(
       adUnitId: 'ca-app-pub-2845453539708646/7319663722',
@@ -103,7 +124,7 @@ class _LoginHistoryScreenState extends ConsumerState<LoginHistoryScreen> with Ro
   @override
   void didPopNext() {
     // Called when coming back to this screen
-    ref.invalidate(loginHistoryProvider);
+    ref.invalidate(loginHistoryMigratedProvider);
     super.didPopNext();
   }
 
@@ -164,9 +185,70 @@ class _LoginHistoryScreenState extends ConsumerState<LoginHistoryScreen> with Ro
     }
   }
 
+  /// Handles retry action for failed requests
+  void _handleRetry() {
+    ref.invalidate(loginHistoryMigratedProvider);
+    GlobalErrorHandler.showErrorSnackbar(
+      context,
+      'Retrying request...',
+      ErrorType.generic,
+    );
+  }
+
+  /// Shows error-specific help information
+  void _showErrorInfo(dynamic error) {
+    final errorState = GlobalErrorHandler.processError(error);
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(errorState.icon, color: errorState.color),
+            const SizedBox(width: 8),
+            Text('Help Information'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Error Type: ${errorState.type.toString().split('.').last}'),
+            const SizedBox(height: 8),
+            Text(errorState.message),
+            const SizedBox(height: 16),
+            const Text('Troubleshooting steps:', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Text(_getTroubleshootingSteps(errorState.type)),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _getTroubleshootingSteps(ErrorType errorType) {
+    switch (errorType) {
+      case ErrorType.unauthorized:
+        return '• Check if you are still logged in\n• Try logging out and back in\n• Contact support if issue persists';
+      case ErrorType.networkError:
+        return '• Check your internet connection\n• Try switching networks\n• Wait and try again';
+      case ErrorType.serverError:
+        return '• Server may be temporarily down\n• Try again in a few minutes\n• Check server status';
+      case ErrorType.rateLimited:
+        return '• You are making requests too quickly\n• Wait a few minutes\n• Try again later';
+      default:
+        return '• Try refreshing the page\n• Check your connection\n• Contact support if needed';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final asyncLogins = ref.watch(loginHistoryProvider);
+    final asyncLogins = ref.watch(loginHistoryMigratedProvider);
     final userTz = ref.watch(timezoneProvider);
     final theme = ref.watch(currentThemeProvider);
     final textTheme = theme.textTheme;
@@ -179,39 +261,28 @@ class _LoginHistoryScreenState extends ConsumerState<LoginHistoryScreen> with Ro
         foregroundColor: colorScheme.onPrimary,
         elevation: 1,
       ),
-      backgroundColor: colorScheme.background,
+      backgroundColor: colorScheme.surface,
       body: RefreshIndicator(
-        onRefresh: () async => ref.invalidate(loginHistoryProvider),
+        onRefresh: () async => ref.invalidate(loginHistoryMigratedProvider),
         child: asyncLogins.when(
-          loading: () => Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                CircularProgressIndicator(color: colorScheme.primary),
-                const SizedBox(height: 16),
-                Text('Loading recent logins...', style: textTheme.bodyLarge),
-              ],
-            ),
-          ),
-          error: (err, _) => Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.error_outline, color: colorScheme.error, size: 40),
-                const SizedBox(height: 12),
-                Text('Something went wrong', style: textTheme.titleMedium?.copyWith(color: colorScheme.error)),
-                const SizedBox(height: 8),
-                Text('$err', style: textTheme.bodyMedium, textAlign: TextAlign.center),
-                const SizedBox(height: 16),
-                ElevatedButton.icon(
-                  icon: const Icon(Icons.refresh),
-                  label: const Text('Retry'),
-                  onPressed: () => ref.invalidate(loginHistoryProvider),
-                  style: ElevatedButton.styleFrom(backgroundColor: colorScheme.primary),
-                ),
-              ],
-            ),
-          ),
+          loading: () => const LoadingStateWidget(message: 'Loading recent logins...'),
+          error: (error, stackTrace) {
+            // Handle 401 Unauthorized: redirect to /auth/v1
+            final errorState = GlobalErrorHandler.processError(error);
+            if (errorState.type == ErrorType.unauthorized) {
+              WidgetsBinding.instance.addPostFrameCallback((_) async {
+                await SessionManager.handleSessionExpiry(context, ref);
+                Navigator.of(context).pushReplacementNamed('/auth/v1');
+              });
+              return const SizedBox.shrink();
+            }
+            return ErrorStateWidget(
+              error: error,
+              onRetry: _handleRetry,
+              onInfo: () => _showErrorInfo(error),
+              customMessage: 'Unable to load login history. Please try again.',
+            );
+          },
           data: (logins) {
             final items = logins.where((e) => e['outcome'] == 'success').toList();
             if (items.isEmpty) {
