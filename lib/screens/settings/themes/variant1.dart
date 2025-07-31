@@ -19,15 +19,27 @@ class ThemeSelectionScreenV1 extends ConsumerStatefulWidget {
 
 class _ThemeSelectionScreenV1State extends ConsumerState<ThemeSelectionScreenV1> {
   int toggleState = 0; // 0 = Light, 1 = Dark
+  bool _didInit = false;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     final currentThemeKey = ref.read(themeProvider);
-    if (AppThemes.darkThemeKeys.contains(currentThemeKey)) {
-      if (toggleState != 1 && mounted) setState(() => toggleState = 1);
-    } else if (AppThemes.lightThemeKeys.contains(currentThemeKey)) {
-      if (toggleState != 0 && mounted) setState(() => toggleState = 0);
+    if (!_didInit) {
+      // Only set toggleState without setState on first build
+      if (AppThemes.darkThemeKeys.contains(currentThemeKey)) {
+        toggleState = 1;
+      } else if (AppThemes.lightThemeKeys.contains(currentThemeKey)) {
+        toggleState = 0;
+      }
+      _didInit = true;
+    } else {
+      // Only call setState if value actually changes
+      if (AppThemes.darkThemeKeys.contains(currentThemeKey)) {
+        if (toggleState != 1 && mounted) setState(() => toggleState = 1);
+      } else if (AppThemes.lightThemeKeys.contains(currentThemeKey)) {
+        if (toggleState != 0 && mounted) setState(() => toggleState = 0);
+      }
     }
   }
 

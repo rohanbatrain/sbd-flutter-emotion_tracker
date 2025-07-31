@@ -9,6 +9,7 @@ import 'package:emotion_tracker/screens/settings/account/enable-2fa/2fa_status_s
 import 'package:emotion_tracker/screens/settings/account/trusted-ip/trusted_ip_status_screen.dart';
 import 'package:emotion_tracker/screens/settings/account/login_history_screen.dart';
 import 'package:emotion_tracker/screens/settings/account/api-tokens/api_tokens_screen.dart';
+import 'package:emotion_tracker/screens/settings/account/user-agent/trusted_user_agent_status_screen.dart';
 import 'package:emotion_tracker/widgets/custom_app_bar.dart';
 
 class AccountSettingsScreenV1 extends ConsumerWidget {
@@ -158,6 +159,24 @@ class AccountSettingsScreenV1 extends ConsumerWidget {
                   Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => const TrustedIpStatusScreen(),
+                    ),
+                  );
+                }
+              },
+            ),
+            SizedBox(height: 14),
+            ListTile(
+              leading: Icon(Icons.devices_other, color: theme.primaryColor),
+              title: Text('Trusted User Agent Lockdown'),
+              onTap: () async {
+                final authenticated = await _authenticate(
+                  context,
+                  reason: 'Please authenticate to view Trusted User Agent Lockdown',
+                );
+                if (authenticated) {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const TrustedUserAgentStatusScreen(),
                     ),
                   );
                 }
