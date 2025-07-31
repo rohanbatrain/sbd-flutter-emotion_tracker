@@ -43,40 +43,41 @@ class BundlesTab extends ConsumerWidget {
             constraints: BoxConstraints(
               minHeight: constraints.maxHeight,
             ),
-            child: IntrinsicHeight(
-              child: RefreshIndicator(
-                onRefresh: () async {
-                  onRefresh();
-                },
-                child: ListView.builder(
-                  padding: const EdgeInsets.all(ShopConstants.defaultPadding),
-                  itemCount: bundleCategories.length,
-                  itemBuilder: (context, index) {
-                    final category = bundleCategories.keys.elementAt(index);
-                    final categoryBundles = bundleCategories[category]!;
-
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                          child: Text(
-                            category,
-                            style: theme.textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
+            child: RefreshIndicator(
+              onRefresh: () async {
+                onRefresh();
+              },
+              child: ListView.builder(
+                physics: const NeverScrollableScrollPhysics(),
+                shrinkWrap: true,
+                padding: const EdgeInsets.all(ShopConstants.defaultPadding),
+                itemCount: bundleCategories.length,
+                itemBuilder: (context, index) {
+                  final category = bundleCategories.keys.elementAt(index);
+                  final categoryBundles = bundleCategories[category]!;
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                        child: Text(
+                          category,
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
-                        const SizedBox(height: 12),
-                        GridView.builder(
+                      ),
+                      const SizedBox(height: 12),
+                      Container(
+                        height: (categoryBundles.length / ShopConstants.bundleGridCrossAxisCount).ceil() * 240.0, // 240 is approx card height
+                        child: GridView.builder(
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
                           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                             crossAxisCount: ShopConstants.bundleGridCrossAxisCount,
                             crossAxisSpacing: ShopConstants.bannerGridCrossAxisSpacing,
                             mainAxisSpacing: ShopConstants.bannerGridMainAxisSpacing,
-                            childAspectRatio:
-                                0.74, // Adjusted aspect ratio to resolve overflow
+                            childAspectRatio: 0.72,
                           ),
                           itemCount: categoryBundles.length,
                           itemBuilder: (context, index) {
@@ -84,11 +85,11 @@ class BundlesTab extends ConsumerWidget {
                             return _buildBundleCard(context, ref, theme, bundle);
                           },
                         ),
-                        const SizedBox(height: 16),
-                      ],
-                    );
-                  },
-                ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+                  );
+                },
               ),
             ),
           ),

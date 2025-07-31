@@ -29,6 +29,9 @@ class _ProfileScreenV1State extends ConsumerState<ProfileScreenV1> {
   String userEmail = '';
   String selectedAvatarId = 'person'; // Default avatar
   String selectedBannerId = 'default-dark'; // Default banner FOR DARK THEMES
+  String dob = '';
+  String gender = '';
+  String bio = '';
   bool isLoading = true;
   dynamic error;
 
@@ -36,6 +39,9 @@ class _ProfileScreenV1State extends ConsumerState<ProfileScreenV1> {
   final TextEditingController lastNameController = TextEditingController();
   final TextEditingController usernameController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
+  final TextEditingController dobController = TextEditingController();
+  final TextEditingController genderController = TextEditingController();
+  final TextEditingController bioController = TextEditingController();
 
   @override
   void initState() {
@@ -49,6 +55,9 @@ class _ProfileScreenV1State extends ConsumerState<ProfileScreenV1> {
     lastNameController.dispose();
     usernameController.dispose();
     emailController.dispose();
+    dobController.dispose();
+    genderController.dispose();
+    bioController.dispose();
     super.dispose();
   }
 
@@ -65,6 +74,9 @@ class _ProfileScreenV1State extends ConsumerState<ProfileScreenV1> {
       final firstNameData = await secureStorage.read(key: 'user_first_name') ?? '';
       final lastNameData = await secureStorage.read(key: 'user_last_name') ?? '';
       final usernameData = await secureStorage.read(key: 'user_username') ?? '';
+      final dobData = await secureStorage.read(key: 'user_dob') ?? '';
+      final genderData = await secureStorage.read(key: 'user_gender') ?? '';
+      final bioData = await secureStorage.read(key: 'user_bio') ?? '';
       // Try to get current avatar from backend
       String avatarId = await _getCurrentAvatar() ?? await secureStorage.read(key: 'user_avatar_id') ?? 'person';
       // Try to get current banner from backend
@@ -74,6 +86,9 @@ class _ProfileScreenV1State extends ConsumerState<ProfileScreenV1> {
         firstName = firstNameData;
         lastName = lastNameData;
         username = usernameData;
+        dob = dobData;
+        gender = genderData;
+        bio = bioData;
         selectedAvatarId = avatarId;
         selectedBannerId = bannerId;
         // Set controller values
@@ -81,6 +96,9 @@ class _ProfileScreenV1State extends ConsumerState<ProfileScreenV1> {
         lastNameController.text = lastNameData;
         usernameController.text = usernameData;
         emailController.text = email;
+        dobController.text = dobData;
+        genderController.text = genderData;
+        bioController.text = bioData;
         isLoading = false;
       });
     } on core_exceptions.UnauthorizedException catch (_) {
@@ -114,6 +132,9 @@ class _ProfileScreenV1State extends ConsumerState<ProfileScreenV1> {
       await secureStorage.write(key: 'user_email', value: emailController.text);
       await secureStorage.write(key: 'user_avatar_id', value: selectedAvatarId);
       await secureStorage.write(key: 'user_banner_id', value: selectedBannerId);
+      await secureStorage.write(key: 'user_dob', value: dobController.text);
+      await secureStorage.write(key: 'user_gender', value: genderController.text);
+      await secureStorage.write(key: 'user_bio', value: bioController.text);
 
       // Update local state
       setState(() {
@@ -121,6 +142,9 @@ class _ProfileScreenV1State extends ConsumerState<ProfileScreenV1> {
         lastName = lastNameController.text;
         username = usernameController.text;
         userEmail = emailController.text;
+        dob = dobController.text;
+        gender = genderController.text;
+        bio = bioController.text;
         isLoading = false;
       });
 
@@ -382,8 +406,57 @@ class _ProfileScreenV1State extends ConsumerState<ProfileScreenV1> {
     TextInputType keyboardType = TextInputType.text,
     int? maxLength,
   }) async {
+    if (fieldName == 'user_dob') {
+      // Show date picker for DOB
+      DateTime? initialDate;
+      if (dob.isNotEmpty) {
+        try {
+          initialDate = DateTime.parse(dob);
+        } catch (_) {}
+      }
+      final picked = await showDatePicker(
+        context: context,
+        initialDate: initialDate ?? DateTime(2000, 1, 1),
+        firstDate: DateTime(1900),
+        lastDate: DateTime(DateTime.now().year - 10),
+        helpText: 'Select Date of Birth',
+      );
+      if (picked != null) {
+        dobController.text = picked.toIso8601String().substring(0, 10); // yyyy-MM-dd
+        await _saveUserData();
+      }
+      return;
+    }
+    if (fieldName == 'user_gender') {
+      // Show gender selection dialog
+      final genders = ['Male', 'Female', 'Other'];
+      String selected = gender.isNotEmpty ? gender : 'Other';
+      await showDialog<void>(
+        context: context,
+        builder: (context) {
+          final theme = Theme.of(context);
+          return AlertDialog(
+            title: const Text('Select Gender'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: genders.map((g) => RadioListTile<String>(
+                title: Text(g),
+                value: g,
+                groupValue: selected,
+                onChanged: (val) {
+                  selected = val!;
+                  Navigator.of(context).pop();
+                },
+              )).toList(),
+            ),
+          );
+        },
+      );
+      genderController.text = selected;
+      await _saveUserData();
+      return;
+    }
     controller.text = currentValue;
-
     return showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -522,150 +595,252 @@ class _ProfileScreenV1State extends ConsumerState<ProfileScreenV1> {
     }
 
     final displayName = username.isNotEmpty ? '@$username' : 'User';
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: theme.primaryColor,
-        foregroundColor: theme.colorScheme.onPrimary,
-        title: const Text('Profile', style: TextStyle(fontWeight: FontWeight.bold)),
-        centerTitle: true,
-      ),
-      body: Column(
-        children: [
-          Stack(
-            clipBehavior: Clip.none,
-            alignment: Alignment.center,
-            children: [
-              // Banner at the top (tappable for change)
-              GestureDetector(
-                onTap: _showBannerSelectionDialog,
-                child: ProfileBannerDisplay(
-                  banner: _getThemeBanner(theme),
-                  height: 160,
-                ),
-              ),
-              // Divider below banner
-              Positioned(
-                bottom: 0,
-                left: 0,
-                right: 0,
-                child: Divider(
-                  height: 2,
-                  thickness: 2,
-                  color: theme.dividerColor,
-                ),
-              ),
-              // Overlapping avatar
-              Positioned(
-                bottom: -65, // Overlap amount - moved further down
-                child: GestureDetector(
-                  onTap: _showAvatarSelectionDialog,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: theme.scaffoldBackgroundColor, width: 4),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.18),
-                          blurRadius: 16,
-                          offset: const Offset(0, 6),
-                        ),
-                      ],
-                    ),
-                    child: _buildAvatarCircle(theme, size: 60),
+    return SafeArea(
+      child: Scaffold(
+        appBar: AppBar(
+          backgroundColor: theme.primaryColor,
+          foregroundColor: theme.colorScheme.onPrimary,
+          title: const Text('Profile', style: TextStyle(fontWeight: FontWeight.bold)),
+          centerTitle: true,
+        ),
+        body: Column(
+          children: [
+            Stack(
+              clipBehavior: Clip.none,
+              alignment: Alignment.center,
+              children: [
+                // Banner at the top (tappable for change)
+                GestureDetector(
+                  onTap: _showBannerSelectionDialog,
+                  child: ProfileBannerDisplay(
+                    banner: _getThemeBanner(theme),
+                    height: 160,
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 60), // Space for avatar
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              child: Column(
-                children: [
-                  Container(
-                    width: double.infinity,
-                    child: Text(
-                      displayName,
-                      style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-                      textAlign: TextAlign.center,
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 2,
-                    ),
+                // Divider below banner
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: Divider(
+                    height: 2,
+                    thickness: 2,
+                    color: theme.dividerColor,
                   ),
-                  const SizedBox(height: 24),
-                  // First Name Card
-                  Card(
-                    elevation: 2,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    child: ListTile(
-                      leading: Icon(Icons.person, color: theme.primaryColor),
-                      title: Text(
-                        'First Name',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
+                ),
+                // Overlapping avatar
+                Positioned(
+                  bottom: -65, // Overlap amount - moved further down
+                  child: GestureDetector(
+                    onTap: _showAvatarSelectionDialog,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: theme.scaffoldBackgroundColor, width: 4),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.18),
+                            blurRadius: 16,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
                       ),
-                      subtitle: Text(
-                        firstName.isNotEmpty ? firstName : 'Not set',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: firstName.isNotEmpty
-                              ? theme.textTheme.bodyMedium?.color
-                              : theme.textTheme.bodyMedium?.color?.withOpacity(0.5),
-                        ),
+                      child: _buildAvatarCircle(theme, size: 60),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 60), // Space for avatar
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                child: Column(
+                  children: [
+                    Container(
+                      width: double.infinity,
+                      child: Text(
+                        displayName,
+                        style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                        textAlign: TextAlign.center,
                         overflow: TextOverflow.ellipsis,
                         maxLines: 2,
                       ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      onTap: () => _showEditDialog(
-                        title: 'First Name',
-                        currentValue: firstName,
-                        controller: firstNameController,
-                        fieldName: 'user_first_name',
-                        maxLength: 50,
-                      ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  // Last Name Card
-                  Card(
-                    elevation: 2,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    child: ListTile(
-                      leading: Icon(Icons.person_outline, color: theme.primaryColor),
-                      title: Text(
-                        'Last Name',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
+                    const SizedBox(height: 24),
+                    // First Name Card
+                    Card(
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      child: ListTile(
+                        leading: Icon(Icons.person, color: theme.primaryColor),
+                        title: Text(
+                          'First Name',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        subtitle: Text(
+                          firstName.isNotEmpty ? firstName : 'Not set',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: firstName.isNotEmpty
+                                ? theme.textTheme.bodyMedium?.color
+                                : theme.textTheme.bodyMedium?.color?.withOpacity(0.5),
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 2,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        onTap: () => _showEditDialog(
+                          title: 'First Name',
+                          currentValue: firstName,
+                          controller: firstNameController,
+                          fieldName: 'user_first_name',
+                          maxLength: 50,
                         ),
                       ),
-                      subtitle: Text(
-                        lastName.isNotEmpty ? lastName : 'Not set',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: lastName.isNotEmpty
-                              ? theme.textTheme.bodyMedium?.color
-                              : theme.textTheme.bodyMedium?.color?.withOpacity(0.5),
+                    ),
+                    const SizedBox(height: 12),
+                    // Last Name Card
+                    Card(
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      child: ListTile(
+                        leading: Icon(Icons.person_outline, color: theme.primaryColor),
+                        title: Text(
+                          'Last Name',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
-                        overflow: TextOverflow.ellipsis,
-                        maxLines: 2,
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      onTap: () => _showEditDialog(
-                        title: 'Last Name',
-                        currentValue: lastName,
-                        controller: lastNameController,
-                        fieldName: 'user_last_name',
-                        maxLength: 50,
+                        subtitle: Text(
+                          lastName.isNotEmpty ? lastName : 'Not set',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: lastName.isNotEmpty
+                                ? theme.textTheme.bodyMedium?.color
+                                : theme.textTheme.bodyMedium?.color?.withOpacity(0.5),
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 2,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        onTap: () => _showEditDialog(
+                          title: 'Last Name',
+                          currentValue: lastName,
+                          controller: lastNameController,
+                          fieldName: 'user_last_name',
+                          maxLength: 50,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  // Add more profile info here as needed
-                ],
+                    const SizedBox(height: 12),
+                    // Date of Birth Card
+                    Card(
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      child: ListTile(
+                        leading: Icon(Icons.cake, color: theme.primaryColor),
+                        title: Text(
+                          'Date of Birth',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        subtitle: Text(
+                          dob.isNotEmpty ? dob : 'Not set',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: dob.isNotEmpty
+                                ? theme.textTheme.bodyMedium?.color
+                                : theme.textTheme.bodyMedium?.color?.withOpacity(0.5),
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 2,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        onTap: () => _showEditDialog(
+                          title: 'Date of Birth',
+                          currentValue: dob,
+                          controller: dobController,
+                          fieldName: 'user_dob',
+                          maxLength: 10,
+                          keyboardType: TextInputType.datetime,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    // Gender Card
+                    Card(
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      child: ListTile(
+                        leading: Icon(Icons.wc, color: theme.primaryColor),
+                        title: Text(
+                          'Gender',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        subtitle: Text(
+                          gender.isNotEmpty ? gender : 'Not set',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: gender.isNotEmpty
+                                ? theme.textTheme.bodyMedium?.color
+                                : theme.textTheme.bodyMedium?.color?.withOpacity(0.5),
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 2,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        onTap: () => _showEditDialog(
+                          title: 'Gender',
+                          currentValue: gender,
+                          controller: genderController,
+                          fieldName: 'user_gender',
+                          maxLength: 20,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    // Bio Card
+                    Card(
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      child: ListTile(
+                        leading: Icon(Icons.info_outline, color: theme.primaryColor),
+                        title: Text(
+                          'Bio',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        subtitle: Text(
+                          bio.isNotEmpty ? bio : 'Not set',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: bio.isNotEmpty
+                                ? theme.textTheme.bodyMedium?.color
+                                : theme.textTheme.bodyMedium?.color?.withOpacity(0.5),
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 3,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        onTap: () => _showEditDialog(
+                          title: 'Bio',
+                          currentValue: bio,
+                          controller: bioController,
+                          fieldName: 'user_bio',
+                          maxLength: 200,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    // Add more profile info here as needed
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
