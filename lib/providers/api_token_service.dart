@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:emotion_tracker/providers/secure_storage_provider.dart';
 import 'package:emotion_tracker/utils/http_util.dart';
 import 'package:http/http.dart' as http;
+import 'package:emotion_tracker/providers/user_agent_util.dart';
 
 const String _accessTokenKey = 'access_token';
 
@@ -121,9 +122,12 @@ class ApiTokenService {
     if (token == null) {
       throw UnauthorizedException(ApiTokenConstants.errorSessionExpired);
     }
+    final userAgent = await getUserAgent();
     return {
       'Content-Type': 'application/json',
       'Authorization': 'Bearer $token',
+      'User-Agent': userAgent,
+      'X-User-Agent': userAgent,
     };
   }
 

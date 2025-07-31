@@ -56,6 +56,7 @@ class ThemeUnlockService {
           headers: {
             'Authorization': 'Bearer $accessToken',
             'User-Agent': userAgent,
+            'X-User-Agent': userAgent,
           },
         );
         if (response.statusCode == 200) {
@@ -88,6 +89,7 @@ class ThemeUnlockService {
           headers: {
             'Authorization': 'Bearer $accessToken',
             'User-Agent': userAgent,
+            'X-User-Agent': userAgent,
           },
         );
         if (ownedResp.statusCode == 200) {
@@ -305,6 +307,7 @@ class ThemeUnlockService {
         headers: {
           'Authorization': 'Bearer $accessToken',
           'User-Agent': userAgent,
+          'X-User-Agent': userAgent,
           'Content-Type': 'application/json',
         },
         body: jsonEncode({'theme_id': 'emotion_tracker-$themeKey'}),
@@ -378,6 +381,7 @@ class ThemeUnlockService {
           headers: {
             'Authorization': 'Bearer $accessToken',
             'User-Agent': userAgent,
+            'X-User-Agent': userAgent,
           },
         );
         if (ownedResp.statusCode == 200) {
@@ -408,6 +412,7 @@ class ThemeUnlockService {
           headers: {
             'Authorization': 'Bearer $accessToken',
             'User-Agent': userAgent,
+            'X-User-Agent': userAgent,
           },
         );
         if (response.statusCode == 200) {

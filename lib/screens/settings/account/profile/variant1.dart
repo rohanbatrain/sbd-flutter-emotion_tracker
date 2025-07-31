@@ -172,6 +172,7 @@ class _ProfileScreenV1State extends ConsumerState<ProfileScreenV1> {
       headers: {
         'Authorization': 'Bearer $token',
         'User-Agent': userAgent,
+        'X-User-Agent': userAgent,
         'Content-Type': 'application/json',
       },
       body: jsonEncode({'avatar_id': avatarId}),
@@ -192,6 +193,7 @@ class _ProfileScreenV1State extends ConsumerState<ProfileScreenV1> {
       headers: {
         'Authorization': 'Bearer $token',
         'User-Agent': userAgent,
+        'X-User-Agent': userAgent,
         'Content-Type': 'application/json',
       },
       body: jsonEncode({'banner_id': bannerId}),
@@ -210,6 +212,8 @@ class _ProfileScreenV1State extends ConsumerState<ProfileScreenV1> {
       headers: {
         'Authorization': 'Bearer $token',
         'User-Agent': userAgent,
+        'X-User-Agent': userAgent,
+        'Content-Type': 'application/json',
       },
     );
     if (response.statusCode == 200) {
@@ -230,6 +234,8 @@ class _ProfileScreenV1State extends ConsumerState<ProfileScreenV1> {
       headers: {
         'Authorization': 'Bearer $token',
         'User-Agent': userAgent,
+        'X-User-Agent': userAgent,
+        'Content-Type': 'application/json',
       },
     );
     if (response.statusCode == 200) {

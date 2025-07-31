@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'avatar_unlock_provider.dart';
 
 // --- Data Models ---
 enum AvatarType { static, animated }

@@ -1,9 +1,9 @@
 import 'dart:convert';
+import 'package:emotion_tracker/providers/user_agent_util.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:emotion_tracker/providers/secure_storage_provider.dart';
 import 'package:emotion_tracker/utils/http_util.dart';
 import 'package:emotion_tracker/providers/shared_prefs_provider.dart';
-import 'package:emotion_tracker/providers/user_agent_util.dart';
 
 class TrustedUserAgentLockdownService {
   final Ref ref;
@@ -35,6 +35,7 @@ class TrustedUserAgentLockdownService {
       headers: {
         'Authorization': 'Bearer $token',
         'User-Agent': userAgent,
+        'X-User-Agent': userAgent,
       },
     );
     if (response.statusCode == 200) {
@@ -55,6 +56,7 @@ class TrustedUserAgentLockdownService {
         'Authorization': 'Bearer $token',
         'Content-Type': 'application/json',
         'User-Agent': userAgent,
+        'X-User-Agent': userAgent,
       },
       body: jsonEncode({
         'action': action,
@@ -77,6 +79,7 @@ class TrustedUserAgentLockdownService {
         'Authorization': 'Bearer $token',
         'Content-Type': 'application/json',
         'User-Agent': userAgent,
+        'X-User-Agent': userAgent,
       },
       body: jsonEncode({'code': code}),
     );

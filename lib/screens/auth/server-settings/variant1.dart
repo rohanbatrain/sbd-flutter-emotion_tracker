@@ -1,3 +1,4 @@
+import 'package:emotion_tracker/providers/user_agent_util.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:emotion_tracker/providers/theme_provider.dart';
@@ -200,7 +201,11 @@ class _ServerSettingsDialogState extends ConsumerState<ServerSettingsDialog> {
                                   }
                                   final url = healthCheckUrl.replaceFirst(domain, inputDomain.isEmpty ? 'dev-app-sbd.rohanbatra.in' : inputDomain);
                                   try {
-                                    final response = await HttpUtil.get(Uri.parse(url)).timeout(const Duration(seconds: 3));
+                                    final userAgent = await getUserAgent();
+                                    final response = await HttpUtil.get(
+                                      Uri.parse(url),
+                                      headers: {'User-Agent': userAgent, 'X-User-Agent': userAgent},
+                                    ).timeout(const Duration(seconds: 3));
                                     if (response.statusCode == 200) {
                                       setState(() {
                                         testSuccess = true;
@@ -406,7 +411,11 @@ class _ServerSettingsDialogState extends ConsumerState<ServerSettingsDialog> {
                               }
                               final url = healthCheckUrl.replaceFirst(domain, inputDomain.isEmpty ? 'dev-app-sbd.rohanbatra.in' : inputDomain);
                               try {
-                                final response = await HttpUtil.get(Uri.parse(url)).timeout(const Duration(seconds: 3));
+                                final userAgent = await getUserAgent();
+                                final response = await HttpUtil.get(
+                                  Uri.parse(url),
+                                  headers: {'User-Agent': userAgent, 'X-User-Agent': userAgent},
+                                ).timeout(const Duration(seconds: 3));
                                 if (response.statusCode == 200) {
                                   setState(() {
                                     testSuccess = true;

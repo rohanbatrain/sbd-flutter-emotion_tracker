@@ -499,6 +499,7 @@ Future<Map<String, dynamic>> sendForgotPasswordResetLink(WidgetRef ref, String e
     headers: {
       'Content-Type': 'application/json',
       'User-Agent': userAgent,
+      'X-User-Agent': userAgent,
     },
     body: jsonEncode({'email': email}),
   );
@@ -527,6 +528,7 @@ Future<Map<String, dynamic>> resendForgotPasswordResetLink(WidgetRef ref, String
     headers: {
       'Content-Type': 'application/json',
       'User-Agent': userAgent,
+      'X-User-Agent': userAgent,
     },
     body: jsonEncode({'email': email}),
   );

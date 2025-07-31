@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:emotion_tracker/providers/user_agent_util.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:emotion_tracker/providers/secure_storage_provider.dart';
 import 'package:emotion_tracker/utils/http_util.dart';
@@ -27,10 +28,15 @@ class TrustedIpLockdownService {
   Future<Map<String, dynamic>> getStatus() async {
     final token = await _getAccessToken();
     if (token == null) throw Exception('Not authenticated');
+    final userAgent = await getUserAgent();
     final url = _buildUri('/auth/trusted-ips/lockdown-status');
     final response = await HttpUtil.get(
       url,
-      headers: {'Authorization': 'Bearer $token'},
+      headers: {
+        'Authorization': 'Bearer $token',
+        'User-Agent': userAgent,
+        'X-User-Agent': userAgent,
+      },
     );
     if (response.statusCode == 200) {
       return jsonDecode(response.body);
@@ -42,10 +48,16 @@ class TrustedIpLockdownService {
   Future<void> requestLockdown({required String action, required List<String> trustedIps}) async {
     final token = await _getAccessToken();
     if (token == null) throw Exception('Not authenticated');
+    final userAgent = await getUserAgent();
     final url = _buildUri('/auth/trusted-ips/lockdown-request');
     final response = await HttpUtil.post(
       url,
-      headers: {'Authorization': 'Bearer $token', 'Content-Type': 'application/json'},
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+        'User-Agent': userAgent,
+        'X-User-Agent': userAgent,
+      },
       body: jsonEncode({
         'action': action,
         'trusted_ips': trustedIps,
@@ -59,10 +71,16 @@ class TrustedIpLockdownService {
   Future<void> confirmLockdown(String code) async {
     final token = await _getAccessToken();
     if (token == null) throw Exception('Not authenticated');
+    final userAgent = await getUserAgent();
     final url = _buildUri('/auth/trusted-ips/lockdown-confirm');
     final response = await HttpUtil.post(
       url,
-      headers: {'Authorization': 'Bearer $token', 'Content-Type': 'application/json'},
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+        'User-Agent': userAgent,
+        'X-User-Agent': userAgent,
+      },
       body: jsonEncode({'code': code}),
     );
     if (response.statusCode != 200) {

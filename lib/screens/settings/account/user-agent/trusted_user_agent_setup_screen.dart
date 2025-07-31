@@ -173,23 +173,8 @@ class _TrustedUserAgentSetupScreenState extends ConsumerState<TrustedUserAgentSe
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDisableMode = !widget.enableMode;
-    if (isLoading) {
-      return const LoadingStateWidget(message: 'Processing...');
-    }
-    if (error != null) {
-      if (error == '__unauthorized_redirect__') {
-        return Scaffold(
-          backgroundColor: theme.scaffoldBackgroundColor,
-          body: Center(child: Text('Session expired. Redirecting to login...')),
-        );
-      }
-      return ErrorStateWidget(
-        error: error,
-        onRetry: _submit,
-        customMessage: 'Unable to process Trusted User Agent lockdown. Please try again.',
-      );
-    }
-    return Scaffold(
+
+    Widget content = Scaffold(
       appBar: AppBar(
         title: Text(widget.enableMode ? 'Enable Lockdown' : 'Disable Lockdown'),
       ),
@@ -341,6 +326,30 @@ class _TrustedUserAgentSetupScreenState extends ConsumerState<TrustedUserAgentSe
           ),
         ),
       ),
+    );
+
+    // Error handling using global ErrorStateWidget
+    if (error != null) {
+      if (error == '__unauthorized_redirect__') {
+        // Let ErrorStateWidget handle auto-redirect and UI
+        return ErrorStateWidget(
+          error: error,
+          onRetry: _submit,
+          customMessage: 'Unable to process Trusted User Agent lockdown. Please try again.',
+        );
+      }
+      return ErrorStateWidget(
+        error: error,
+        onRetry: _submit,
+        customMessage: 'Unable to process Trusted User Agent lockdown. Please try again.',
+      );
+    }
+
+    // Loading overlay using global LoadingStateHelper
+    return LoadingStateHelper.createLoadingOverlay(
+      child: content,
+      isLoading: isLoading,
+      loadingMessage: 'Processing...'
     );
   }
 }

@@ -1,3 +1,4 @@
+import 'package:emotion_tracker/providers/user_agent_util.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:emotion_tracker/providers/theme_provider.dart';
@@ -124,9 +125,10 @@ class _VerifyEmailScreenV1State extends ConsumerState<VerifyEmailScreenV1> {
       return;
     }
     try {
+      final userAgent = await getUserAgent();
       final response = await HttpUtil.get(
         url,
-        headers: {'Authorization': 'Bearer $token'},
+        headers: {'Authorization': 'Bearer $token', 'User-Agent': userAgent, 'X-User-Agent': userAgent},
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);

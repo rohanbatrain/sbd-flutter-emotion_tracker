@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:emotion_tracker/providers/secure_storage_provider.dart';
 import 'package:emotion_tracker/utils/http_util.dart';
 import 'package:http/http.dart' as http;
+import 'user_agent_util.dart';
 
 const String _accessTokenKey = 'access_token';
 
@@ -69,9 +70,12 @@ class TwoFAService {
     if (token == null) {
       throw UnauthorizedException(TwoFAConstants.errorSessionExpired);
     }
+    final userAgent = await getUserAgent();
     return {
       'Content-Type': 'application/json',
       'Authorization': 'Bearer $token',
+      'User-Agent': userAgent,
+      'X-User-Agent': userAgent,
     };
   }
 

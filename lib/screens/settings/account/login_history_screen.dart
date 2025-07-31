@@ -15,6 +15,7 @@ import 'package:emotion_tracker/core/session_manager.dart';
 import 'package:emotion_tracker/providers/api_token_service.dart';
 import 'package:emotion_tracker/widgets/error_state_widget.dart';
 import 'package:emotion_tracker/widgets/loading_state_widget.dart';
+import 'package:emotion_tracker/providers/user_agent_util.dart';
 
 final loginHistoryMigratedProvider = FutureProvider<List<Map<String, dynamic>>>(
   (ref) async {
@@ -31,7 +32,11 @@ final loginHistoryMigratedProvider = FutureProvider<List<Map<String, dynamic>>>(
 
       final response = await http.get(
         url,
-        headers: {'Authorization': 'Bearer $token'},
+        headers: {
+          'Authorization': 'Bearer $token',
+          'User-Agent': await getUserAgent(),
+          'X-User-Agent': await getUserAgent(),
+        },
       );
 
       if (response.statusCode == 200) {

@@ -1,3 +1,4 @@
+import 'package:emotion_tracker/providers/user_agent_util.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lottie/lottie.dart';
@@ -103,7 +104,11 @@ class _SplashScreenV1State extends ConsumerState<SplashScreenV1>
       final domain = ref.read(serverDomainProvider);
       final healthCheckUrl = '$protocol://$domain/health';
       
-      final response = await HttpUtil.get(Uri.parse(healthCheckUrl)).timeout(const Duration(seconds: 3));
+      final userAgent = await getUserAgent();
+      final response = await HttpUtil.get(
+        Uri.parse(healthCheckUrl),
+        headers: {'User-Agent': userAgent, 'X-User-Agent': userAgent},
+      ).timeout(const Duration(seconds: 3));
       
       if (response.statusCode != 200) {
         // Server health check failed, but we'll still proceed to auth screen

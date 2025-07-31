@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:emotion_tracker/core/global_error_handler.dart';
 import 'package:emotion_tracker/core/error_utils.dart';
-import 'package:emotion_tracker/core/error_state.dart';
 import 'package:emotion_tracker/widgets/error_state_widget.dart';
 import 'shop_constants.dart';
 
@@ -13,6 +12,7 @@ class ShopErrorHandler {
     BuildContext context,
     dynamic error, {
     String? customMessage,
+    VoidCallback? onRetry,
   }) {
     final errorState = GlobalErrorHandler.processError(error);
     final message =
@@ -32,8 +32,15 @@ class ShopErrorHandler {
       },
     );
 
-    // Show error snackbar
-    GlobalErrorHandler.showErrorSnackbar(context, message, errorState.type);
+    // Use ErrorStateWidget for consistent error UI
+    showDialog(
+      context: context,
+      builder: (ctx) => ErrorStateWidget(
+        error: error,
+        customMessage: message,
+        onRetry: (onRetry != null && GlobalErrorHandler.isRetryable(errorState)) ? onRetry : null,
+      ),
+    );
   }
 
   /// Handles errors that occur during item loading operations
@@ -62,36 +69,15 @@ class ShopErrorHandler {
       },
     );
 
-    // For loading errors, we might want to show a different UI
-    if (onRetry != null && GlobalErrorHandler.isRetryable(errorState)) {
-      // Show error snackbar with retry option
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              Icon(errorState.icon, color: Colors.white, size: 20),
-              const SizedBox(width: 12),
-              Expanded(child: Text(message)),
-              TextButton(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                  onRetry();
-                },
-                child: const Text(
-                  'Retry',
-                  style: TextStyle(color: Colors.white),
-                ),
-              ),
-            ],
-          ),
-          backgroundColor: errorState.color,
-          duration: const Duration(seconds: 5),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    } else {
-      GlobalErrorHandler.showErrorSnackbar(context, message, errorState.type);
-    }
+    // Use ErrorStateWidget for consistent error UI
+    showDialog(
+      context: context,
+      builder: (ctx) => ErrorStateWidget(
+        error: error,
+        customMessage: message,
+        onRetry: (onRetry != null && GlobalErrorHandler.isRetryable(errorState)) ? onRetry : null,
+      ),
+    );
   }
 
   /// Handles errors that occur during purchase operations
@@ -101,6 +87,7 @@ class ShopErrorHandler {
     dynamic error, {
     String? itemId,
     String? itemType,
+    VoidCallback? onRetry,
   }) {
     final errorState = GlobalErrorHandler.processError(error);
 
@@ -116,18 +103,14 @@ class ShopErrorHandler {
       },
     );
 
-    // Handle unauthorized errors specially for purchases
-    if (errorState.type == ErrorType.unauthorized) {
-      ErrorUtils.handleSessionError(context, ref, error);
-      return;
-    }
-
-    final message = ErrorUtils.formatErrorMessage(
-      error,
-      fallback: ShopConstants.purchaseError,
+    // Use ErrorStateWidget for consistent error UI
+    showDialog(
+      context: context,
+      builder: (ctx) => ErrorStateWidget(
+        error: error,
+        onRetry: (onRetry != null && GlobalErrorHandler.isRetryable(errorState)) ? onRetry : null,
+      ),
     );
-
-    GlobalErrorHandler.showErrorSnackbar(context, message, errorState.type);
   }
 
   /// Creates a retry mechanism for shop operations

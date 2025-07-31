@@ -42,6 +42,7 @@ class BundleUnlockService {
         headers: {
           'Authorization': 'Bearer $accessToken',
           'User-Agent': userAgent,
+          'X-User-Agent': userAgent,
           'Content-Type': 'application/json',
         },
         body: jsonEncode({'bundle_id': bundleId}),
@@ -98,6 +99,7 @@ class BundleUnlockService {
       headers: {
         'Authorization': 'Bearer $accessToken',
         'User-Agent': userAgent,
+        'X-User-Agent': userAgent,
         'Content-Type': 'application/json',
       },
     );

@@ -36,51 +36,64 @@ class BundlesTab extends ConsumerWidget {
       return const Center(child: CircularProgressIndicator());
     }
 
-    return RefreshIndicator(
-      onRefresh: () async {
-        onRefresh();
-      },
-      child: ListView.builder(
-        padding: const EdgeInsets.all(ShopConstants.defaultPadding),
-        itemCount: bundleCategories.length,
-        itemBuilder: (context, index) {
-          final category = bundleCategories.keys.elementAt(index);
-          final categoryBundles = bundleCategories[category]!;
-
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                child: Text(
-                  category,
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: ShopConstants.bundleGridCrossAxisCount,
-                  crossAxisSpacing: ShopConstants.bannerGridCrossAxisSpacing,
-                  mainAxisSpacing: ShopConstants.bannerGridMainAxisSpacing,
-                  childAspectRatio:
-                      0.74, // Adjusted aspect ratio to resolve overflow
-                ),
-                itemCount: categoryBundles.length,
-                itemBuilder: (context, index) {
-                  final bundle = categoryBundles[index];
-                  return _buildBundleCard(context, ref, theme, bundle);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: constraints.maxHeight,
+            ),
+            child: IntrinsicHeight(
+              child: RefreshIndicator(
+                onRefresh: () async {
+                  onRefresh();
                 },
+                child: ListView.builder(
+                  padding: const EdgeInsets.all(ShopConstants.defaultPadding),
+                  itemCount: bundleCategories.length,
+                  itemBuilder: (context, index) {
+                    final category = bundleCategories.keys.elementAt(index);
+                    final categoryBundles = bundleCategories[category]!;
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                          child: Text(
+                            category,
+                            style: theme.textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        GridView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: ShopConstants.bundleGridCrossAxisCount,
+                            crossAxisSpacing: ShopConstants.bannerGridCrossAxisSpacing,
+                            mainAxisSpacing: ShopConstants.bannerGridMainAxisSpacing,
+                            childAspectRatio:
+                                0.74, // Adjusted aspect ratio to resolve overflow
+                          ),
+                          itemCount: categoryBundles.length,
+                          itemBuilder: (context, index) {
+                            final bundle = categoryBundles[index];
+                            return _buildBundleCard(context, ref, theme, bundle);
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+                    );
+                  },
+                ),
               ),
-              const SizedBox(height: 16),
-            ],
-          );
-        },
-      ),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -104,8 +117,8 @@ class BundlesTab extends ConsumerWidget {
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
-                    theme.colorScheme.primary.withValues(alpha: 0.1),
-                    theme.colorScheme.secondary.withValues(alpha: 0.1),
+                    theme.colorScheme.primary.withAlpha(25),
+                    theme.colorScheme.secondary.withAlpha(25),
                   ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
@@ -211,7 +224,7 @@ class BundlesTab extends ConsumerWidget {
   ) async {
     await showDialog(
       context: context,
-      barrierColor: Colors.black.withValues(alpha: 0.5),
+      barrierColor: Colors.black.withAlpha(128),
       builder: (context) => BundleDetailDialog(
         bundle: bundle,
         isOwned: isOwned,

@@ -221,8 +221,9 @@ class ShopScreenV1State extends ConsumerState<ShopScreenV1>
                         await showModalBottomSheet(
                           context: context,
                           isScrollControlled: true,
-                          builder: (_) =>
-                              const SizedBox(height: 500, child: CartView()),
+                          builder: (_) => SafeArea(
+                            child: const SizedBox(height: 500, child: CartView()),
+                          ),
                         );
                         setState(() {}); // Refresh badge after modal closes
                       },

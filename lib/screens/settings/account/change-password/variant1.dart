@@ -1,3 +1,4 @@
+import 'package:emotion_tracker/providers/user_agent_util.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:emotion_tracker/providers/theme_provider.dart';
@@ -263,9 +264,12 @@ Future<void> changePassword(WidgetRef ref, String currentPassword, String newPas
   if (token == null || token.isEmpty) {
     throw core_exceptions.UnauthorizedException('Session expired. Please log in again.');
   }
+  final userAgent = await getUserAgent();
   final headers = {
     'Authorization': 'Bearer $token',
     'Content-Type': 'application/json',
+    'User-Agent': userAgent,
+    'X-User-Agent': userAgent,
   };
   final body = {
     'current_password': currentPassword,

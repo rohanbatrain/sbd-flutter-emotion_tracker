@@ -85,6 +85,7 @@ class BannerUnlockService {
           headers: {
             'Authorization': 'Bearer $accessToken',
             'User-Agent': userAgent,
+            'X-User-Agent': userAgent,
           },
         );
         if (response.statusCode == 200) {
@@ -117,6 +118,7 @@ class BannerUnlockService {
           headers: {
             'Authorization': 'Bearer $accessToken',
             'User-Agent': userAgent,
+            'X-User-Agent': userAgent,
           },
         );
         if (ownedResp.statusCode == 200) {
@@ -301,6 +303,7 @@ class BannerUnlockService {
         headers: {
           'Authorization': 'Bearer $accessToken',
           'User-Agent': userAgent,
+          'X-User-Agent': userAgent,
           'Content-Type': 'application/json',
         },
         body: jsonEncode({'banner_id': bannerId}),

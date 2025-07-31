@@ -27,12 +27,22 @@ class HttpUtil {
     }
   }
 
+  /// Asserts that User-Agent headers are present (throws in release mode)
+  static void _assertUserAgent(Map<String, String>? headers) {
+    assert(headers != null && headers['User-Agent'] != null && headers['X-User-Agent'] != null,
+      'User-Agent and X-User-Agent must be set in all API requests!');
+    if (headers == null || headers['User-Agent'] == null || headers['X-User-Agent'] == null) {
+      throw ArgumentError('User-Agent and X-User-Agent must be set in all API requests!');
+    }
+  }
+
   /// Performs an HTTP GET request with Cloudflare error detection
   static Future<http.Response> get(
     Uri url, {
     Map<String, String>? headers,
     Duration? timeout,
   }) async {
+    _assertUserAgent(headers);
     return _performRequest(
       () => http.get(url, headers: headers),
       timeout: timeout,
@@ -47,6 +57,7 @@ class HttpUtil {
     Encoding? encoding,
     Duration? timeout,
   }) async {
+    _assertUserAgent(headers);
     return _performRequest(
       () => http.post(url, headers: headers, body: body, encoding: encoding),
       timeout: timeout,
@@ -61,6 +72,7 @@ class HttpUtil {
     Encoding? encoding,
     Duration? timeout,
   }) async {
+    _assertUserAgent(headers);
     return _performRequest(
       () => http.put(url, headers: headers, body: body, encoding: encoding),
       timeout: timeout,
@@ -75,8 +87,24 @@ class HttpUtil {
     Encoding? encoding,
     Duration? timeout,
   }) async {
+    _assertUserAgent(headers);
     return _performRequest(
       () => http.delete(url, headers: headers, body: body, encoding: encoding),
+      timeout: timeout,
+    );
+  }
+
+  /// Performs an HTTP PATCH request with Cloudflare error detection
+  static Future<http.Response> patch(
+    Uri url, {
+    Map<String, String>? headers,
+    Object? body,
+    Encoding? encoding,
+    Duration? timeout,
+  }) async {
+    _assertUserAgent(headers);
+    return _performRequest(
+      () => http.patch(url, headers: headers, body: body, encoding: encoding),
       timeout: timeout,
     );
   }
@@ -286,10 +314,10 @@ class HttpUtil {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.orange.withValues(alpha: 0.1),
+                  color: Colors.orange.withAlpha(25),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: Colors.orange.withValues(alpha: 0.3),
+                    color: Colors.orange.withAlpha(75),
                   ),
                 ),
                 child: Column(
@@ -466,10 +494,10 @@ class HttpUtil {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: errorState.color.withValues(alpha: 0.1),
+                    color: errorState.color.withAlpha(25),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
-                      color: errorState.color.withValues(alpha: 0.3),
+                      color: errorState.color.withAlpha(75),
                     ),
                   ),
                   child: Column(
@@ -487,7 +515,7 @@ class HttpUtil {
                             'Additional Information:',
                             style: theme.textTheme.bodyMedium?.copyWith(
                               fontWeight: FontWeight.bold,
-                              color: errorState.color.withValues(alpha: 0.8),
+                              color: errorState.color.withAlpha(200),
                             ),
                           ),
                         ],
@@ -497,7 +525,7 @@ class HttpUtil {
                         Text(
                           'Status Code: ${errorState.metadata!['statusCode']}',
                           style: theme.textTheme.bodySmall?.copyWith(
-                            color: errorState.color.withValues(alpha: 0.7),
+                            color: errorState.color.withAlpha(175),
                           ),
                         ),
                     ],

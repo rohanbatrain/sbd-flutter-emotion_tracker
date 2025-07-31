@@ -5,6 +5,7 @@ import 'package:emotion_tracker/providers/secure_storage_provider.dart';
 import 'package:emotion_tracker/providers/shared_prefs_provider.dart';
 import 'package:emotion_tracker/utils/http_util.dart' as http_util;
 import 'package:emotion_tracker/core/exceptions.dart';
+import 'package:emotion_tracker/providers/user_agent_util.dart';
 
 class SbdTokensState {
   final int? balance;
@@ -58,8 +59,11 @@ class SbdTokensNotifier extends StateNotifier<SbdTokensState> {
       final url = username != null && username.isNotEmpty
           ? Uri.parse('$baseUrl/sbd_tokens/$username')
           : Uri.parse('$baseUrl/sbd_tokens');
+      final userAgent = await getUserAgent();
       final res = await http.get(url, headers: {
         'Authorization': 'Bearer $token',
+        'User-Agent': userAgent,
+        'X-User-Agent': userAgent,
       });
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
@@ -81,11 +85,14 @@ class SbdTokensNotifier extends StateNotifier<SbdTokensState> {
       if (token == null) throw Exception('Not authenticated');
       final baseUrl = _getBaseUrl();
       final url = Uri.parse('$baseUrl/sbd_tokens/send');
+      final userAgent = await getUserAgent();
       final res = await http_util.HttpUtil.post(
         url,
         headers: {
-          'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+          'User-Agent': userAgent,
+          'X-User-Agent': userAgent,
         },
         body: jsonEncode({
           'to_user': toUser,
@@ -122,8 +129,11 @@ class SbdTokensNotifier extends StateNotifier<SbdTokensState> {
         final baseUrl = _getBaseUrl();
         final userPath = username != null && username.isNotEmpty ? '/$username' : '';
         final url = Uri.parse('$baseUrl/sbd_tokens/transactions$userPath?skip=$skip&limit=$limit');
+        final userAgent = await getUserAgent();
         final res = await http_util.HttpUtil.get(url, headers: {
           'Authorization': 'Bearer $token',
+          'User-Agent': userAgent,
+          'X-User-Agent': userAgent,
         });
         if (res.statusCode == 200) {
           final data = jsonDecode(res.body);
