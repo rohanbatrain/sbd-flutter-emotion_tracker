@@ -14,6 +14,7 @@ import 'package:emotion_tracker/widgets/error_state_widget.dart';
 import 'package:emotion_tracker/widgets/loading_state_widget.dart';
 import 'package:emotion_tracker/core/session_manager.dart';
 import 'package:emotion_tracker/core/exceptions.dart' as core_exceptions;
+import 'package:emotion_tracker/screens/settings/account/profile/profile_info_provider.dart';
 
 class ProfileScreenV1 extends ConsumerStatefulWidget {
   const ProfileScreenV1({Key? key}) : super(key: key);
@@ -398,161 +399,149 @@ class _ProfileScreenV1State extends ConsumerState<ProfileScreenV1> {
     }
   }
 
-  Future<void> _showEditDialog({
-    required String title,
-    required String currentValue,
-    required TextEditingController controller,
-    required String fieldName,
-    TextInputType keyboardType = TextInputType.text,
-    int? maxLength,
-  }) async {
-    if (fieldName == 'user_dob') {
-      // Show date picker for DOB
-      DateTime? initialDate;
-      if (dob.isNotEmpty) {
-        try {
-          initialDate = DateTime.parse(dob);
-        } catch (_) {}
-      }
-      final picked = await showDatePicker(
-        context: context,
-        initialDate: initialDate ?? DateTime(2000, 1, 1),
-        firstDate: DateTime(1900),
-        lastDate: DateTime(DateTime.now().year - 10),
-        helpText: 'Select Date of Birth',
-      );
-      if (picked != null) {
-        dobController.text = picked.toIso8601String().substring(0, 10); // yyyy-MM-dd
-        await _saveUserData();
-      }
-      return;
-    }
-    if (fieldName == 'user_gender') {
-      // Show gender selection dialog
-      final genders = ['Male', 'Female', 'Other'];
-      String selected = gender.isNotEmpty ? gender : 'Other';
-      await showDialog<void>(
-        context: context,
-        builder: (context) {
-          final theme = Theme.of(context);
-          return AlertDialog(
-            title: const Text('Select Gender'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: genders.map((g) => RadioListTile<String>(
-                title: Text(g),
-                value: g,
-                groupValue: selected,
-                onChanged: (val) {
-                  selected = val!;
-                  Navigator.of(context).pop();
-                },
-              )).toList(),
-            ),
-          );
-        },
-      );
-      genderController.text = selected;
-      await _saveUserData();
-      return;
-    }
-    controller.text = currentValue;
-    return showDialog<void>(
+  Future<void> _showEditProfileDialog() async {
+    final theme = Theme.of(context);
+    final formKey = GlobalKey<FormState>();
+    TextEditingController tempFirstNameController = TextEditingController(text: firstName);
+    TextEditingController tempLastNameController = TextEditingController(text: lastName);
+    TextEditingController tempDobController = TextEditingController(text: dob);
+    TextEditingController tempBioController = TextEditingController(text: bio);
+    // Capitalize gender for dropdown value
+    String selectedGender = gender.isNotEmpty
+        ? (gender[0].toUpperCase() + gender.substring(1).toLowerCase())
+        : 'Other';
+    await showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (BuildContext context) {
-        final theme = Theme.of(context);
+      builder: (context) {
         return AlertDialog(
-          title: Text('Edit $title'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: controller,
-                keyboardType: keyboardType,
-                maxLength: maxLength,
-                decoration: InputDecoration(
-                  labelText: title,
-                  hintText: fieldName == 'user_username'
-                      ? 'Enter username (3-50 chars, a-z, 0-9, _, -)'
-                      : fieldName == 'user_email'
-                          ? 'Enter your email address'
-                          : 'Enter your $title',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+          title: const Text('Edit Profile'),
+          content: SingleChildScrollView(
+            child: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    controller: tempFirstNameController,
+                    maxLength: 50,
+                    decoration: const InputDecoration(labelText: 'First Name', border: OutlineInputBorder()),
+                    validator: (val) {
+                      if (val == null || val.trim().isEmpty) return 'First name cannot be empty';
+                      if (val.length > 50) return 'First name cannot exceed 50 characters';
+                      return null;
+                    },
                   ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: theme.primaryColor, width: 2),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: tempLastNameController,
+                    maxLength: 50,
+                    decoration: const InputDecoration(labelText: 'Last Name', border: OutlineInputBorder()),
+                    validator: (val) {
+                      if (val == null || val.trim().isEmpty) return 'Last name cannot be empty';
+                      if (val.length > 50) return 'Last name cannot exceed 50 characters';
+                      return null;
+                    },
                   ),
-                  counterText: '', // Always hide counter
-                  prefixText: fieldName == 'user_username' ? '@' : null,
-                ),
-                autofocus: true,
-              ),
-              if (fieldName == 'user_username')
-                Padding(
-                  padding: const EdgeInsets.only(top: 8.0),
-                  child: Text(
-                    'Username must be 3-50 characters long and contain only lowercase letters, numbers, underscores, and hyphens.',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.textTheme.bodySmall?.color?.withOpacity(0.7),
+                  const SizedBox(height: 12),
+                  GestureDetector(
+                    onTap: () async {
+                      DateTime? initialDate;
+                      if (tempDobController.text.isNotEmpty) {
+                        try {
+                          initialDate = DateTime.parse(tempDobController.text);
+                        } catch (_) {}
+                      }
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: initialDate ?? DateTime(2000, 1, 1),
+                        firstDate: DateTime(1900),
+                        lastDate: DateTime(DateTime.now().year - 10),
+                        helpText: 'Select Date of Birth',
+                      );
+                      if (picked != null) {
+                        tempDobController.text = picked.toIso8601String().substring(0, 10);
+                      }
+                    },
+                    child: AbsorbPointer(
+                      child: TextFormField(
+                        controller: tempDobController,
+                        decoration: const InputDecoration(labelText: 'Date of Birth', border: OutlineInputBorder()),
+                        maxLength: 10,
+                        validator: (val) {
+                          if (val == null || val.trim().isEmpty) return 'Date of birth cannot be empty';
+                          // Optionally add more validation
+                          return null;
+                        },
+                      ),
                     ),
                   ),
-                ),
-            ],
-          ),
-          actions: <Widget>[
-            TextButton(
-              child: Text(
-                'Cancel',
-                style: TextStyle(color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7)),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    value: selectedGender,
+                    items: ['Male', 'Female', 'Other']
+                        .map((g) => DropdownMenuItem(value: g, child: Text(g)))
+                        .toList(),
+                    onChanged: (val) {
+                      if (val != null) selectedGender = val;
+                    },
+                    decoration: const InputDecoration(labelText: 'Gender', border: OutlineInputBorder()),
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: tempBioController,
+                    maxLength: 200,
+                    minLines: 2,
+                    maxLines: 4,
+                    decoration: const InputDecoration(labelText: 'Bio', border: OutlineInputBorder()),
+                  ),
+                ],
               ),
-              onPressed: () {
-                controller.text = currentValue; // Reset to original value
-                Navigator.of(context).pop();
-              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              child: Text('Cancel', style: TextStyle(color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7))),
+              onPressed: () => Navigator.of(context).pop(),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: theme.primaryColor,
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
               child: const Text('Save'),
               onPressed: () async {
-                // Use centralized validation
-                String value = controller.text.trim();
-                String? error;
-
-                if (fieldName == 'user_username') {
-                  error = InputValidator.validateUsername(value);
-                } else if (fieldName == 'user_email') {
-                  error = InputValidator.validateEmail(value);
-                } else if (fieldName == 'user_first_name' || fieldName == 'user_last_name') {
-                  if (value.isEmpty) {
-                    error = '$title cannot be empty';
-                  } else if (value.length > 50) {
-                    error = '$title cannot exceed 50 characters';
+                if (formKey.currentState?.validate() ?? false) {
+                  firstNameController.text = tempFirstNameController.text.trim();
+                  lastNameController.text = tempLastNameController.text.trim();
+                  dobController.text = tempDobController.text.trim();
+                  genderController.text = selectedGender;
+                  bioController.text = tempBioController.text.trim();
+                  Navigator.of(context).pop();
+                  await _saveUserData();
+                  // --- NEW: Also update via provider to hit backend and update cache ---
+                  try {
+                    await ref.read(profileInfoProvider.notifier).updateProfileInfo(
+                      firstName: tempFirstNameController.text.trim(),
+                      lastName: tempLastNameController.text.trim(),
+                      dob: tempDobController.text.trim(),
+                      gender: selectedGender.toLowerCase(), // send lowercase to backend
+                      bio: tempBioController.text.trim(),
+                    );
+                    // Optionally, refresh provider state after update
+                    await ref.read(profileInfoProvider.notifier).refreshProfileInfo();
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Failed to update profile on server.'),
+                          backgroundColor: Theme.of(context).colorScheme.error,
+                        ),
+                      );
+                    }
                   }
                 }
-
-                if (error != null) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(error),
-                      backgroundColor: theme.colorScheme.error,
-                      duration: const Duration(seconds: 3),
-                    ),
-                  );
-                  return;
-                }
-
-                controller.text = value;
-                Navigator.of(context).pop();
-                await _saveUserData();
               },
             ),
           ],
@@ -652,22 +641,25 @@ class _ProfileScreenV1State extends ConsumerState<ProfileScreenV1> {
               ],
             ),
             const SizedBox(height: 60), // Space for avatar
+            // Add spacing between avatar and username
+            const SizedBox(height: 18),
+            Container(
+              width: double.infinity,
+              child: Text(
+                displayName,
+                style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+                overflow: TextOverflow.ellipsis,
+                maxLines: 2,
+              ),
+            ),
+            const SizedBox(height: 24),
+            // Only the profile info tiles are scrollable
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 0),
                 child: Column(
                   children: [
-                    Container(
-                      width: double.infinity,
-                      child: Text(
-                        displayName,
-                        style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-                        textAlign: TextAlign.center,
-                        overflow: TextOverflow.ellipsis,
-                        maxLines: 2,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
                     // First Name Card
                     Card(
                       elevation: 2,
@@ -691,13 +683,6 @@ class _ProfileScreenV1State extends ConsumerState<ProfileScreenV1> {
                           maxLines: 2,
                         ),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        onTap: () => _showEditDialog(
-                          title: 'First Name',
-                          currentValue: firstName,
-                          controller: firstNameController,
-                          fieldName: 'user_first_name',
-                          maxLength: 50,
-                        ),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -724,13 +709,6 @@ class _ProfileScreenV1State extends ConsumerState<ProfileScreenV1> {
                           maxLines: 2,
                         ),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        onTap: () => _showEditDialog(
-                          title: 'Last Name',
-                          currentValue: lastName,
-                          controller: lastNameController,
-                          fieldName: 'user_last_name',
-                          maxLength: 50,
-                        ),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -757,14 +735,6 @@ class _ProfileScreenV1State extends ConsumerState<ProfileScreenV1> {
                           maxLines: 2,
                         ),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        onTap: () => _showEditDialog(
-                          title: 'Date of Birth',
-                          currentValue: dob,
-                          controller: dobController,
-                          fieldName: 'user_dob',
-                          maxLength: 10,
-                          keyboardType: TextInputType.datetime,
-                        ),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -791,13 +761,6 @@ class _ProfileScreenV1State extends ConsumerState<ProfileScreenV1> {
                           maxLines: 2,
                         ),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        onTap: () => _showEditDialog(
-                          title: 'Gender',
-                          currentValue: gender,
-                          controller: genderController,
-                          fieldName: 'user_gender',
-                          maxLength: 20,
-                        ),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -824,13 +787,21 @@ class _ProfileScreenV1State extends ConsumerState<ProfileScreenV1> {
                           maxLines: 3,
                         ),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        onTap: () => _showEditDialog(
-                          title: 'Bio',
-                          currentValue: bio,
-                          controller: bioController,
-                          fieldName: 'user_bio',
-                          maxLength: 200,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    // Edit Profile Button
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        icon: Icon(Icons.edit, color: Colors.white),
+                        label: Text('Edit Profile', style: TextStyle(color: Colors.white)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: theme.primaryColor,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
                         ),
+                        onPressed: _showEditProfileDialog,
                       ),
                     ),
                     const SizedBox(height: 12),
