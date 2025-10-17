@@ -20,6 +20,17 @@ class HttpUtil {
       _checkCloudflareErrors(response);
       return response;
     } catch (e) {
+      // Log the underlying error and stacktrace to help diagnose network issues
+      // (e.g., DNS failure, TLS, socket errors). This does not change error
+      // semantics but makes debugging easier in development.
+      try {
+        // ignore: avoid_print
+        print('[HttpUtil] request failed: $e');
+      } catch (_) {}
+      try {
+        // ignore: avoid_print
+        print(StackTrace.current);
+      } catch (_) {}
       if (e is CloudflareTunnelException) {
         rethrow;
       }
@@ -29,10 +40,18 @@ class HttpUtil {
 
   /// Asserts that User-Agent headers are present (throws in release mode)
   static void _assertUserAgent(Map<String, String>? headers) {
-    assert(headers != null && headers['User-Agent'] != null && headers['X-User-Agent'] != null,
-      'User-Agent and X-User-Agent must be set in all API requests!');
-    if (headers == null || headers['User-Agent'] == null || headers['X-User-Agent'] == null) {
-      throw ArgumentError('User-Agent and X-User-Agent must be set in all API requests!');
+    assert(
+      headers != null &&
+          headers['User-Agent'] != null &&
+          headers['X-User-Agent'] != null,
+      'User-Agent and X-User-Agent must be set in all API requests!',
+    );
+    if (headers == null ||
+        headers['User-Agent'] == null ||
+        headers['X-User-Agent'] == null) {
+      throw ArgumentError(
+        'User-Agent and X-User-Agent must be set in all API requests!',
+      );
     }
   }
 
@@ -316,9 +335,7 @@ class HttpUtil {
                 decoration: BoxDecoration(
                   color: Colors.orange.withAlpha(25),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: Colors.orange.withAlpha(75),
-                  ),
+                  border: Border.all(color: Colors.orange.withAlpha(75)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -434,7 +451,10 @@ class HttpUtil {
   /// into the centralized system while maintaining backward compatibility
   static void showHttpErrorDialog(BuildContext context, dynamic error) {
     if (error is core_exceptions.UnauthorizedException) {
-      SessionManager.redirectToLogin(context, message: 'Session expired. Please log in again.');
+      SessionManager.redirectToLogin(
+        context,
+        message: 'Session expired. Please log in again.',
+      );
       return;
     }
 
@@ -496,9 +516,7 @@ class HttpUtil {
                   decoration: BoxDecoration(
                     color: errorState.color.withAlpha(25),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: errorState.color.withAlpha(75),
-                    ),
+                    border: Border.all(color: errorState.color.withAlpha(75)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,

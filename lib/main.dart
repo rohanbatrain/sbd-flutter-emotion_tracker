@@ -23,24 +23,29 @@ void main() async {
 
   // Pre-warm AdMob initialization in background (non-blocking)
   _initializeAdMobInBackground();
-  
+
   // Run the app immediately, let background tasks initialize asynchronously
   runApp(const ProviderScope(child: MyApp()));
 }
 
 // Initialize AdMob in background without blocking app startup
 void _initializeAdMobInBackground() {
-  // Only initialize AdMob if not running on Linux
-  if (defaultTargetPlatform != TargetPlatform.linux) {
-    Future.microtask(() async {
-      try {
-        await MobileAds.instance.initialize();
-      } catch (e) {
-        // AdMob initialization failed, but don't block the app
-        print('Background AdMob initialization failed: $e');
-      }
-    });
+  // Only initialize AdMob on iOS or Android. Many desktop targets (including macOS)
+  // do not have a native implementation for the google_mobile_ads plugin and
+  // calling MobileAds.instance.initialize() will throw MissingPluginException.
+  if (!(defaultTargetPlatform == TargetPlatform.android ||
+      defaultTargetPlatform == TargetPlatform.iOS)) {
+    return;
   }
+
+  Future.microtask(() async {
+    try {
+      await MobileAds.instance.initialize();
+    } catch (e) {
+      // AdMob initialization failed, but don't block the app
+      print('Background AdMob initialization failed: $e');
+    }
+  });
 }
 
 class MyApp extends ConsumerWidget {
@@ -74,8 +79,10 @@ class MyApp extends ConsumerWidget {
         '/home/v1': (context) => const AuthGuard(child: HomeScreenV1()),
         '/verify-email/v1': (context) => const VerifyEmailScreenV1(),
         '/forgot-password/v1': (context) => const ForgotPasswordScreenV1(),
-        '/client-side-encryption/v1': (context) => const ClientSideEncryptionScreenV1(),
-        '/login-with-token/v1': (context) => const LoginWithTokenScreenV1(), // <-- Added route
+        '/client-side-encryption/v1': (context) =>
+            const ClientSideEncryptionScreenV1(),
+        '/login-with-token/v1': (context) =>
+            const LoginWithTokenScreenV1(), // <-- Added route
         // Variant 2 Routes
       },
     );
