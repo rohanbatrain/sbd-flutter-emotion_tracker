@@ -11,6 +11,7 @@ import 'package:emotion_tracker/screens/settings/account/login_history_screen.da
 import 'package:emotion_tracker/screens/settings/account/api-tokens/api_tokens_screen.dart';
 import 'package:emotion_tracker/screens/settings/account/user-agent/trusted_user_agent_status_screen.dart';
 import 'package:emotion_tracker/widgets/custom_app_bar.dart';
+// Family moved out of Account; keep family screens under Settings main menu.
 
 class AccountSettingsScreenV1 extends ConsumerWidget {
   const AccountSettingsScreenV1({Key? key}) : super(key: key);
@@ -35,25 +36,24 @@ class AccountSettingsScreenV1 extends ConsumerWidget {
       if (e.code == 'NotAvailable' && allowSkip) {
         final proceed = await showDialog<bool>(
           context: context,
-          builder:
-              (context) => AlertDialog(
-                title: Text('Device Security Not Enabled'),
-                content: Text(
-                  'No device security (PIN, password, or biometrics) is enabled.\n\n'
-                  'Enabling 2FA without device protection is less secure.\n\n'
-                  'Would you like to continue anyway?',
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(false),
-                    child: Text('Cancel'),
-                  ),
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(true),
-                    child: Text('Continue Anyway'),
-                  ),
-                ],
+          builder: (context) => AlertDialog(
+            title: Text('Device Security Not Enabled'),
+            content: Text(
+              'No device security (PIN, password, or biometrics) is enabled.\n\n'
+              'Enabling 2FA without device protection is less secure.\n\n'
+              'Would you like to continue anyway?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: Text('Cancel'),
               ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: Text('Continue Anyway'),
+              ),
+            ],
+          ),
         );
         if (proceed == true) {
           if (onSkip != null) onSkip();
@@ -171,7 +171,8 @@ class AccountSettingsScreenV1 extends ConsumerWidget {
               onTap: () async {
                 final authenticated = await _authenticate(
                   context,
-                  reason: 'Please authenticate to view Trusted User Agent Lockdown',
+                  reason:
+                      'Please authenticate to view Trusted User Agent Lockdown',
                 );
                 if (authenticated) {
                   Navigator.of(context).push(

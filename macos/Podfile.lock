@@ -62,7 +62,7 @@ SPEC CHECKSUMS:
   device_info_plus: b0fafc687fb901e2af612763340f1b0d4352f8e5
   flutter_secure_storage_macos: 7f45e30f838cf2659862a4e4e3ee1c347c2b3b54
   FlutterMacOS: d0db08ddef1a9af05a5ec4b724367152bb0500b1
-  local_auth_darwin: 553ce4f9b16d3fdfeafce9cf042e7c9f77c1c391
+  local_auth_darwin: d2e8c53ef0c4f43c646462e3415432c4dab3ae19
   mobile_scanner: 9157936403f5a0644ca3779a38ff8404c5434a93
   package_info_plus: f0052d280d17aa382b932f399edf32507174e870
   path_provider_foundation: 080d55be775b7414fd5a5ef3ac137b97b097e564

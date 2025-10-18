@@ -6,6 +6,8 @@ import 'package:emotion_tracker/widgets/app_scaffold.dart';
 import 'themes/variant1.dart';
 import 'account/variant1.dart';
 import 'developer/variant1.dart';
+import 'account/family/variant1.dart';
+import 'account/team/variant1.dart';
 import 'package:emotion_tracker/screens/shop/variant1/variant1.dart';
 
 // Provider to check if user has developer role
@@ -31,9 +33,9 @@ class SettingsScreenV1 extends ConsumerWidget {
       if (item == 'dashboard') {
         Navigator.of(context).pushReplacementNamed('/home/v1');
       } else if (item == 'shop') {
-        Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const ShopScreenV1()),
-        );
+        Navigator.of(
+          context,
+        ).push(MaterialPageRoute(builder: (_) => const ShopScreenV1()));
       }
     }
 
@@ -60,16 +62,35 @@ class SettingsScreenV1 extends ConsumerWidget {
           Card(
             elevation: 3,
             margin: EdgeInsets.symmetric(horizontal: 2, vertical: 6),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(18),
+            ),
             child: ListTile(
-              contentPadding: EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+              contentPadding: EdgeInsets.symmetric(
+                horizontal: 24,
+                vertical: 14,
+              ),
               leading: CircleAvatar(
                 radius: 22,
                 backgroundColor: theme.primaryColor.withOpacity(0.13),
-                child: Icon(Icons.color_lens, color: theme.primaryColor, size: 26),
+                child: Icon(
+                  Icons.color_lens,
+                  color: theme.primaryColor,
+                  size: 26,
+                ),
               ),
-              title: Text('Themes', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600, fontSize: 18)),
-              trailing: Icon(Icons.arrow_forward_ios, size: 20, color: theme.hintColor),
+              title: Text(
+                'Themes',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 18,
+                ),
+              ),
+              trailing: Icon(
+                Icons.arrow_forward_ios,
+                size: 20,
+                color: theme.hintColor,
+              ),
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => ThemeSelectionScreenV1()),
               ),
@@ -91,19 +112,111 @@ class SettingsScreenV1 extends ConsumerWidget {
           Card(
             elevation: 3,
             margin: EdgeInsets.symmetric(horizontal: 2, vertical: 6),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(18),
+            ),
             child: ListTile(
-              contentPadding: EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+              contentPadding: EdgeInsets.symmetric(
+                horizontal: 24,
+                vertical: 14,
+              ),
               leading: CircleAvatar(
                 radius: 22,
                 backgroundColor: theme.primaryColor.withOpacity(0.13),
                 child: Icon(Icons.person, color: theme.primaryColor, size: 26),
               ),
-              title: Text('Account', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600, fontSize: 18)),
-              trailing: Icon(Icons.arrow_forward_ios, size: 20, color: theme.hintColor),
+              title: Text(
+                'Account',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 18,
+                ),
+              ),
+              trailing: Icon(
+                Icons.arrow_forward_ios,
+                size: 20,
+                color: theme.hintColor,
+              ),
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => AccountSettingsScreenV1()),
               ),
+            ),
+          ),
+          SizedBox(height: 12),
+          Card(
+            elevation: 3,
+            margin: EdgeInsets.symmetric(horizontal: 2, vertical: 6),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: ListTile(
+              contentPadding: EdgeInsets.symmetric(
+                horizontal: 24,
+                vertical: 14,
+              ),
+              leading: CircleAvatar(
+                radius: 22,
+                backgroundColor: theme.primaryColor.withOpacity(0.13),
+                child: Icon(
+                  Icons.family_restroom,
+                  color: theme.primaryColor,
+                  size: 26,
+                ),
+              ),
+              title: Text(
+                'Family',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 18,
+                ),
+              ),
+              trailing: Icon(
+                Icons.arrow_forward_ios,
+                size: 20,
+                color: theme.hintColor,
+              ),
+              onTap: () => Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => const FamilyScreenV1())),
+            ),
+          ),
+          SizedBox(height: 12),
+          // Teams (new entry)
+          Card(
+            elevation: 3,
+            margin: EdgeInsets.symmetric(horizontal: 2, vertical: 6),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: ListTile(
+              contentPadding: EdgeInsets.symmetric(
+                horizontal: 24,
+                vertical: 14,
+              ),
+              leading: CircleAvatar(
+                radius: 22,
+                backgroundColor: theme.primaryColor.withOpacity(0.13),
+                child: Icon(
+                  Icons.group,
+                  color: theme.primaryColor,
+                  size: 26,
+                ),
+              ),
+              title: Text(
+                'Teams',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 18,
+                ),
+              ),
+              trailing: Icon(
+                Icons.arrow_forward_ios,
+                size: 20,
+                color: theme.hintColor,
+              ),
+              onTap: () => Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => const TeamScreenV1())),
             ),
           ),
           // Developer Options (only visible for developers)
@@ -114,7 +227,11 @@ class SettingsScreenV1 extends ConsumerWidget {
                     children: [
                       SizedBox(height: 28),
                       Padding(
-                        padding: const EdgeInsets.only(left: 4.0, top: 10, bottom: 10),
+                        padding: const EdgeInsets.only(
+                          left: 4.0,
+                          top: 10,
+                          bottom: 10,
+                        ),
                         child: Row(
                           children: [
                             Text(
@@ -128,7 +245,10 @@ class SettingsScreenV1 extends ConsumerWidget {
                             ),
                             SizedBox(width: 8),
                             Container(
-                              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
                               decoration: BoxDecoration(
                                 color: theme.colorScheme.secondary,
                                 borderRadius: BorderRadius.circular(12),
@@ -147,8 +267,13 @@ class SettingsScreenV1 extends ConsumerWidget {
                       ),
                       Card(
                         elevation: 3,
-                        margin: EdgeInsets.symmetric(horizontal: 2, vertical: 6),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                        margin: EdgeInsets.symmetric(
+                          horizontal: 2,
+                          vertical: 6,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(18),
+                        ),
                         child: Container(
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(18),
@@ -162,11 +287,19 @@ class SettingsScreenV1 extends ConsumerWidget {
                             ),
                           ),
                           child: ListTile(
-                            contentPadding: EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: 24,
+                              vertical: 14,
+                            ),
                             leading: CircleAvatar(
                               radius: 22,
-                              backgroundColor: theme.colorScheme.secondary.withOpacity(0.2),
-                              child: Icon(Icons.developer_mode, color: theme.colorScheme.secondary, size: 26),
+                              backgroundColor: theme.colorScheme.secondary
+                                  .withOpacity(0.2),
+                              child: Icon(
+                                Icons.developer_mode,
+                                color: theme.colorScheme.secondary,
+                                size: 26,
+                              ),
                             ),
                             title: Text(
                               'Developer Options',
@@ -181,9 +314,15 @@ class SettingsScreenV1 extends ConsumerWidget {
                                 color: theme.hintColor,
                               ),
                             ),
-                            trailing: Icon(Icons.arrow_forward_ios, size: 20, color: theme.hintColor),
+                            trailing: Icon(
+                              Icons.arrow_forward_ios,
+                              size: 20,
+                              color: theme.hintColor,
+                            ),
                             onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute(builder: (_) => DeveloperOptionsScreenV1()),
+                              MaterialPageRoute(
+                                builder: (_) => DeveloperOptionsScreenV1(),
+                              ),
                             ),
                           ),
                         ),
