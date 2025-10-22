@@ -144,8 +144,13 @@ class ProfilesNotifier extends StateNotifier<ProfilesState> {
     Map<String, dynamic> result;
     try {
       // Perform login (this will call storeAuthData internally)
-      result = await loginWithApi(_ref as WidgetRef, usernameOrEmail, password,
-          twoFaCode: twoFaCode, twoFaMethod: twoFaMethod);
+      result = await loginWithApi(
+        _ref as WidgetRef,
+        usernameOrEmail,
+        password,
+        twoFaCode: twoFaCode,
+        twoFaMethod: twoFaMethod,
+      );
     } catch (e) {
       rethrow;
     }
