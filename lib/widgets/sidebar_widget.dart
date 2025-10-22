@@ -1,9 +1,10 @@
+import 'package:emotion_tracker/widgets/account_button.dart' show AccountButton;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:flutter/foundation.dart';
 import 'package:emotion_tracker/providers/theme_provider.dart';
-import 'package:emotion_tracker/providers/app_providers.dart';
+// app_providers import removed; AccountButton handles auth actions.
 import 'package:emotion_tracker/providers/ad_provider.dart';
 
 class SidebarWidget extends ConsumerStatefulWidget {
@@ -51,8 +52,12 @@ class _SidebarWidgetState extends ConsumerState<SidebarWidget> {
     final isLinux = defaultTargetPlatform == TargetPlatform.linux;
 
     // Conditionally watch ad-related providers
-    final bannerAd = !isLinux ? ref.watch(bannerAdProvider(sidebarBannerAdId)) : null;
-    final isBannerAdReady = !isLinux ? ref.watch(adProvider.notifier).isBannerAdReady(sidebarBannerAdId) : false;
+    final bannerAd = !isLinux
+        ? ref.watch(bannerAdProvider(sidebarBannerAdId))
+        : null;
+    final isBannerAdReady = !isLinux
+        ? ref.watch(adProvider.notifier).isBannerAdReady(sidebarBannerAdId)
+        : false;
 
     return SafeArea(
       child: Container(
@@ -95,7 +100,7 @@ class _SidebarWidgetState extends ConsumerState<SidebarWidget> {
                 ],
               ),
             ),
-            
+
             // Menu Items
             Expanded(
               child: Padding(
@@ -129,7 +134,7 @@ class _SidebarWidgetState extends ConsumerState<SidebarWidget> {
                 ),
               ),
             ),
-            
+
             // Footer
             Padding(
               padding: EdgeInsets.all(16),
@@ -150,42 +155,15 @@ class _SidebarWidgetState extends ConsumerState<SidebarWidget> {
                         ),
                       ),
                     ),
-                  // Logout Button
+                  // Account control (profile switcher + logout)
                   Container(
                     width: double.infinity,
-                    margin: EdgeInsets.only(bottom: 12),
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(12),
-                        onTap: () => _handleLogout(context, ref),
-                        child: Container(
-                          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: theme.colorScheme.onPrimary.withOpacity(0.3),
-                              width: 1,
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.logout_rounded,
-                                color: theme.colorScheme.onPrimary,
-                                size: 20,
-                              ),
-                              SizedBox(width: 12),
-                              Text(
-                                'Logout',
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                  color: theme.colorScheme.onPrimary,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                    margin: const EdgeInsets.only(bottom: 12),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 4.0),
+                        child: AccountButton(),
                       ),
                     ),
                   ),
@@ -216,7 +194,7 @@ class _SidebarWidgetState extends ConsumerState<SidebarWidget> {
       margin: EdgeInsets.symmetric(vertical: 2),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
-        color: isSelected 
+        color: isSelected
             ? theme.colorScheme.onPrimary.withOpacity(0.2)
             : Colors.transparent,
       ),
@@ -229,17 +207,15 @@ class _SidebarWidgetState extends ConsumerState<SidebarWidget> {
             padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Row(
               children: [
-                Icon(
-                  icon,
-                  color: theme.colorScheme.onPrimary,
-                  size: 22,
-                ),
+                Icon(icon, color: theme.colorScheme.onPrimary, size: 22),
                 SizedBox(width: 16),
                 Text(
                   title,
                   style: theme.textTheme.bodyLarge?.copyWith(
                     color: theme.colorScheme.onPrimary,
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                    fontWeight: isSelected
+                        ? FontWeight.w600
+                        : FontWeight.normal,
                   ),
                 ),
               ],
@@ -250,54 +226,5 @@ class _SidebarWidgetState extends ConsumerState<SidebarWidget> {
     );
   }
 
-  void _handleLogout(BuildContext context, WidgetRef ref) async {
-    // Show confirmation dialog
-    final bool? shouldLogout = await showDialog<bool>(
-      context: context,
-      builder: (BuildContext context) {
-        final theme = ref.watch(currentThemeProvider);
-        return AlertDialog(
-          backgroundColor: theme.cardTheme.color,
-          title: Text(
-            'Logout',
-            style: theme.textTheme.titleLarge,
-          ),
-          content: Text(
-            'Are you sure you want to logout?',
-            style: theme.textTheme.bodyLarge,
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: Text(
-                'Cancel',
-                style: TextStyle(color: theme.textTheme.bodyMedium?.color),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: theme.primaryColor,
-                foregroundColor: theme.colorScheme.onPrimary,
-              ),
-              child: const Text('Logout'),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (shouldLogout == true) {
-      // Perform logout
-      await ref.read(authProvider.notifier).logout();
-      
-      // Navigate to auth screen
-      if (context.mounted) {
-        Navigator.of(context).pushNamedAndRemoveUntil(
-          '/auth/v1',
-          (route) => false,
-        );
-      }
-    }
-  }
+  // Logout is handled by the AccountButton/ProfileSwitcherSheet now.
 }

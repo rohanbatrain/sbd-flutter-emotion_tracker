@@ -5,6 +5,7 @@ import 'package:emotion_tracker/providers/theme_provider.dart';
 import 'package:emotion_tracker/core/global_error_handler.dart';
 import 'package:emotion_tracker/widgets/error_state_widget.dart';
 import 'package:emotion_tracker/widgets/loading_state_widget.dart';
+import 'package:emotion_tracker/providers/profiles_provider.dart';
 import 'dart:async';
 
 /// Example provider that might fail - simulates dashboard data loading
@@ -41,6 +42,9 @@ final dashboardDataProvider = FutureProvider<Map<String, dynamic>>((ref) async {
   }
 });
 
+/// Provider to avoid triggering dashboard-initiated refresh multiple times
+final dashboardRefreshTriggeredProvider = StateProvider<bool>((_) => false);
+
 /// Migrated version of DashboardScreenV1 demonstrating error handling integration
 class DashboardScreenV1Migrated extends ConsumerWidget {
   const DashboardScreenV1Migrated({super.key});
@@ -60,66 +64,61 @@ class DashboardScreenV1Migrated extends ConsumerWidget {
 
     showDialog(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            title: Row(
-              children: [
-                Icon(errorState.icon, color: errorState.color),
-                const SizedBox(width: 8),
-                const Text('Dashboard Error Help'),
-              ],
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(errorState.icon, color: errorState.color),
+            const SizedBox(width: 8),
+            const Text('Dashboard Error Help'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Unable to load your dashboard data.'),
+            const SizedBox(height: 12),
+            Text(
+              'What you can try:',
+              style: const TextStyle(fontWeight: FontWeight.bold),
             ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Unable to load your dashboard data.'),
-                const SizedBox(height: 12),
-                Text(
-                  'What you can try:',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+            const SizedBox(height: 8),
+            Text(_getDashboardTroubleshootingSteps(errorState.type)),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: errorState.color.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: errorState.color.withValues(alpha: 0.3),
                 ),
-                const SizedBox(height: 8),
-                Text(_getDashboardTroubleshootingSteps(errorState.type)),
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: errorState.color.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: errorState.color.withValues(alpha: 0.3),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, color: errorState.color, size: 16),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Your data is safe. This is just a temporary loading issue.',
+                      style: TextStyle(
+                        color: errorState.color.withValues(alpha: 0.8),
+                        fontSize: 12,
+                      ),
                     ),
                   ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.info_outline,
-                        color: errorState.color,
-                        size: 16,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Your data is safe. This is just a temporary loading issue.',
-                          style: TextStyle(
-                            color: errorState.color.withValues(alpha: 0.8),
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('OK'),
+                ],
               ),
-            ],
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
           ),
+        ],
+      ),
     );
   }
 
@@ -140,6 +139,17 @@ class DashboardScreenV1Migrated extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Trigger a one-time active-profile refresh from the dashboard (if needed)
+    final triggered = ref.read(dashboardRefreshTriggeredProvider.notifier);
+    if (!ref.read(dashboardRefreshTriggeredProvider)) {
+      // schedule microtask so this doesn't run during provider reads
+      Future.microtask(() async {
+        try {
+          await ref.read(profilesProvider.notifier).refreshActiveProfile();
+        } catch (_) {}
+        triggered.state = true;
+      });
+    }
     final theme = ref.watch(currentThemeProvider);
     final dashboardAsync = ref.watch(dashboardDataProvider);
 
@@ -153,10 +163,8 @@ class DashboardScreenV1Migrated extends ConsumerWidget {
             await ref.read(dashboardDataProvider.future);
           },
           child: dashboardAsync.when(
-            loading:
-                () => const LoadingStateWidget(
-                  message: 'Loading your dashboard...',
-                ),
+            loading: () =>
+                const LoadingStateWidget(message: 'Loading your dashboard...'),
             error: (error, stackTrace) {
               return ErrorStateWidget(
                 error: error,

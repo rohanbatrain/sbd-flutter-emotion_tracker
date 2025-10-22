@@ -151,6 +151,8 @@ class FamilyMember {
 
 class SBDAccount {
   final String accountId;
+  final String? accountUsername;
+  final String? accountName;
   final int balance;
   final String currency;
   final bool isFrozen;
@@ -160,6 +162,8 @@ class SBDAccount {
 
   SBDAccount({
     required this.accountId,
+    this.accountUsername,
+    this.accountName,
     required this.balance,
     required this.currency,
     required this.isFrozen,
@@ -182,6 +186,8 @@ class SBDAccount {
 
     return SBDAccount(
       accountId: json['account_id'] ?? '',
+      accountUsername: json['account_username'],
+      accountName: json['account_name'],
       balance: json['balance'] ?? 0,
       currency: json['currency'] ?? 'SBD',
       isFrozen: json['is_frozen'] ?? false,
@@ -196,6 +202,8 @@ class SBDAccount {
   Map<String, dynamic> toJson() {
     return {
       'account_id': accountId,
+      if (accountUsername != null) 'account_username': accountUsername,
+      if (accountName != null) 'account_name': accountName,
       'balance': balance,
       'currency': currency,
       'is_frozen': isFrozen,
@@ -207,6 +215,12 @@ class SBDAccount {
         ),
     };
   }
+
+  /// Get the display name for the account (account_name if available, otherwise account_username)
+  String get displayName => accountName ?? accountUsername ?? accountId;
+
+  /// Get the username for QR codes and transfers (account_username if available, otherwise account_id)
+  String get qrUsername => accountUsername ?? accountId;
 }
 
 class SpendingPermissions {

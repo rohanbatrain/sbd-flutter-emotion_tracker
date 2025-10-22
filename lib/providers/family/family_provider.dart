@@ -223,6 +223,83 @@ class FamilyDetailsNotifier extends StateNotifier<FamilyDetailsState> {
     }
   }
 
+  /// Update a member's spending permissions (admin-only)
+  /// Returns the raw API wrapper response so callers can inspect `message` and `transaction_safe`.
+  Future<Map<String, dynamic>?> updateSpendingPermissions({
+    required String userId,
+    required int spendingLimit,
+    required bool canSpend,
+  }) async {
+    try {
+      final request = models.UpdateSpendingPermissionsRequest(
+        userId: userId,
+        spendingLimit: spendingLimit,
+        canSpend: canSpend,
+      );
+      final response = await _apiService.updateSpendingPermissions(
+        familyId,
+        request,
+      );
+
+      // Response wrapper expected to contain `new_permissions` map
+      if (response.containsKey('new_permissions')) {
+        final np = response['new_permissions'] as Map<String, dynamic>;
+
+        // Update in-memory members list if present
+        final updatedMembers = state.members.map((m) {
+          if (m.userId == userId) {
+            final updatedPerm = models.SpendingPermissions.fromJson(np);
+            return models.FamilyMember(
+              userId: m.userId,
+              username: m.username,
+              email: m.email,
+              firstName: m.firstName,
+              lastName: m.lastName,
+              role: np['role'] ?? m.role,
+              relationshipType: m.relationshipType,
+              joinedAt: m.joinedAt,
+              isBackupAdmin: m.isBackupAdmin,
+              spendingPermissions: updatedPerm,
+            );
+          }
+          return m;
+        }).toList();
+
+        // Also update sbdAccount.memberPermissions map if present
+        models.SBDAccount? updatedAccount = state.sbdAccount;
+        if (updatedAccount != null) {
+          final Map<String, models.SpendingPermissions> mp = {};
+          if (updatedAccount.memberPermissions != null) {
+            mp.addAll(updatedAccount.memberPermissions!);
+          }
+          mp[userId] = models.SpendingPermissions.fromJson(np);
+
+          updatedAccount = models.SBDAccount(
+            accountId: updatedAccount.accountId,
+            accountUsername: updatedAccount.accountUsername,
+            accountName: updatedAccount.accountName,
+            balance: updatedAccount.balance,
+            currency: updatedAccount.currency,
+            isFrozen: updatedAccount.isFrozen,
+            freezeReason: updatedAccount.freezeReason,
+            frozenAt: updatedAccount.frozenAt,
+            memberPermissions: mp,
+          );
+        }
+
+        state = state.copyWith(
+          members: updatedMembers,
+          sbdAccount: updatedAccount,
+        );
+      }
+
+      return response;
+    } catch (e) {
+      state = state.copyWith(error: e.toString());
+      return null;
+    }
+  }
+
   void clearError() {
     state = state.copyWith(error: null);
   }
@@ -283,7 +360,19 @@ class TokenRequestsNotifier extends StateNotifier<TokenRequestsState> {
   Future<void> loadRequests() async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      final pending = await _apiService.getPendingTokenRequests(familyId);
+      List<models.TokenRequest> pending;
+      try {
+        pending = await _apiService.getPendingTokenRequests(familyId);
+      } catch (e) {
+        // The backend returns 403 for non-admins on this admin-only endpoint.
+        // Don't surface a page-level error for non-admin users; treat as empty.
+        final msg = e.toString();
+        if (msg.contains('API Error (403)') || msg.contains('403')) {
+          pending = [];
+        } else {
+          rethrow;
+        }
+      }
       final myRequests = await _apiService.getMyTokenRequests(familyId);
       state = state.copyWith(
         pendingRequests: pending,

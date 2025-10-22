@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:math';
+// dart:math not required here
 
 import 'package:emotion_tracker/providers/app_providers.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -25,26 +25,17 @@ class FamilyApiService {
   Future<String?> _getAccessToken() async {
     final secureStorage = _ref.read(secureStorageProvider);
     final token = await secureStorage.read(key: 'access_token');
-    print('[FAMILY_API] Reading access_token from secure storage...');
-    print(
-      '[FAMILY_API] Token value: ${token != null ? "***${token.length} chars (last 10: ${token.substring(max(0, token.length - 10))})***" : "NULL/EMPTY"}',
-    );
     return token;
   }
 
   Future<Map<String, String>> _getHeaders() async {
     final token = await _getAccessToken();
-    print(
-      '[FAMILY_API] Token from secure storage: ${token != null ? "***${token.substring(token.length - 10)}" : "NULL"}',
-    );
     if (token == null) {
-      print('[FAMILY_API] ❌ No token found in secure storage!');
       throw core_exceptions.UnauthorizedException(
         'Session expired. Please log in again.',
       );
     }
     final userAgent = await getUserAgent();
-    print('[FAMILY_API] ✓ Headers prepared with token and User-Agent');
     return {
       'Content-Type': 'application/json',
       'Authorization': 'Bearer $token',
@@ -149,6 +140,9 @@ class FamilyApiService {
       throw Exception('Network error: ${e.message}');
     }
   }
+
+  // Attempt to refresh the active profile's token using its refreshToken.
+  // Returns true if refresh succeeded and stored token is updated.
 
   // ==================== Core Family Management ====================
 
@@ -458,16 +452,22 @@ class FamilyApiService {
     return models.SBDAccount.fromJson(response);
   }
 
-  Future<models.SBDAccount> updateSpendingPermissions(
+  /// Update a member's spending permissions.
+  /// New backend contract returns a wrapper object with `new_permissions` and metadata.
+  Future<Map<String, dynamic>> updateSpendingPermissions(
     String familyId,
     models.UpdateSpendingPermissionsRequest request,
   ) async {
+    // New endpoint includes the target user id in the path
+    final userId = request.userId;
     final response = await _request(
       'PUT',
-      '/family/$familyId/sbd-account/permissions',
+      '/family/$familyId/spending-permissions/$userId',
       data: request.toJson(),
     );
-    return models.SBDAccount.fromJson(response);
+
+    // Return the raw wrapper so callers can inspect message/transaction_safe/new_permissions
+    return Map<String, dynamic>.from(response);
   }
 
   Future<List<models.Transaction>> getTransactions(String familyId) async {
