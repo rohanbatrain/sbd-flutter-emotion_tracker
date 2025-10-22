@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:emotion_tracker/providers/shared_prefs_provider.dart';
 import 'package:emotion_tracker/providers/secure_storage_provider.dart';
 import 'package:emotion_tracker/providers/transition_provider.dart';
+import 'package:emotion_tracker/models/profile.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:emotion_tracker/providers/user_agent_util.dart';
@@ -737,6 +738,31 @@ class AuthNotifier extends StateNotifier<AuthState> {
     } catch (e) {
       return false;
     }
+  }
+
+  Future<void> setFromProfile(Profile profile) async {
+    // Write profile data to legacy secure storage keys for compatibility
+    final storage = _secureStorage;
+    await storage.write(key: 'access_token', value: profile.accessToken ?? '');
+    await storage.write(key: 'token_type', value: 'Bearer'); // Assume Bearer
+    await storage.write(key: 'user_email', value: profile.email ?? '');
+    // Use displayName as username if no separate username field
+    await storage.write(key: 'user_username', value: profile.displayName);
+
+    // Write to SharedPreferences for expiry
+    if (profile.expiresAtMs != null) {
+      final expiresAt = DateTime.fromMillisecondsSinceEpoch(
+        profile.expiresAtMs!,
+      );
+      await _prefs.setString('expires_at', expiresAt.toIso8601String());
+    }
+
+    // Update state
+    state = state.copyWith(
+      isLoggedIn: true,
+      userEmail: profile.email ?? profile.displayName,
+      accessToken: profile.accessToken,
+    );
   }
 }
 

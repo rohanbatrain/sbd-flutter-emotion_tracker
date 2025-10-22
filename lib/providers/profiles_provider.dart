@@ -102,17 +102,62 @@ class ProfilesNotifier extends StateNotifier<ProfilesState> {
           .read(secureStorageProvider)
           .write(key: 'current_profile_id', value: found.id);
     } catch (_) {}
+
+    // Write legacy keys and update AuthNotifier for compatibility
+    try {
+      await _ref.read(authProvider.notifier).setFromProfile(found);
+    } catch (_) {}
   }
 
   Future<void> addProfile(Profile profile) async {
-    final list = [...state.profiles, profile];
-    state = state.copyWith(profiles: list);
-    // Persist minimal info (not fully implemented)
+    // If a profile with same id or email already exists, update it instead
     try {
+      final existingIndex = state.profiles.indexWhere(
+        (p) =>
+            p.id == profile.id || (p.email != null && p.email == profile.email),
+      );
+      final newList = [...state.profiles];
+      if (existingIndex >= 0) {
+        newList[existingIndex] = profile;
+      } else {
+        newList.add(profile);
+      }
+
+      // Update in-memory state (do not change current selection here)
+      state = state.copyWith(profiles: newList);
+
+      // Persist profiles list but do NOT modify current_profile_id (adding a profile shouldn't switch the active session)
       final storage = _ref.read(secureStorageProvider);
-      final jsonList = jsonEncode(list.map((p) => p.toJson()).toList());
+      final jsonList = jsonEncode(newList.map((p) => p.toJson()).toList());
       await storage.write(key: 'profiles_list_secure', value: jsonList);
-      await storage.write(key: 'current_profile_id', value: profile.id);
+    } catch (_) {}
+  }
+
+  /// Remove a profile by id. If the removed profile was the current one, switch
+  /// to the first available profile (if any) and persist changes.
+  Future<void> removeProfile(String profileId) async {
+    try {
+      final updated = state.profiles.where((p) => p.id != profileId).toList();
+      Profile? newCurrent = state.current;
+      if (state.current?.id == profileId) {
+        newCurrent = updated.isNotEmpty ? updated.first : null;
+      }
+      state = state.copyWith(profiles: updated, current: newCurrent);
+
+      final storage = _ref.read(secureStorageProvider);
+      await storage.write(
+        key: 'profiles_list_secure',
+        value: jsonEncode(updated.map((p) => p.toJson()).toList()),
+      );
+      if (newCurrent != null) {
+        await storage.write(key: 'current_profile_id', value: newCurrent.id);
+        // Also update legacy keys and AuthNotifier
+        try {
+          await _ref.read(authProvider.notifier).setFromProfile(newCurrent);
+        } catch (_) {}
+      } else {
+        await storage.delete(key: 'current_profile_id');
+      }
     } catch (_) {}
   }
 

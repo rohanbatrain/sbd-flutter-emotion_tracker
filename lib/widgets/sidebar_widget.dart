@@ -24,6 +24,11 @@ class SidebarWidget extends ConsumerStatefulWidget {
 class _SidebarWidgetState extends ConsumerState<SidebarWidget> {
   static const String sidebarBannerAdId = 'sidebar_banner';
   AdNotifier? _adNotifier;
+  // Local banner ad to avoid reusing a shared BannerAd instance across multiple
+  // places in the widget tree which causes "This AdWidget is already in the
+  // Widget tree" runtime exceptions. Each Sidebar gets its own BannerAd.
+  BannerAd? _localBannerAd;
+  bool _localBannerAdReady = false;
 
   @override
   void initState() {
@@ -33,6 +38,33 @@ class _SidebarWidgetState extends ConsumerState<SidebarWidget> {
       if (mounted && defaultTargetPlatform != TargetPlatform.linux) {
         _adNotifier = ref.read(adProvider.notifier);
         _adNotifier?.loadBannerAd(sidebarBannerAdId);
+        // Create a local BannerAd for the sidebar to avoid sharing the same
+        // BannerAd instance from the provider (which may be displayed in
+        // multiple places). This local ad is independent and will be
+        // disposed with this widget.
+        try {
+          _localBannerAd = BannerAd(
+            adUnitId: AdUnitIds.bannerAdUnitId,
+            request: const AdRequest(),
+            size: AdSize.banner,
+            listener: BannerAdListener(
+              onAdLoaded: (ad) {
+                if (!mounted) return;
+                setState(() {
+                  _localBannerAdReady = true;
+                });
+              },
+              onAdFailedToLoad: (ad, error) {
+                ad.dispose();
+                if (!mounted) return;
+                setState(() {
+                  _localBannerAdReady = false;
+                });
+              },
+            ),
+          );
+          _localBannerAd?.load();
+        } catch (_) {}
       }
     });
   }
@@ -42,6 +74,10 @@ class _SidebarWidgetState extends ConsumerState<SidebarWidget> {
     // Only dispose ads if not running on Linux
     if (defaultTargetPlatform != TargetPlatform.linux) {
       _adNotifier?.disposeBannerAd(sidebarBannerAdId);
+      // Dispose local ad if present
+      try {
+        _localBannerAd?.dispose();
+      } catch (_) {}
     }
     super.dispose();
   }
@@ -51,13 +87,11 @@ class _SidebarWidgetState extends ConsumerState<SidebarWidget> {
     final theme = ref.watch(currentThemeProvider);
     final isLinux = defaultTargetPlatform == TargetPlatform.linux;
 
-    // Conditionally watch ad-related providers
-    final bannerAd = !isLinux
-        ? ref.watch(bannerAdProvider(sidebarBannerAdId))
-        : null;
-    final isBannerAdReady = !isLinux
-        ? ref.watch(adProvider.notifier).isBannerAdReady(sidebarBannerAdId)
-        : false;
+    // We use a local BannerAd for the sidebar to avoid sharing a BannerAd
+    // instance across multiple AdWidgets. Fall back to provider state for
+    // non-local usages if needed.
+    final bannerAd = _localBannerAd;
+    final isBannerAdReady = !isLinux ? _localBannerAdReady : false;
 
     return SafeArea(
       child: Container(

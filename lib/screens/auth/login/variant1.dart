@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:emotion_tracker/providers/theme_provider.dart';
 import 'package:emotion_tracker/providers/app_providers.dart';
+import 'package:emotion_tracker/providers/profiles_provider.dart';
+import 'package:emotion_tracker/models/profile.dart';
 import 'package:emotion_tracker/screens/auth/server-settings/variant1.dart';
 import 'package:emotion_tracker/providers/secure_storage_provider.dart';
 
@@ -41,6 +43,9 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1>
   // Remember Me State
   bool _rememberMe = false;
 
+  // Add-profile flow detection
+  bool _isAddProfileFlow = false;
+
   @override
   void initState() {
     super.initState();
@@ -76,6 +81,17 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1>
             curve: Curves.easeOut,
           ),
         );
+
+    // Check if this is an add-profile flow
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final args =
+          ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+      if (args != null && args['from'] == 'add_profile') {
+        setState(() {
+          _isAddProfileFlow = true;
+        });
+      }
+    });
 
     // Show connectivity issue from splash screen if present
     if (widget.connectivityIssue != null) {
@@ -172,7 +188,9 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1>
                     Padding(
                       padding: const EdgeInsets.only(bottom: 12.0),
                       child: Text(
-                        'Please login with your Second Brain Database \n username or email.',
+                        _isAddProfileFlow
+                            ? 'Add a new account to Emotion Tracker.\nPlease login with your Second Brain Database credentials.'
+                            : 'Please login with your Second Brain Database \n username or email.',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.textTheme.bodySmall?.color?.withOpacity(
                             0.7,
@@ -323,7 +341,7 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1>
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Text(
-                              'Login',
+                              _isAddProfileFlow ? 'Add Account' : 'Login',
                               style: theme.textTheme.titleMedium?.copyWith(
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold,
@@ -331,7 +349,13 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1>
                               ),
                             ),
                             const SizedBox(width: 8),
-                            Icon(Icons.login, color: Colors.white, size: 20),
+                            Icon(
+                              _isAddProfileFlow
+                                  ? Icons.person_add
+                                  : Icons.login,
+                              color: Colors.white,
+                              size: 20,
+                            ),
                           ],
                         ),
                       ),
@@ -612,7 +636,37 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1>
     final twoFaCode = _2faCodeController.text.trim();
 
     try {
-      final authNotifier = ref.read(authProvider.notifier);
+      final profilesNotifier = ref.read(profilesProvider.notifier);
+
+      // If we're running the add-profile flow, use the specialized helper
+      // which logs in to capture tokens and then restores the previous
+      // active session so the current user isn't replaced.
+      if (_isAddProfileFlow) {
+        try {
+          final profile = await profilesNotifier.addProfileViaLogin(
+            userInput,
+            password,
+            twoFaCode: _is2faRequired ? twoFaCode : null,
+            twoFaMethod: _is2faRequired ? _selected2faMethod : null,
+          );
+          if (mounted) {
+            Navigator.of(context).pop();
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Profile "${profile.displayName}" added successfully!',
+                ),
+                backgroundColor: Theme.of(context).colorScheme.secondary,
+              ),
+            );
+          }
+          return;
+        } catch (e) {
+          // Let the outer catch handle user-visible errors
+          rethrow;
+        }
+      }
+
       final result = await loginWithApi(
         ref,
         userInput,
@@ -621,24 +675,141 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1>
         twoFaMethod: _is2faRequired ? _selected2faMethod : null,
       );
 
-      await authNotifier.login(userInput);
+      // Handle multi-account: create or update profile
+      final currentProfiles = ref.read(profilesProvider);
 
-      // Save credentials if Remember Me is checked
-      await _saveCredentials();
+      // Build profile from login result
+      final access = result['access_token'] as String?;
+      final refresh = result['refresh_token'] as String?;
+      final expiresAtStr = result['expires_at'] ?? result['expiresAt'];
+      int? expiresAtMs;
+      if (expiresAtStr != null) {
+        try {
+          final dt = DateTime.parse(expiresAtStr.toString());
+          expiresAtMs = dt.millisecondsSinceEpoch;
+        } catch (_) {
+          expiresAtMs = int.tryParse(expiresAtStr.toString());
+        }
+      }
+      final display = result['username'] ?? result['email'] ?? userInput;
+      final email = result['email'] as String?;
 
-      // Ensure all storage operations are complete before continuing
-      await Future.delayed(const Duration(milliseconds: 50));
+      // Check if profile already exists (by email or display name)
+      Profile? existingProfile;
+      if (email != null) {
+        existingProfile = currentProfiles.profiles.cast<Profile?>().firstWhere(
+          (p) => p?.email == email,
+          orElse: () => null,
+        );
+      }
+      if (existingProfile == null) {
+        existingProfile = currentProfiles.profiles.cast<Profile?>().firstWhere(
+          (p) => p?.displayName == display,
+          orElse: () => null,
+        );
+      }
 
-      if (mounted) {
-        final secureStorage = ref.read(secureStorageProvider);
-        // Check for special email not verified error (login failed due to unverified email)
-        if (result['error'] == 'email_not_verified') {
-          // Even with email not verified, check if encryption is also required
+      Profile profile;
+      if (existingProfile != null) {
+        // Update existing profile with new tokens
+        profile = existingProfile.copyWith(
+          accessToken: access,
+          refreshToken: refresh,
+          expiresAtMs: expiresAtMs,
+          lastRefreshMs: DateTime.now().millisecondsSinceEpoch,
+        );
+        // Update in profiles state by re-adding (assuming addProfile handles updates)
+        profilesNotifier.addProfile(profile);
+      } else {
+        // Create new profile
+        final id = 'profile_${DateTime.now().millisecondsSinceEpoch}';
+        profile = Profile(
+          id: id,
+          displayName: display.toString(),
+          email: email,
+          accessToken: access,
+          refreshToken: refresh,
+          expiresAtMs: expiresAtMs,
+          lastRefreshMs: DateTime.now().millisecondsSinceEpoch,
+        );
+        profilesNotifier.addProfile(profile);
+      }
+
+      // Handle add-profile flow vs normal login
+      if (_isAddProfileFlow) {
+        // For add-profile flow, add the profile without switching to it
+        profilesNotifier.addProfile(profile);
+
+        // Navigate back to profile switcher
+        if (mounted) {
+          Navigator.of(context).pop(); // Go back to profile switcher
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Profile "${profile.displayName}" added successfully!',
+              ),
+              backgroundColor: Theme.of(context).colorScheme.secondary,
+            ),
+          );
+        }
+      } else {
+        // Normal login flow: set as current profile
+        await profilesNotifier.switchTo(profile.id);
+
+        // Save credentials if Remember Me is checked
+        await _saveCredentials();
+
+        // Ensure all storage operations are complete before continuing
+        await Future.delayed(const Duration(milliseconds: 50));
+
+        if (mounted) {
+          final secureStorage = ref.read(secureStorageProvider);
+          // Check for special email not verified error (login failed due to unverified email)
+          if (result['error'] == 'email_not_verified') {
+            // Even with email not verified, check if encryption is also required
+            final needsEncryption =
+                result['client_side_encryption'] == true ||
+                result['client_side_encryption'] == 'true';
+
+            if (needsEncryption) {
+              // Check if we already have an encryption key
+              final existingKey = await secureStorage.read(
+                key: 'client_side_encryption_key',
+              );
+              if (existingKey != null && existingKey.isNotEmpty) {
+                // Key exists, go directly to verification
+                Navigator.of(context).pushReplacementNamed(
+                  '/verify-email/v1',
+                  arguments: {'finalScreen': '/home/v1'},
+                );
+              } else {
+                // No key, need to set up encryption first, then verification
+                Navigator.of(context).pushReplacementNamed(
+                  '/client-side-encryption/v1',
+                  arguments: {
+                    'nextScreen': '/verify-email/v1',
+                    'finalScreen': '/home/v1',
+                  },
+                );
+              }
+            } else {
+              // Only verification required
+              Navigator.of(context).pushReplacementNamed(
+                '/verify-email/v1',
+                arguments: {'finalScreen': '/home/v1'},
+              );
+            }
+            return;
+          }
+
+          // Login was successful, now check what additional steps are needed
           final needsEncryption =
               result['client_side_encryption'] == true ||
               result['client_side_encryption'] == 'true';
+          final isVerified =
+              result['is_verified'] == true || result['is_verified'] == 'true';
 
-          if (needsEncryption) {
+          if (needsEncryption && !isVerified) {
             // Check if we already have an encryption key
             final existingKey = await secureStorage.read(
               key: 'client_side_encryption_key',
@@ -659,79 +830,42 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1>
                 },
               );
             }
-          } else {
-            // Only verification required
+            return;
+          } else if (needsEncryption && isVerified) {
+            // Check if we already have an encryption key
+            final existingKey = await secureStorage.read(
+              key: 'client_side_encryption_key',
+            );
+            if (existingKey != null && existingKey.isNotEmpty) {
+              // Key exists and verified, go directly to home
+              Navigator.of(context).pushReplacementNamed('/home/v1');
+            } else {
+              // No key, need to set up encryption
+              Navigator.of(context).pushReplacementNamed(
+                '/client-side-encryption/v1',
+                arguments: {'finalScreen': '/home/v1'},
+              );
+            }
+            return;
+          } else if (!isVerified) {
+            // Only verification required (no encryption needed)
+            // This should only happen if login succeeded but server indicates email not verified
             Navigator.of(context).pushReplacementNamed(
               '/verify-email/v1',
               arguments: {'finalScreen': '/home/v1'},
             );
+            return;
           }
-          return;
+
+          // Neither required, go directly to home
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Login successful!'),
+              backgroundColor: Theme.of(context).colorScheme.secondary,
+            ),
+          );
+          Navigator.of(context).pushReplacementNamed('/home/v1');
         }
-
-        // Login was successful, now check what additional steps are needed
-        final needsEncryption =
-            result['client_side_encryption'] == true ||
-            result['client_side_encryption'] == 'true';
-        final isVerified =
-            result['is_verified'] == true || result['is_verified'] == 'true';
-
-        if (needsEncryption && !isVerified) {
-          // Check if we already have an encryption key
-          final existingKey = await secureStorage.read(
-            key: 'client_side_encryption_key',
-          );
-          if (existingKey != null && existingKey.isNotEmpty) {
-            // Key exists, go directly to verification
-            Navigator.of(context).pushReplacementNamed(
-              '/verify-email/v1',
-              arguments: {'finalScreen': '/home/v1'},
-            );
-          } else {
-            // No key, need to set up encryption first, then verification
-            Navigator.of(context).pushReplacementNamed(
-              '/client-side-encryption/v1',
-              arguments: {
-                'nextScreen': '/verify-email/v1',
-                'finalScreen': '/home/v1',
-              },
-            );
-          }
-          return;
-        } else if (needsEncryption && isVerified) {
-          // Check if we already have an encryption key
-          final existingKey = await secureStorage.read(
-            key: 'client_side_encryption_key',
-          );
-          if (existingKey != null && existingKey.isNotEmpty) {
-            // Key exists and verified, go directly to home
-            Navigator.of(context).pushReplacementNamed('/home/v1');
-          } else {
-            // No key, need to set up encryption
-            Navigator.of(context).pushReplacementNamed(
-              '/client-side-encryption/v1',
-              arguments: {'finalScreen': '/home/v1'},
-            );
-          }
-          return;
-        } else if (!isVerified) {
-          // Only verification required (no encryption needed)
-          // This should only happen if login succeeded but server indicates email not verified
-          Navigator.of(context).pushReplacementNamed(
-            '/verify-email/v1',
-            arguments: {'finalScreen': '/home/v1'},
-          );
-          return;
-        }
-
-        // Neither required, go directly to home
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Login successful!'),
-            backgroundColor: Theme.of(context).colorScheme.secondary,
-          ),
-        );
-        Navigator.of(context).pushReplacementNamed('/home/v1');
       }
     } catch (e) {
       if (mounted) {
