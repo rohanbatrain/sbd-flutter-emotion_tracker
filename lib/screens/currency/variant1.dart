@@ -160,7 +160,10 @@ class _CurrencyScreenV1State extends ConsumerState<CurrencyScreenV1>
         _errorState = errorState;
       });
       if (e is UnauthorizedException) {
-        SessionManager.redirectToLogin(context, message: 'Session expired. Please log in again.');
+        SessionManager.redirectToLogin(
+          context,
+          message: 'Session expired. Please log in again.',
+        );
       }
     }
   }
@@ -194,7 +197,10 @@ class _CurrencyScreenV1State extends ConsumerState<CurrencyScreenV1>
             const SizedBox(height: 8),
             Text(errorState.message),
             const SizedBox(height: 16),
-            const Text('Troubleshooting steps:', style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text(
+              'Troubleshooting steps:',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 8),
             Text(_getTroubleshootingSteps(errorState.type)),
           ],
@@ -288,24 +294,23 @@ class _CurrencyScreenV1State extends ConsumerState<CurrencyScreenV1>
     final theme = ref.read(currentThemeProvider);
     showDialog(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            backgroundColor: theme.cardColor,
-            title: Text('Ad Not Ready', style: theme.textTheme.titleLarge),
-            content: Text(
-              'The ad is still loading. Please try again in a moment.',
-              style: theme.textTheme.bodyMedium,
-            ),
-            actions: [
-              TextButton(
-                onPressed: () async {
-                  Navigator.of(context).pop();
-                  await _adNotifier?.loadRewardedAd(ref: ref);
-                },
-                child: Text('OK', style: TextStyle(color: theme.primaryColor)),
-              ),
-            ],
+      builder: (context) => AlertDialog(
+        backgroundColor: theme.cardColor,
+        title: Text('Ad Not Ready', style: theme.textTheme.titleLarge),
+        content: Text(
+          'The ad is still loading. Please try again in a moment.',
+          style: theme.textTheme.bodyMedium,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              Navigator.of(context).pop();
+              await _adNotifier?.loadRewardedAd(ref: ref);
+            },
+            child: Text('OK', style: TextStyle(color: theme.primaryColor)),
           ),
+        ],
+      ),
     );
   }
 
@@ -313,80 +318,77 @@ class _CurrencyScreenV1State extends ConsumerState<CurrencyScreenV1>
     final theme = ref.read(currentThemeProvider);
     showDialog(
       context: context,
-      builder:
-          (context) => Dialog(
-            backgroundColor: theme.cardColor,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'Wallet QR Code',
-                    style: theme.textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: theme.primaryColor,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: theme.scaffoldBackgroundColor,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: theme.shadowColor.withOpacity(0.08),
-                          blurRadius: 12,
-                          offset: Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    padding: const EdgeInsets.all(16),
-                    child: QrImageView(
-                      data: username,
-                      version: QrVersions.auto,
-                      size: 200,
-                      backgroundColor: Colors.white,
-                      foregroundColor: Colors.black,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    username,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Scan this QR to receive tokens to your wallet username.',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.hintColor,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 20),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: theme.primaryColor,
-                        foregroundColor: theme.colorScheme.onPrimary,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: Text('Close'),
-                    ),
-                  ),
-                ],
+      builder: (context) => Dialog(
+        backgroundColor: theme.cardColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Wallet QR Code',
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: theme.primaryColor,
+                ),
               ),
-            ),
+              const SizedBox(height: 20),
+              Container(
+                decoration: BoxDecoration(
+                  color: theme.scaffoldBackgroundColor,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: theme.shadowColor.withOpacity(0.08),
+                      blurRadius: 12,
+                      offset: Offset(0, 4),
+                    ),
+                  ],
+                ),
+                padding: const EdgeInsets.all(16),
+                child: QrImageView(
+                  data: username,
+                  version: QrVersions.auto,
+                  size: 200,
+                  backgroundColor: Colors.white,
+                  foregroundColor: Colors.black,
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                username,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Scan this QR to receive tokens to your wallet username.',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.hintColor,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: theme.primaryColor,
+                    foregroundColor: theme.colorScheme.onPrimary,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Text('Close'),
+                ),
+              ),
+            ],
           ),
+        ),
+      ),
     );
   }
 
@@ -394,77 +396,72 @@ class _CurrencyScreenV1State extends ConsumerState<CurrencyScreenV1>
     final theme = ref.read(currentThemeProvider);
     showDialog(
       context: context,
-      builder:
-          (context) => Dialog(
-            backgroundColor: theme.cardColor,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: SizedBox(
-              width: 320,
-              height: 420,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Text(
-                      'Scan Wallet QR',
-                      style: theme.textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: theme.primaryColor,
-                      ),
-                    ),
+      builder: (context) => Dialog(
+        backgroundColor: theme.cardColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: SizedBox(
+          width: 320,
+          height: 420,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Text(
+                  'Scan Wallet QR',
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: theme.primaryColor,
                   ),
-                  Expanded(
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(16),
-                      child: MobileScanner(
-                        controller: MobileScannerController(
-                          formats: [BarcodeFormat.qrCode],
-                        ),
-                        fit: BoxFit.cover,
-                        onDetect: (capture) {
-                          final barcode = capture.barcodes.first;
-                          final String? code = barcode.rawValue;
-                          if (code != null &&
-                              code.length <= 50 &&
-                              RegExp(
-                                r'^[a-zA-Z0-9._-]{1,50} **$',
-                              ).hasMatch(code)) {
-                            Navigator.of(context).pop();
-                            _recipientController.text = code;
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Username scanned: ' + code),
-                              ),
-                            );
-                          }
-                        },
-                      ),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: theme.primaryColor,
-                          foregroundColor: theme.colorScheme.onPrimary,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: Text('Cancel'),
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
-            ),
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: MobileScanner(
+                    controller: MobileScannerController(
+                      formats: [BarcodeFormat.qrCode],
+                    ),
+                    fit: BoxFit.cover,
+                    onDetect: (capture) {
+                      final barcode = capture.barcodes.first;
+                      final String? code = barcode.rawValue;
+                      if (code != null &&
+                          code.length <= 50 &&
+                          RegExp(
+                            r'^[a-zA-Z0-9._-]{1,50} **$',
+                          ).hasMatch(code)) {
+                        Navigator.of(context).pop();
+                        _recipientController.text = code;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Username scanned: ' + code)),
+                        );
+                      }
+                    },
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: theme.primaryColor,
+                      foregroundColor: theme.colorScheme.onPrimary,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: Text('Cancel'),
+                  ),
+                ),
+              ),
+            ],
           ),
+        ),
+      ),
     );
   }
 
@@ -491,7 +488,9 @@ class _CurrencyScreenV1State extends ConsumerState<CurrencyScreenV1>
             ),
           if (sbdState.isLoading && _errorState == null)
             const LoadingStateWidget(message: 'Loading your wallet...'),
-          if (_errorState == null && !sbdState.isLoading && sbdState.error == null)
+          if (_errorState == null &&
+              !sbdState.isLoading &&
+              sbdState.error == null)
             SingleChildScrollView(
               child: Padding(
                 padding: EdgeInsets.fromLTRB(
@@ -663,222 +662,204 @@ class _CurrencyScreenV1State extends ConsumerState<CurrencyScreenV1>
                       children: [
                         Expanded(
                           child: ElevatedButton(
-                            onPressed:
-                                _isSending
-                                    ? null
-                                    : () async {
-                                      final toUser =
-                                          _recipientController.text.trim();
-                                      final amountText =
-                                          _amountController.text.trim();
-                                      if (toUser.isEmpty ||
-                                          amountText.isEmpty) {
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                              'Please enter a recipient and amount.',
-                                            ),
+                            onPressed: _isSending
+                                ? null
+                                : () async {
+                                    final toUser = _recipientController.text
+                                        .trim();
+                                    final amountText = _amountController.text
+                                        .trim();
+                                    if (toUser.isEmpty || amountText.isEmpty) {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            'Please enter a recipient and amount.',
                                           ),
-                                        );
-                                        return;
-                                      }
-                                      final amount = int.tryParse(amountText);
-                                      if (amount == null || amount <= 0) {
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                              'Please enter a valid amount greater than 0.',
-                                            ),
+                                        ),
+                                      );
+                                      return;
+                                    }
+                                    final amount = int.tryParse(amountText);
+                                    if (amount == null || amount <= 0) {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            'Please enter a valid amount greater than 0.',
                                           ),
-                                        );
-                                        return;
-                                      }
-                                      if (sbdState.balance != null &&
-                                          amount > (sbdState.balance ?? 0)) {
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                              'You cannot send more than your available balance.',
-                                            ),
+                                        ),
+                                      );
+                                      return;
+                                    }
+                                    if (sbdState.balance != null &&
+                                        amount > (sbdState.balance ?? 0)) {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            'You cannot send more than your available balance.',
                                           ),
-                                        );
-                                        return;
-                                      }
-                                      final didAuth =
-                                          await _authenticateForSend();
-                                      if (!didAuth) {
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                              'Authentication failed. Cannot send tokens.',
-                                            ),
+                                        ),
+                                      );
+                                      return;
+                                    }
+                                    final didAuth =
+                                        await _authenticateForSend();
+                                    if (!didAuth) {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            'Authentication failed. Cannot send tokens.',
                                           ),
+                                        ),
+                                      );
+                                      return;
+                                    }
+                                    setState(() => _isSending = true);
+                                    final success = await ref
+                                        .read(sbdTokensProvider.notifier)
+                                        .sendTokens(
+                                          toUser: toUser,
+                                          amount: amount,
                                         );
-                                        return;
-                                      }
-                                      setState(() => _isSending = true);
-                                      final success = await ref
-                                          .read(sbdTokensProvider.notifier)
-                                          .sendTokens(
-                                            toUser: toUser,
-                                            amount: amount,
-                                          );
-                                      setState(() => _isSending = false);
-                                      if (success) {
-                                        _amountController.clear();
-                                        _recipientController.clear();
-                                        if (!mounted) return;
-                                        await showDialog(
-                                          context: context,
-                                          barrierDismissible: false,
-                                          builder: (context) {
-                                            final theme = Theme.of(context);
-                                            return Dialog(
-                                              backgroundColor:
-                                                  Colors.transparent,
-                                              insetPadding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 24,
-                                                    vertical: 24,
-                                                  ),
-                                              child: Center(
-                                                child: Container(
-                                                  margin: const EdgeInsets.all(
-                                                    0,
-                                                  ),
-                                                  padding:
-                                                      const EdgeInsets.symmetric(
-                                                        vertical: 32,
-                                                        horizontal: 24,
+                                    setState(() => _isSending = false);
+                                    if (success) {
+                                      _amountController.clear();
+                                      _recipientController.clear();
+                                      if (!mounted) return;
+                                      await showDialog(
+                                        context: context,
+                                        barrierDismissible: false,
+                                        builder: (context) {
+                                          final theme = Theme.of(context);
+                                          return Dialog(
+                                            backgroundColor: Colors.transparent,
+                                            insetPadding:
+                                                const EdgeInsets.symmetric(
+                                                  horizontal: 24,
+                                                  vertical: 24,
+                                                ),
+                                            child: Center(
+                                              child: Container(
+                                                margin: const EdgeInsets.all(0),
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      vertical: 32,
+                                                      horizontal: 24,
+                                                    ),
+                                                decoration: BoxDecoration(
+                                                  color: theme.cardColor,
+                                                  borderRadius:
+                                                      BorderRadius.circular(24),
+                                                  boxShadow: [
+                                                    BoxShadow(
+                                                      color: theme.shadowColor
+                                                          .withOpacity(0.08),
+                                                      blurRadius: 16,
+                                                      offset: const Offset(
+                                                        0,
+                                                        4,
                                                       ),
-                                                  decoration: BoxDecoration(
-                                                    color: theme.cardColor,
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                          24,
-                                                        ),
-                                                    boxShadow: [
-                                                      BoxShadow(
-                                                        color: theme.shadowColor
-                                                            .withOpacity(0.08),
-                                                        blurRadius: 16,
-                                                        offset: const Offset(
-                                                          0,
-                                                          4,
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                  child: Column(
-                                                    mainAxisSize:
-                                                        MainAxisSize.min,
-                                                    mainAxisAlignment:
-                                                        MainAxisAlignment
-                                                            .center,
-                                                    children: [
-                                                      Icon(
-                                                        Icons.check_circle,
-                                                        color:
-                                                            theme.primaryColor,
-                                                        size: 48,
-                                                      ),
-                                                      const SizedBox(
-                                                        height: 18,
-                                                      ),
-                                                      Text(
-                                                        'Sent!',
-                                                        style: theme
-                                                            .textTheme
-                                                            .headlineSmall
-                                                            ?.copyWith(
-                                                              fontWeight:
-                                                                  FontWeight
-                                                                      .bold,
-                                                            ),
-                                                      ),
-                                                      const SizedBox(
-                                                        height: 10,
-                                                      ),
-                                                      Text(
-                                                        'You sent $amount SBD to $toUser.',
-                                                        textAlign:
-                                                            TextAlign.center,
-                                                        style:
-                                                            theme
-                                                                .textTheme
-                                                                .bodyLarge,
-                                                      ),
-                                                      const SizedBox(
-                                                        height: 28,
-                                                      ),
-                                                      SizedBox(
-                                                        width: double.infinity,
-                                                        child: ElevatedButton(
-                                                          style: ElevatedButton.styleFrom(
-                                                            backgroundColor:
-                                                                theme
-                                                                    .primaryColor,
-                                                            foregroundColor:
-                                                                theme
-                                                                    .colorScheme
-                                                                    .onPrimary,
-                                                            padding:
-                                                                const EdgeInsets.symmetric(
-                                                                  vertical: 16,
+                                                    ),
+                                                  ],
+                                                ),
+                                                child: Column(
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
+                                                  mainAxisAlignment:
+                                                      MainAxisAlignment.center,
+                                                  children: [
+                                                    Icon(
+                                                      Icons.check_circle,
+                                                      color: theme.primaryColor,
+                                                      size: 48,
+                                                    ),
+                                                    const SizedBox(height: 18),
+                                                    Text(
+                                                      'Sent!',
+                                                      style: theme
+                                                          .textTheme
+                                                          .headlineSmall
+                                                          ?.copyWith(
+                                                            fontWeight:
+                                                                FontWeight.bold,
+                                                          ),
+                                                    ),
+                                                    const SizedBox(height: 10),
+                                                    Text(
+                                                      'You sent $amount SBD to $toUser.',
+                                                      textAlign:
+                                                          TextAlign.center,
+                                                      style: theme
+                                                          .textTheme
+                                                          .bodyLarge,
+                                                    ),
+                                                    const SizedBox(height: 28),
+                                                    SizedBox(
+                                                      width: double.infinity,
+                                                      child: ElevatedButton(
+                                                        style: ElevatedButton.styleFrom(
+                                                          backgroundColor: theme
+                                                              .primaryColor,
+                                                          foregroundColor: theme
+                                                              .colorScheme
+                                                              .onPrimary,
+                                                          padding:
+                                                              const EdgeInsets.symmetric(
+                                                                vertical: 16,
+                                                              ),
+                                                          shape: RoundedRectangleBorder(
+                                                            borderRadius:
+                                                                BorderRadius.circular(
+                                                                  14,
                                                                 ),
-                                                            shape: RoundedRectangleBorder(
-                                                              borderRadius:
-                                                                  BorderRadius.circular(
-                                                                    14,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                          onPressed: () {
-                                                            Navigator.of(
-                                                              context,
-                                                            ).pop(); // Just close dialog, no loading
-                                                          },
-                                                          child: const Text(
-                                                            'Go to Wallet',
                                                           ),
                                                         ),
+                                                        onPressed: () {
+                                                          Navigator.of(
+                                                            context,
+                                                          ).pop(); // Just close dialog, no loading
+                                                        },
+                                                        child: const Text(
+                                                          'Go to Wallet',
+                                                        ),
                                                       ),
-                                                    ],
-                                                  ),
+                                                    ),
+                                                  ],
                                                 ),
                                               ),
-                                            );
-                                          },
-                                        );
-                                        // After dialog closes, refresh balance and transactions (no loading spinner)
-                                        await ref
-                                            .read(sbdTokensProvider.notifier)
-                                            .fetchBalance();
-                                        await ref
-                                            .read(sbdTokensProvider.notifier)
-                                            .fetchTransactions();
-                                      } else {
-                                        final err =
-                                            ref.read(sbdTokensProvider).error;
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                              'Failed: ${err ?? 'Unknown error'}',
                                             ),
+                                          );
+                                        },
+                                      );
+                                      // After dialog closes, refresh balance and transactions (no loading spinner)
+                                      await ref
+                                          .read(sbdTokensProvider.notifier)
+                                          .fetchBalance();
+                                      await ref
+                                          .read(sbdTokensProvider.notifier)
+                                          .fetchTransactions();
+                                    } else {
+                                      final err = ref
+                                          .read(sbdTokensProvider)
+                                          .error;
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            'Failed: ${err ?? 'Unknown error'}',
                                           ),
-                                        );
-                                      }
-                                    },
+                                        ),
+                                      );
+                                    }
+                                  },
                             style: ElevatedButton.styleFrom(
                               padding: const EdgeInsets.symmetric(vertical: 16),
                               backgroundColor: theme.primaryColor,
@@ -887,26 +868,23 @@ class _CurrencyScreenV1State extends ConsumerState<CurrencyScreenV1>
                                 borderRadius: BorderRadius.circular(12),
                               ),
                             ),
-                            child:
-                                _isSending
-                                    ? SizedBox(
-                                      width: 22,
-                                      height: 22,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2.5,
-                                        valueColor:
-                                            AlwaysStoppedAnimation<Color>(
-                                              theme.colorScheme.onPrimary,
-                                            ),
+                            child: _isSending
+                                ? SizedBox(
+                                    width: 22,
+                                    height: 22,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2.5,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        theme.colorScheme.onPrimary,
                                       ),
-                                    )
-                                    : Text(
-                                      'Send',
-                                      style: theme.textTheme.labelLarge
-                                          ?.copyWith(
-                                            color: theme.colorScheme.onPrimary,
-                                          ),
                                     ),
+                                  )
+                                : Text(
+                                    'Send',
+                                    style: theme.textTheme.labelLarge?.copyWith(
+                                      color: theme.colorScheme.onPrimary,
+                                    ),
+                                  ),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -1167,26 +1145,24 @@ class _CurrencyScreenV1State extends ConsumerState<CurrencyScreenV1>
                           onTap: () async {
                             await showDialog(
                               context: context,
-                              builder:
-                                  (context) => TransactionDetailsDialog(
-                                    tx: tx,
-                                    theme: theme,
-                                    onNoteSaved: (note) async {
-                                      setState(() {
-                                        tx['note'] = note;
-                                      });
-                                      if (tx['transaction_id'] != null &&
-                                          note.isNotEmpty) {
-                                        await ref
-                                            .read(sbdTokensProvider.notifier)
-                                            .updateTransactionNote(
-                                              transactionId:
-                                                  tx['transaction_id'],
-                                              note: note,
-                                            );
-                                      }
-                                    },
-                                  ),
+                              builder: (context) => TransactionDetailsDialog(
+                                tx: tx,
+                                theme: theme,
+                                onNoteSaved: (note) async {
+                                  setState(() {
+                                    tx['note'] = note;
+                                  });
+                                  if (tx['transaction_id'] != null &&
+                                      note.isNotEmpty) {
+                                    await ref
+                                        .read(sbdTokensProvider.notifier)
+                                        .updateTransactionNote(
+                                          transactionId: tx['transaction_id'],
+                                          note: note,
+                                        );
+                                  }
+                                },
+                              ),
                             );
                           },
                         );
@@ -1403,9 +1379,8 @@ class TransactionDetailsDialogState
     final tzString = ref.watch(timezoneProvider);
     final formattedTimestamp = formatTransactionTimestamp(timestamp, tzString);
     return Dialog(
-      backgroundColor:
-          Colors
-              .transparent, // Make dialog background transparent for card effect
+      backgroundColor: Colors
+          .transparent, // Make dialog background transparent for card effect
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       child: Center(
         child: Container(
@@ -1435,10 +1410,9 @@ class TransactionDetailsDialogState
                   children: [
                     Container(
                       decoration: BoxDecoration(
-                        color:
-                            isSend
-                                ? Colors.redAccent.withOpacity(0.12)
-                                : Colors.green.withOpacity(0.12),
+                        color: isSend
+                            ? Colors.redAccent.withOpacity(0.12)
+                            : Colors.green.withOpacity(0.12),
                         shape: BoxShape.circle,
                       ),
                       padding: const EdgeInsets.all(10),
@@ -1606,75 +1580,74 @@ class TransactionDetailsDialogState
                       const SizedBox(height: 4),
                       _isEditing
                           ? Column(
-                            children: [
-                              TextField(
-                                controller: _noteController,
-                                decoration: InputDecoration(
-                                  hintText: 'Add a note to this transaction',
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(8),
+                              children: [
+                                TextField(
+                                  controller: _noteController,
+                                  decoration: InputDecoration(
+                                    hintText: 'Add a note to this transaction',
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    isDense: true,
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      vertical: 10,
+                                      horizontal: 12,
+                                    ),
                                   ),
-                                  isDense: true,
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    vertical: 10,
-                                    horizontal: 12,
-                                  ),
+                                  maxLines: 2,
+                                  autofocus: true,
                                 ),
-                                maxLines: 2,
-                                autofocus: true,
-                              ),
-                              const SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: ElevatedButton(
-                                      onPressed: () {
-                                        widget.onNoteSaved(
-                                          _noteController.text.trim(),
-                                        );
-                                        setState(() {
-                                          _isEditing = false;
-                                          _originalNote =
-                                              _noteController.text.trim();
-                                        });
-                                        Navigator.of(context).pop();
-                                      },
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: theme.primaryColor,
-                                        foregroundColor:
-                                            theme.colorScheme.onPrimary,
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: ElevatedButton(
+                                        onPressed: () {
+                                          widget.onNoteSaved(
+                                            _noteController.text.trim(),
+                                          );
+                                          setState(() {
+                                            _isEditing = false;
+                                            _originalNote = _noteController.text
+                                                .trim();
+                                          });
+                                          Navigator.of(context).pop();
+                                        },
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: theme.primaryColor,
+                                          foregroundColor:
+                                              theme.colorScheme.onPrimary,
+                                        ),
+                                        child: const Text('Save'),
                                       ),
-                                      child: const Text('Save'),
                                     ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: OutlinedButton(
-                                      onPressed: () {
-                                        setState(() {
-                                          _noteController.text =
-                                              _originalNote ?? '';
-                                          _isEditing = false;
-                                        });
-                                      },
-                                      child: const Text('Cancel'),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: OutlinedButton(
+                                        onPressed: () {
+                                          setState(() {
+                                            _noteController.text =
+                                                _originalNote ?? '';
+                                            _isEditing = false;
+                                          });
+                                        },
+                                        child: const Text('Cancel'),
+                                      ),
                                     ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          )
+                                  ],
+                                ),
+                              ],
+                            )
                           : Text(
-                            (_originalNote?.isNotEmpty ?? false)
-                                ? _originalNote!
-                                : 'No note added.',
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color:
-                                  (_originalNote?.isNotEmpty ?? false)
-                                      ? theme.colorScheme.onSurface
-                                      : theme.hintColor,
+                              (_originalNote?.isNotEmpty ?? false)
+                                  ? _originalNote!
+                                  : 'No note added.',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: (_originalNote?.isNotEmpty ?? false)
+                                    ? theme.colorScheme.onSurface
+                                    : theme.hintColor,
+                              ),
                             ),
-                          ),
                     ],
                   ),
                 ),
