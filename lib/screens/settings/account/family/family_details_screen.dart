@@ -43,7 +43,7 @@ class _FamilyDetailsScreenState extends ConsumerState<FamilyDetailsScreen> {
       appBar: CustomAppBar(
         title: detailsState.family?.name ?? 'Family',
         showHamburger: false,
-        showCurrency: true,
+        showCurrency: false, // SBD token display disabled
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).pop(),
@@ -51,17 +51,43 @@ class _FamilyDetailsScreenState extends ConsumerState<FamilyDetailsScreen> {
         actions: [
           if (detailsState.family?.isAdmin == true)
             PopupMenuButton(
+              icon: Icon(Icons.more_vert),
               itemBuilder: (context) => [
                 PopupMenuItem(
                   child: Row(
                     children: [
                       Icon(Icons.delete, color: Colors.red, size: 20),
                       const SizedBox(width: 8),
-                      Text('Delete Family'),
+                      Text(
+                        'Delete Family',
+                        style: TextStyle(color: Colors.red),
+                      ),
                     ],
                   ),
-                  onTap: () =>
-                      _showDeleteFamilyDialog(detailsState.family!, theme),
+                  onTap: () => Future.delayed(
+                    Duration(milliseconds: 100),
+                    () => _showDeleteFamilyDialog(detailsState.family!, theme),
+                  ),
+                ),
+                PopupMenuItem(
+                  child: Row(
+                    children: [
+                      Icon(Icons.exit_to_app, color: Colors.orange, size: 20),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Leave Family',
+                        style: TextStyle(color: Colors.orange),
+                      ),
+                    ],
+                  ),
+                  onTap: () {
+                    // TODO: Implement leave family
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Leave family feature coming soon'),
+                      ),
+                    );
+                  },
                 ),
               ],
             ),
@@ -87,13 +113,11 @@ class _FamilyDetailsScreenState extends ConsumerState<FamilyDetailsScreen> {
                     .read(familyDetailsProvider(widget.familyId).notifier)
                     .loadFamilyDetails();
               },
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: detailsState.family == null
-                    ? Column(
+              child: detailsState.family == null
+                  ? Center(
+                      child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          SizedBox(height: 80),
                           Icon(
                             Icons.family_restroom,
                             size: 72,
@@ -135,53 +159,199 @@ class _FamilyDetailsScreenState extends ConsumerState<FamilyDetailsScreen> {
                             },
                             child: Text('Retry'),
                           ),
-                          SizedBox(height: 40),
-                        ],
-                      )
-                    : Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildFamilyHeader(detailsState.family!, theme),
-                          const SizedBox(height: 24),
-                          if (detailsState.sbdAccount != null) ...[
-                            _buildSBDAccountCard(
-                              detailsState.sbdAccount!,
-                              detailsState.family!,
-                              theme,
-                            ),
-                            const SizedBox(height: 16),
-                          ],
-                          _buildMembersCard(
-                            detailsState.members,
-                            detailsState.family!,
-                            theme,
-                          ),
-                          const SizedBox(height: 16),
-                          if (detailsState.family!.isAdmin) ...[
-                            _buildInvitationsCard(
-                              detailsState.invitations,
-                              theme,
-                            ),
-                            const SizedBox(height: 16),
-                          ],
-                          _buildTokenRequestsCard(detailsState.family!, theme),
-                          const SizedBox(height: 16),
-                          _buildNotificationsCard(theme),
-                          if (detailsState.family!.isAdmin) ...[
-                            const SizedBox(height: 16),
-                            _buildAdminActionsCard(theme),
-                          ],
                         ],
                       ),
-              ),
+                    )
+                  : ListView(
+                      padding: const EdgeInsets.all(16),
+                      children: [
+                        // Family Info Header Card
+                        _buildFamilyInfoCard(detailsState.family!, theme),
+                        const SizedBox(height: 24),
+
+                        // Family Management Section
+                        Padding(
+                          padding: const EdgeInsets.only(left: 4.0, bottom: 10),
+                          child: Text(
+                            'Family Management',
+                            style: theme.textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: theme.primaryColor,
+                              letterSpacing: 0.8,
+                            ),
+                          ),
+                        ),
+
+                        _buildMenuTile(
+                          context: context,
+                          icon: Icons.people,
+                          title: 'Members',
+                          subtitle:
+                              '${detailsState.members.length} member${detailsState.members.length != 1 ? 's' : ''}',
+                          onTap: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    MembersScreen(familyId: widget.familyId),
+                              ),
+                            );
+                          },
+                          theme: theme,
+                        ),
+                        const SizedBox(height: 12),
+
+                        if (detailsState.family!.isAdmin) ...[
+                          _buildMenuTile(
+                            context: context,
+                            icon: Icons.mail_outline,
+                            title: 'Invitations',
+                            subtitle: _getInvitationSubtitle(
+                              detailsState.invitations,
+                            ),
+                            badge: _getPendingInvitationsCount(
+                              detailsState.invitations,
+                            ),
+                            onTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => InvitationsScreen(
+                                    familyId: widget.familyId,
+                                  ),
+                                ),
+                              );
+                            },
+                            theme: theme,
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+
+                        const SizedBox(height: 24),
+
+                        // Financial Section
+                        if (detailsState.sbdAccount != null) ...[
+                          Padding(
+                            padding: const EdgeInsets.only(
+                              left: 4.0,
+                              bottom: 10,
+                            ),
+                            child: Text(
+                              'Financial',
+                              style: theme.textTheme.titleLarge?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: theme.primaryColor,
+                                letterSpacing: 0.8,
+                              ),
+                            ),
+                          ),
+
+                          _buildMenuTile(
+                            context: context,
+                            icon: Icons.account_balance_wallet,
+                            title: 'SBD Account',
+                            subtitle:
+                                '${detailsState.sbdAccount!.balance} ${detailsState.sbdAccount!.currency}',
+                            iconColor: detailsState.sbdAccount!.isFrozen
+                                ? Colors.red
+                                : Colors.green,
+                            badge: detailsState.sbdAccount!.isFrozen
+                                ? 'FROZEN'
+                                : null,
+                            badgeColor: Colors.red,
+                            onTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => SBDAccountScreen(
+                                    familyId: widget.familyId,
+                                  ),
+                                ),
+                              );
+                            },
+                            theme: theme,
+                          ),
+                          const SizedBox(height: 12),
+
+                          _buildMenuTile(
+                            context: context,
+                            icon: Icons.request_page,
+                            title: 'Token Requests',
+                            subtitle: detailsState.family!.isAdmin
+                                ? 'Review pending requests'
+                                : 'Request or view your requests',
+                            onTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => TokenRequestsScreen(
+                                    familyId: widget.familyId,
+                                  ),
+                                ),
+                              );
+                            },
+                            theme: theme,
+                          ),
+                          const SizedBox(height: 24),
+                        ],
+
+                        // Notifications & Activity Section
+                        Padding(
+                          padding: const EdgeInsets.only(left: 4.0, bottom: 10),
+                          child: Text(
+                            'Activity',
+                            style: theme.textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: theme.primaryColor,
+                              letterSpacing: 0.8,
+                            ),
+                          ),
+                        ),
+
+                        _buildMenuTile(
+                          context: context,
+                          icon: Icons.notifications_outlined,
+                          title: 'Notifications',
+                          subtitle: 'View family activity and alerts',
+                          onTap: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => FamilyNotificationsScreen(
+                                  familyId: widget.familyId,
+                                ),
+                              ),
+                            );
+                          },
+                          theme: theme,
+                        ),
+                        const SizedBox(height: 12),
+
+                        if (detailsState.family!.isAdmin) ...[
+                          _buildMenuTile(
+                            context: context,
+                            icon: Icons.admin_panel_settings,
+                            title: 'Admin Actions Log',
+                            subtitle:
+                                'View audit log of administrative actions',
+                            onTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => AdminActionsScreen(
+                                    familyId: widget.familyId,
+                                  ),
+                                ),
+                              );
+                            },
+                            theme: theme,
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+                      ],
+                    ),
             ),
     );
   }
 
-  Widget _buildFamilyHeader(models.Family family, ThemeData theme) {
+  Widget _buildFamilyInfoCard(models.Family family, ThemeData theme) {
     return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      elevation: 3,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -212,17 +382,31 @@ class _FamilyDetailsScreenState extends ConsumerState<FamilyDetailsScreen> {
                         ),
                       ),
                       const SizedBox(height: 4),
-                      Text(
-                        'Your Role: ${family.userRole.toUpperCase()}',
-                        style: theme.textTheme.bodyMedium?.copyWith(
+                      Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
                           color: family.isAdmin
-                              ? Colors.blue[700]
-                              : theme.textTheme.bodyMedium?.color?.withOpacity(
-                                  0.7,
-                                ),
-                          fontWeight: family.isAdmin
-                              ? FontWeight.bold
-                              : FontWeight.normal,
+                              ? Colors.blue.withOpacity(0.1)
+                              : theme.primaryColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: family.isAdmin
+                                ? Colors.blue.withOpacity(0.3)
+                                : theme.primaryColor.withOpacity(0.3),
+                          ),
+                        ),
+                        child: Text(
+                          family.userRole.toUpperCase(),
+                          style: TextStyle(
+                            color: family.isAdmin
+                                ? Colors.blue[700]
+                                : theme.primaryColor,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ],
@@ -288,448 +472,82 @@ class _FamilyDetailsScreenState extends ConsumerState<FamilyDetailsScreen> {
     );
   }
 
-  Widget _buildSBDAccountCard(
-    models.SBDAccount account,
-    models.Family family,
-    ThemeData theme,
-  ) {
+  Widget _buildMenuTile({
+    required BuildContext context,
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+    required ThemeData theme,
+    Color? iconColor,
+    dynamic badge,
+    Color? badgeColor,
+  }) {
     return Card(
       elevation: 2,
+      margin: EdgeInsets.symmetric(horizontal: 2, vertical: 0),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => SBDAccountScreen(familyId: widget.familyId),
-            ),
-          );
-        },
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(
-                    Icons.account_balance_wallet,
-                    color: account.isFrozen ? Colors.red : Colors.green,
-                    size: 28,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'SBD Account',
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  Icon(Icons.chevron_right, color: theme.hintColor),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Divider(),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Balance',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.textTheme.bodyMedium?.color?.withOpacity(
-                            0.7,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${account.balance} ${account.currency}',
-                        style: theme.textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: account.isFrozen
-                              ? Colors.red
-                              : theme.primaryColor,
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (account.isFrozen)
-                    Container(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.red.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.red.withOpacity(0.3)),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.lock, color: Colors.red[700], size: 16),
-                          const SizedBox(width: 4),
-                          Text(
-                            'FROZEN',
-                            style: TextStyle(
-                              color: Colors.red[700],
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                ],
-              ),
-            ],
+      child: ListTile(
+        contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        leading: CircleAvatar(
+          radius: 22,
+          backgroundColor: (iconColor ?? theme.primaryColor).withOpacity(0.1),
+          child: Icon(icon, color: iconColor ?? theme.primaryColor, size: 24),
+        ),
+        title: Text(
+          title,
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w600,
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildMembersCard(
-    List<models.FamilyMember> members,
-    models.Family family,
-    ThemeData theme,
-  ) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => MembersScreen(familyId: widget.familyId),
-            ),
-          );
-        },
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.people, color: theme.primaryColor, size: 28),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Members (${members.length})',
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  if (family.isAdmin)
-                    Icon(Icons.add_circle_outline, color: theme.primaryColor),
-                  const SizedBox(width: 8),
-                  Icon(Icons.chevron_right, color: theme.hintColor),
-                ],
-              ),
-              if (members.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Divider(),
-                ...members
-                    .take(3)
-                    .map(
-                      (member) => ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: CircleAvatar(
-                          backgroundColor: theme.primaryColor.withOpacity(0.1),
-                          child: Text(
-                            member.displayName[0].toUpperCase(),
-                            style: TextStyle(
-                              color: theme.primaryColor,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                        title: Text(
-                          member.displayName,
-                          style: theme.textTheme.bodyLarge?.copyWith(
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        subtitle: Text(member.role.toUpperCase()),
-                        trailing: member.role == 'admin'
-                            ? Container(
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.blue.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  'ADMIN',
-                                  style: TextStyle(
-                                    color: Colors.blue[700],
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              )
-                            : null,
-                      ),
-                    ),
-                if (members.length > 3)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Text(
-                      '+ ${members.length - 3} more',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.primaryColor,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-              ],
-            ],
+        subtitle: Text(
+          subtitle,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.textTheme.bodySmall?.color?.withOpacity(0.7),
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildInvitationsCard(
-    List<models.FamilyInvitation> invitations,
-    ThemeData theme,
-  ) {
-    final pendingCount = invitations
-        .where((i) => i.isPending && !i.isExpired)
-        .length;
-
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => InvitationsScreen(familyId: widget.familyId),
-            ),
-          );
-        },
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Row(
-            children: [
-              Icon(Icons.mail_outline, color: theme.primaryColor, size: 28),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Pending Invitations',
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      pendingCount > 0
-                          ? '$pendingCount pending'
-                          : 'No pending invitations',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.textTheme.bodyMedium?.color?.withOpacity(
-                          0.7,
-                        ),
-                      ),
-                    ),
-                  ],
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (badge != null) ...[
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: (badgeColor ?? Colors.orange).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: (badgeColor ?? Colors.orange).withOpacity(0.3),
+                  ),
+                ),
+                child: Text(
+                  badge is int ? badge.toString() : badge.toString(),
+                  style: TextStyle(
+                    color: badgeColor ?? Colors.orange[700],
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
-              if (pendingCount > 0)
-                Container(
-                  padding: EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.withOpacity(0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Text(
-                    pendingCount.toString(),
-                    style: TextStyle(
-                      color: Colors.orange[700],
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
-                  ),
-                ),
               const SizedBox(width: 8),
-              Icon(Icons.chevron_right, color: theme.hintColor),
             ],
-          ),
+            Icon(Icons.chevron_right, color: theme.hintColor),
+          ],
         ),
+        onTap: onTap,
       ),
     );
   }
 
-  Widget _buildTokenRequestsCard(models.Family family, ThemeData theme) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => TokenRequestsScreen(familyId: widget.familyId),
-            ),
-          );
-        },
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Row(
-            children: [
-              Icon(Icons.request_page, color: theme.primaryColor, size: 28),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Token Requests',
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      family.isAdmin
-                          ? 'Review pending requests'
-                          : 'Request or view your requests',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.textTheme.bodyMedium?.color?.withOpacity(
-                          0.7,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Icon(Icons.chevron_right, color: theme.hintColor),
-            ],
-          ),
-        ),
-      ),
-    );
+  String _getInvitationSubtitle(List<models.FamilyInvitation> invitations) {
+    final pendingCount = _getPendingInvitationsCount(invitations);
+    if (pendingCount > 0) {
+      return '$pendingCount pending invitation${pendingCount != 1 ? 's' : ''}';
+    }
+    return 'Manage family invitations';
   }
 
-  Widget _buildNotificationsCard(ThemeData theme) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) =>
-                  FamilyNotificationsScreen(familyId: widget.familyId),
-            ),
-          );
-        },
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Row(
-            children: [
-              Icon(
-                Icons.notifications_outlined,
-                color: theme.primaryColor,
-                size: 28,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Notifications',
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'View family activity and alerts',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.textTheme.bodyMedium?.color?.withOpacity(
-                          0.7,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Icon(Icons.chevron_right, color: theme.hintColor),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAdminActionsCard(ThemeData theme) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => AdminActionsScreen(familyId: widget.familyId),
-            ),
-          );
-        },
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Row(
-            children: [
-              Icon(
-                Icons.admin_panel_settings,
-                color: theme.primaryColor,
-                size: 28,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Admin Actions Log',
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'View audit log of administrative actions',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.textTheme.bodyMedium?.color?.withOpacity(
-                          0.7,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Icon(Icons.chevron_right, color: theme.hintColor),
-            ],
-          ),
-        ),
-      ),
-    );
+  int _getPendingInvitationsCount(List<models.FamilyInvitation> invitations) {
+    return invitations.where((i) => i.isPending && !i.isExpired).length;
   }
 
   String _formatDate(DateTime date) {
@@ -827,11 +645,7 @@ class _FamilyDetailsScreenState extends ConsumerState<FamilyDetailsScreen> {
             ),
           );
           // Pop back to family list
-          Future.delayed(Duration(milliseconds: 300), () {
-            if (mounted) {
-              Navigator.of(context).popUntil((route) => route.isFirst);
-            }
-          });
+          Navigator.of(context).pop();
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(

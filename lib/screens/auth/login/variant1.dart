@@ -38,9 +38,13 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1>
   Animation<double>? _2faSectionFadeAnimation;
   Animation<Offset>? _2faSectionSlideAnimation;
 
+  // Remember Me State
+  bool _rememberMe = false;
+
   @override
   void initState() {
     super.initState();
+    _loadSavedCredentials();
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 800),
       vsync: this,
@@ -48,12 +52,13 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1>
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _animationController!, curve: Curves.easeInOut),
     );
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.5),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(parent: _animationController!, curve: Curves.easeOutBack),
-    );
+    _slideAnimation =
+        Tween<Offset>(begin: const Offset(0, 0.5), end: Offset.zero).animate(
+          CurvedAnimation(
+            parent: _animationController!,
+            curve: Curves.easeOutBack,
+          ),
+        );
     _animationController!.forward();
 
     _2faAnimationController = AnimationController(
@@ -64,18 +69,55 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1>
       parent: _2faAnimationController!,
       curve: Curves.easeInOut,
     );
-    _2faSectionSlideAnimation = Tween<Offset>(
-      begin: const Offset(0, -0.2),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(parent: _2faAnimationController!, curve: Curves.easeOut),
-    );
+    _2faSectionSlideAnimation =
+        Tween<Offset>(begin: const Offset(0, -0.2), end: Offset.zero).animate(
+          CurvedAnimation(
+            parent: _2faAnimationController!,
+            curve: Curves.easeOut,
+          ),
+        );
 
     // Show connectivity issue from splash screen if present
     if (widget.connectivityIssue != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _showConnectivityNotification(widget.connectivityIssue!);
       });
+    }
+  }
+
+  Future<void> _loadSavedCredentials() async {
+    try {
+      final secureStorage = ref.read(secureStorageProvider);
+      final savedUsername = await secureStorage.read(key: 'saved_username');
+      final savedPassword = await secureStorage.read(key: 'saved_password');
+
+      if (savedUsername != null && savedPassword != null) {
+        setState(() {
+          usernameOrEmailController.text = savedUsername;
+          passwordController.text = savedPassword;
+          _rememberMe = true;
+        });
+      }
+    } catch (e) {
+      print('[LOGIN] Error loading saved credentials: $e');
+    }
+  }
+
+  Future<void> _saveCredentials() async {
+    final secureStorage = ref.read(secureStorageProvider);
+    if (_rememberMe) {
+      await secureStorage.write(
+        key: 'saved_username',
+        value: usernameOrEmailController.text.trim(),
+      );
+      await secureStorage.write(
+        key: 'saved_password',
+        value: passwordController.text,
+      );
+    } else {
+      // Clear saved credentials if remember me is unchecked
+      await secureStorage.delete(key: 'saved_username');
+      await secureStorage.delete(key: 'saved_password');
     }
   }
 
@@ -160,14 +202,81 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1>
                       prefixIcon: Icons.lock_outline,
                       isPassword: true,
                       isPasswordVisible: isPasswordVisible,
-                      onPasswordToggle:
-                          () => setState(
-                            () => isPasswordVisible = !isPasswordVisible,
-                          ),
+                      onPasswordToggle: () => setState(
+                        () => isPasswordVisible = !isPasswordVisible,
+                      ),
                       autofillHints: [AutofillHints.password],
                       theme: theme,
                       keyboardType: TextInputType.text,
                       focusNode: passwordFocusNode,
+                    ),
+                    const SizedBox(height: 8),
+                    // Remember Me Checkbox
+                    Row(
+                      children: [
+                        Checkbox(
+                          value: _rememberMe,
+                          onChanged: (value) {
+                            setState(() {
+                              _rememberMe = value ?? false;
+                            });
+                          },
+                          activeColor: theme.primaryColor,
+                        ),
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _rememberMe = !_rememberMe;
+                              });
+                            },
+                            child: Text(
+                              'Remember Me',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.textTheme.bodyMedium?.color
+                                    ?.withOpacity(0.8),
+                              ),
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          icon: Icon(
+                            Icons.info_outline,
+                            size: 20,
+                            color: theme.hintColor,
+                          ),
+                          onPressed: () {
+                            showDialog(
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                title: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.lock_outline,
+                                      color: theme.primaryColor,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text('Secure Storage'),
+                                  ],
+                                ),
+                                content: Text(
+                                  'Your credentials will be securely encrypted and stored on your device using platform-specific secure storage (Keychain on iOS/macOS, KeyStore on Android).\n\nYou can uncheck this option at any time to remove saved credentials.',
+                                  style: theme.textTheme.bodyMedium,
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () =>
+                                        Navigator.of(context).pop(),
+                                    child: Text('Got it'),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                          padding: EdgeInsets.zero,
+                          constraints: BoxConstraints(),
+                        ),
+                      ],
                     ),
                     if (_is2faRequired)
                       FadeTransition(
@@ -309,30 +418,29 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1>
           if (_available2faMethods.length > 1)
             DropdownButtonFormField<String>(
               value: _selected2faMethod,
-              items:
-                  _available2faMethods.map((String method) {
-                    return DropdownMenuItem<String>(
-                      value: method,
-                      child: Row(
-                        children: [
-                          Icon(
-                            method == 'totp' ? Icons.shield : Icons.vpn_key,
-                            color: theme.primaryColor,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            method == 'totp'
-                                ? 'Authenticator App Code'
-                                : 'Backup Code',
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
+              items: _available2faMethods.map((String method) {
+                return DropdownMenuItem<String>(
+                  value: method,
+                  child: Row(
+                    children: [
+                      Icon(
+                        method == 'totp' ? Icons.shield : Icons.vpn_key,
+                        color: theme.primaryColor,
+                        size: 20,
                       ),
-                    );
-                  }).toList(),
+                      const SizedBox(width: 8),
+                      Text(
+                        method == 'totp'
+                            ? 'Authenticator App Code'
+                            : 'Backup Code',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
               onChanged: (String? newValue) {
                 setState(() {
                   _selected2faMethod = newValue;
@@ -484,17 +592,16 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1>
             size: 20,
           ),
         ),
-        suffixIcon:
-            isPassword
-                ? IconButton(
-                  onPressed: onPasswordToggle,
-                  icon: Icon(
-                    isPasswordVisible ? Icons.visibility_off : Icons.visibility,
-                    color: theme.iconTheme.color?.withOpacity(0.7),
-                    size: 20,
-                  ),
-                )
-                : null,
+        suffixIcon: isPassword
+            ? IconButton(
+                onPressed: onPasswordToggle,
+                icon: Icon(
+                  isPasswordVisible ? Icons.visibility_off : Icons.visibility,
+                  color: theme.iconTheme.color?.withOpacity(0.7),
+                  size: 20,
+                ),
+              )
+            : null,
       ),
     );
   }
@@ -515,6 +622,9 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1>
       );
 
       await authNotifier.login(userInput);
+
+      // Save credentials if Remember Me is checked
+      await _saveCredentials();
 
       // Ensure all storage operations are complete before continuing
       await Future.delayed(const Duration(milliseconds: 50));
@@ -692,7 +802,46 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1>
         String displayMessage = 'Authentication failed';
         Color? backgroundColor = Theme.of(context).colorScheme.error;
 
-        if (errorMsg.contains('CLOUDFLARE_TUNNEL_DOWN:')) {
+        print('[LOGIN_SCREEN] Checking error type: $errorMsg');
+
+        if (errorMsg.contains('BACKEND_REDIRECT_ERROR:')) {
+          print(
+            '[LOGIN_SCREEN] ✓ Detected BACKEND_REDIRECT_ERROR - showing snackbar, NOT dialog',
+          );
+          // Backend is redirecting POST requests - this is a backend bug
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '⚠️ Backend Configuration Issue',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'The server is redirecting login requests. This is a backend bug that needs to be fixed.',
+                    style: TextStyle(fontSize: 13),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'Backend team: Remove redirect from POST /auth/login',
+                    style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
+                  ),
+                ],
+              ),
+              backgroundColor: Colors.orange,
+              duration: const Duration(seconds: 8),
+              action: SnackBarAction(
+                label: 'Retry',
+                textColor: Colors.white,
+                onPressed: _handleSubmit,
+              ),
+            ),
+          );
+          return;
+        } else if (errorMsg.contains('CLOUDFLARE_TUNNEL_DOWN:')) {
           displayMessage =
               'Cloudflare tunnel is down. Please try again later or contact support.';
           backgroundColor = Colors.orange;
@@ -1010,8 +1159,6 @@ class _LoginScreenV1State extends ConsumerState<LoginScreenV1>
       ),
     );
   }
-
-
 
   void _showServerChangeDialog() {
     ref.read(currentThemeProvider);

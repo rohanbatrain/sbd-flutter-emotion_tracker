@@ -4,6 +4,7 @@ import 'package:emotion_tracker/providers/shared_prefs_provider.dart';
 import 'package:emotion_tracker/providers/secure_storage_provider.dart';
 import 'package:emotion_tracker/providers/transition_provider.dart';
 import 'dart:convert';
+import 'dart:io';
 import 'package:emotion_tracker/providers/user_agent_util.dart';
 import 'package:emotion_tracker/utils/http_util.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -94,6 +95,9 @@ class _ApiErrorHandler {
       return Exception('CLOUDFLARE_TUNNEL_DOWN: ${error.message}');
     } else if (error is NetworkException) {
       return Exception('NETWORK_ERROR: ${error.message}');
+    } else if (error.toString().contains('BACKEND_REDIRECT_ERROR:')) {
+      // Don't transform backend redirect errors - pass them through as-is
+      return error as Exception;
     } else if (error.toString().contains('Login failed:') ||
         error.toString().contains('Registration failed:') ||
         error.toString().contains('Failed to resend verification email:')) {
@@ -109,12 +113,36 @@ class _ApiErrorHandler {
 // Common utility for API request headers
 class _ApiHeaders {
   static Future<Map<String, String>> getCommonHeaders() async {
-    final userAgent = await getUserAgent();
-    return {
-      'Content-Type': 'application/json',
-      'User-Agent': userAgent,
-      'X-User-Agent': userAgent,
-    };
+    print('[AUTH] Getting common headers...');
+    try {
+      // Add timeout to prevent hanging on getUserAgent (especially on desktop platforms)
+      print('[AUTH] Calling getUserAgent()...');
+      final userAgent = await getUserAgent().timeout(
+        const Duration(seconds: 5),
+        onTimeout: () {
+          // Fallback user agent if getUserAgent times out
+          print('[AUTH] ⚠️ getUserAgent() timed out, using fallback');
+          return 'emotion_tracker/1.0.0 ; (platform=${Platform.operatingSystem.toLowerCase()}; os=unknown; device=desktop)';
+        },
+      );
+      print('[AUTH] ✓ User-Agent obtained: $userAgent');
+      return {
+        'Content-Type': 'application/json',
+        'User-Agent': userAgent,
+        'X-User-Agent': userAgent,
+      };
+    } catch (e) {
+      // Ultimate fallback if everything fails
+      print('[AUTH] ❌ Error in getCommonHeaders: $e');
+      final fallbackUserAgent =
+          'emotion_tracker/1.0.0 ; (platform=${Platform.operatingSystem.toLowerCase()}; os=unknown; device=desktop)';
+      print('[AUTH] Using fallback User-Agent: $fallbackUserAgent');
+      return {
+        'Content-Type': 'application/json',
+        'User-Agent': fallbackUserAgent,
+        'X-User-Agent': fallbackUserAgent,
+      };
+    }
   }
 }
 
@@ -149,13 +177,13 @@ class _AuthDataStorage {
     };
 
     // Store secure data
-    final secureStoreFutures =
-        secureData.entries
-            .map(
-              (entry) =>
-                  secureStorage.write(key: entry.key, value: entry.value),
-            )
-            .toList();
+    print('[AUTH_STORAGE] Storing secure data...');
+    final secureStoreFutures = secureData.entries.map((entry) {
+      print(
+        '[AUTH_STORAGE] Writing ${entry.key}: ${entry.key == "access_token" ? "***${entry.value.length} chars***" : entry.value}',
+      );
+      return secureStorage.write(key: entry.key, value: entry.value);
+    }).toList();
 
     // Store user data (only if not empty)
     for (final entry in userData.entries) {
@@ -282,8 +310,9 @@ class InputValidator {
   // Validation with detailed error messages
   static String? validateEmail(String email, {bool caseSensitive = false}) {
     if (email.isEmpty) return 'Email cannot be empty';
-    final isValid =
-        caseSensitive ? isEmailCaseInsensitive(email) : isEmail(email);
+    final isValid = caseSensitive
+        ? isEmailCaseInsensitive(email)
+        : isEmail(email);
     return isValid ? null : 'Please enter a valid email address';
   }
 
@@ -657,13 +686,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
     };
 
     // Store secure data
-    final secureStoreFutures =
-        secureData.entries
-            .map(
-              (entry) =>
-                  _secureStorage.write(key: entry.key, value: entry.value),
-            )
-            .toList();
+    final secureStoreFutures = secureData.entries
+        .map(
+          (entry) => _secureStorage.write(key: entry.key, value: entry.value),
+        )
+        .toList();
 
     // Store user data (only if not empty)
     for (final entry in userData.entries) {
@@ -739,40 +766,104 @@ Future<Map<String, dynamic>> loginWithApi(
   String? twoFaCode,
   String? twoFaMethod,
 }) async {
+  print('[LOGIN] ========== Starting login process ==========');
+  print('[LOGIN] Platform: ${Platform.operatingSystem}');
   final baseUrl = ref.read(apiBaseUrlProvider);
+  print('[LOGIN] Base URL: $baseUrl');
   final url = Uri.parse('$baseUrl/auth/login');
+  print('[LOGIN] Full API URL: $url');
+  print(
+    '[LOGIN] URL scheme: ${url.scheme}, host: ${url.host}, path: ${url.path}',
+  );
+
   try {
+    print('[LOGIN] Getting headers...');
     final headers = await _ApiHeaders.getCommonHeaders();
+    print('[LOGIN] ✓ Headers obtained');
+    print('[LOGIN] Headers: ${headers.keys.join(", ")}');
+
     // Determine if input is email or username
     final isEmail = InputValidator.isEmail(usernameOrEmail);
+    print('[LOGIN] Login type: ${isEmail ? "email" : "username"}');
+    print('[LOGIN] Identifier: $usernameOrEmail');
+
     final body = <String, dynamic>{
       if (isEmail) 'email': usernameOrEmail else 'username': usernameOrEmail,
-      'password': password,
+      'password': '***hidden***', // Don't log actual password
     };
 
     if (twoFaCode != null && twoFaMethod != null) {
-      body['two_fa_code'] = twoFaCode;
+      body['two_fa_code'] = '***hidden***';
       body['two_fa_method'] = twoFaMethod;
+      print('[LOGIN] 2FA: method=$twoFaMethod, code=***hidden***');
     }
 
+    print('[LOGIN] Sending POST request...');
     final response = await HttpUtil.post(
       url,
       headers: headers,
-      body: jsonEncode(body),
+      body: jsonEncode({
+        if (isEmail) 'email': usernameOrEmail else 'username': usernameOrEmail,
+        'password': password,
+        if (twoFaCode != null && twoFaMethod != null) ...{
+          'two_fa_code': twoFaCode,
+          'two_fa_method': twoFaMethod,
+        },
+      }),
+      followRedirects:
+          true, // Follow redirects (including HTTPS upgrades from Cloudflare)
     );
+
+    print('[LOGIN] Response status: ${response.statusCode}');
+    print('[LOGIN] Response body length: ${response.body.length} chars');
+
+    // The HttpUtil.post() method now handles redirects automatically
+    // If we get here with a 3xx status, it means max redirects were exceeded
+    if (response.statusCode >= 300 && response.statusCode < 400) {
+      print('[LOGIN] ⚠️ Redirect detected after max redirects!');
+      print('[LOGIN] Response headers: ${response.headers}');
+      if (response.headers.containsKey('location')) {
+        print('[LOGIN] Redirect location: ${response.headers['location']}');
+      }
+
+      // This should rarely happen now, but kept for edge cases
+      print('[LOGIN] ❌ Backend is incorrectly redirecting POST requests');
+      print('[LOGIN] ========== Login failed ==========');
+      throw Exception(
+        'BACKEND_REDIRECT_ERROR: The server is redirecting the login request. '
+        'This is a backend configuration issue. The backend should accept POST '
+        'requests on /auth/login without redirecting. Please fix the backend '
+        'to not redirect POST requests for the login endpoint.',
+      );
+    }
+
     if (response.statusCode == 200) {
+      print('[LOGIN] ✓ Login successful (200)');
       final result = _ApiResponseValidator.validateAndParseResponse(
         response,
         'Login',
       );
+      print('[LOGIN] Storing auth data...');
       await _AuthDataStorage.storeAuthData(
         ref,
         result,
         loginEmail: isEmail ? usernameOrEmail : null,
       );
+      print('[LOGIN] ✓ Auth data stored');
+
+      // Verify token was stored correctly (macOS debugging)
+      final storedToken = await ref
+          .read(secureStorageProvider)
+          .read(key: 'access_token');
+      print(
+        '[LOGIN] ✓ Verification: Token readback = ${storedToken != null ? "***${storedToken.length} chars***" : "NULL"}',
+      );
+
+      print('[LOGIN] ========== Login completed successfully ==========');
       return result;
     } else if (response.statusCode == 403 &&
         response.body.contains('Email not verified')) {
+      print('[LOGIN] ⚠️ Email not verified (403)');
       // Special case: email not verified
       // Server should respond with: raise HTTPException(status_code=403, detail="Email not verified")
       // This ensures we only trigger email verification for actual unverified emails, not wrong passwords
@@ -791,11 +882,20 @@ Future<Map<String, dynamic>> loginWithApi(
         );
       }
       await secureStorage.write(key: 'temp_user_password', value: password);
+      print('[LOGIN] ========== Login failed: Email not verified ==========');
       return {'error': 'email_not_verified', ...responseBody};
     } else {
+      print('[LOGIN] ❌ Login failed with status ${response.statusCode}');
+      print(
+        '[LOGIN] Response body: ${response.body.substring(0, response.body.length > 500 ? 500 : response.body.length)}',
+      );
+      print('[LOGIN] ========== Login failed ==========');
       throw Exception('Login failed: ${response.statusCode} ${response.body}');
     }
   } catch (e) {
+    print('[LOGIN] ❌ Exception caught: $e');
+    print('[LOGIN] Exception type: ${e.runtimeType}');
+    print('[LOGIN] ========== Login error ==========');
     // Only catch network and Cloudflare errors here, let authentication errors pass through
     throw _ApiErrorHandler.handleError(e);
   }

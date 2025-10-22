@@ -262,14 +262,42 @@ class FamilyInvitation {
   });
 
   factory FamilyInvitation.fromJson(Map<String, dynamic> json) {
+    // Handle family_name - treat null and empty string as "Unknown Family"
+    final familyNameRaw = json['family_name'] as String?;
+    final familyName = (familyNameRaw == null || familyNameRaw.trim().isEmpty)
+        ? 'Unknown Family'
+        : familyNameRaw;
+
+    // Handle invited_by_username - backend might return inviter_username or invited_by_username
+    final invitedByUsernameRaw =
+        (json['invited_by_username'] ?? json['inviter_username']) as String?;
+    final invitedByUsername =
+        (invitedByUsernameRaw == null || invitedByUsernameRaw.trim().isEmpty)
+        ? 'Unknown'
+        : invitedByUsernameRaw;
+
+    // Handle invitee_username - treat empty string as null
+    final inviteeUsernameRaw = json['invitee_username'] as String?;
+    final inviteeUsername =
+        (inviteeUsernameRaw != null && inviteeUsernameRaw.trim().isNotEmpty)
+        ? inviteeUsernameRaw
+        : null;
+
+    // Handle invitee_email - treat empty string as null
+    final inviteeEmailRaw = json['invitee_email'] as String?;
+    final inviteeEmail =
+        (inviteeEmailRaw != null && inviteeEmailRaw.trim().isNotEmpty)
+        ? inviteeEmailRaw
+        : null;
+
     return FamilyInvitation(
       invitationId: json['invitation_id'] ?? '',
       familyId: json['family_id'] ?? '',
-      familyName: json['family_name'] ?? '',
+      familyName: familyName,
       invitedBy: json['invited_by'] ?? '',
-      invitedByUsername: json['invited_by_username'] ?? '',
-      inviteeEmail: json['invitee_email'],
-      inviteeUsername: json['invitee_username'],
+      invitedByUsername: invitedByUsername,
+      inviteeEmail: inviteeEmail,
+      inviteeUsername: inviteeUsername,
       relationshipType: json['relationship_type'] ?? 'other',
       status: json['status'] ?? 'pending',
       createdAt: DateTime.parse(
@@ -302,6 +330,114 @@ class FamilyInvitation {
 
   bool get isExpired => DateTime.now().isAfter(expiresAt);
   bool get isPending => status == 'pending';
+}
+
+/// Model for invitations received by the current user
+/// Matches GET /family/my-invitations response
+class ReceivedInvitation {
+  final String invitationId;
+  final String familyId;
+  final String familyName;
+  final String inviterUserId;
+  final String inviterUsername;
+  final String relationshipType;
+  final String status;
+  final DateTime expiresAt;
+  final DateTime createdAt;
+  final String? invitationToken;
+
+  ReceivedInvitation({
+    required this.invitationId,
+    required this.familyId,
+    required this.familyName,
+    required this.inviterUserId,
+    required this.inviterUsername,
+    required this.relationshipType,
+    required this.status,
+    required this.expiresAt,
+    required this.createdAt,
+    this.invitationToken,
+  });
+
+  factory ReceivedInvitation.fromJson(Map<String, dynamic> json) {
+    // Get family_name and handle both null and empty string
+    final familyNameRaw = json['family_name'] as String?;
+    final familyName = (familyNameRaw == null || familyNameRaw.isEmpty)
+        ? 'Unknown Family'
+        : familyNameRaw;
+
+    // Get inviter_username and handle both null and empty string
+    final inviterUsernameRaw = json['inviter_username'] as String?;
+    final inviterUsername =
+        (inviterUsernameRaw == null || inviterUsernameRaw.isEmpty)
+        ? 'Unknown'
+        : inviterUsernameRaw;
+
+    return ReceivedInvitation(
+      invitationId: json['invitation_id'] ?? '',
+      familyId: json['family_id'] ?? '',
+      familyName: familyName,
+      inviterUserId: json['inviter_user_id'] ?? '',
+      inviterUsername: inviterUsername,
+      relationshipType: json['relationship_type'] ?? 'other',
+      status: json['status'] ?? 'pending',
+      expiresAt: DateTime.parse(
+        json['expires_at'] ??
+            DateTime.now().add(Duration(days: 7)).toIso8601String(),
+      ),
+      createdAt: DateTime.parse(
+        json['created_at'] ?? DateTime.now().toIso8601String(),
+      ),
+      invitationToken: json['invitation_token'],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'invitation_id': invitationId,
+      'family_id': familyId,
+      'family_name': familyName,
+      'inviter_user_id': inviterUserId,
+      'inviter_username': inviterUsername,
+      'relationship_type': relationshipType,
+      'status': status,
+      'expires_at': expiresAt.toIso8601String(),
+      'created_at': createdAt.toIso8601String(),
+      if (invitationToken != null) 'invitation_token': invitationToken,
+    };
+  }
+
+  bool get isExpired => DateTime.now().isAfter(expiresAt);
+  bool get isPending => status == 'pending';
+  bool get isAccepted => status == 'accepted';
+  bool get isDeclined => status == 'declined';
+  bool get isCancelled => status == 'cancelled';
+
+  /// Check if invitation can be responded to (pending and not expired)
+  bool get canRespond => isPending && !isExpired;
+
+  /// Get days until expiry (negative if expired)
+  int get daysUntilExpiry => expiresAt.difference(DateTime.now()).inDays;
+
+  /// Get hours until expiry
+  int get hoursUntilExpiry => expiresAt.difference(DateTime.now()).inHours;
+
+  /// User-friendly expiry text
+  String get expiryText {
+    if (isExpired) return 'Expired';
+    final days = daysUntilExpiry;
+    if (days == 0) return 'Expires today';
+    if (days == 1) return 'Expires tomorrow';
+    return 'Expires in $days days';
+  }
+
+  String get timeUntilExpiry {
+    final diff = expiresAt.difference(DateTime.now());
+    if (diff.isNegative) return 'Expired';
+    if (diff.inDays > 0) return '${diff.inDays}d';
+    if (diff.inHours > 0) return '${diff.inHours}h';
+    return '${diff.inMinutes}m';
+  }
 }
 
 class TokenRequest {

@@ -40,7 +40,7 @@ class AppThemes {
     'cloudGrayDark': CloudGrayDarkTheme.theme,
     'sunsetPeach': SunsetPeachTheme.theme,
     'sunsetPeachDark': SunsetPeachDarkTheme.theme,
-    'midnightLavenderLight': MidnightLavenderLightTheme.theme, 
+    'midnightLavenderLight': MidnightLavenderLightTheme.theme,
     'midnightLavender': MidnightLavenderTheme.theme,
     'crimsonRed': CrimsonRedTheme.theme,
     'crimsonRedDark': CrimsonRedDarkTheme.theme,
@@ -201,7 +201,6 @@ final themeProvider = StateNotifierProvider<ThemeNotifier, String>((ref) {
 // Current theme data provider
 final currentThemeProvider = Provider<ThemeData>((ref) {
   final currentThemeKey = ref.watch(themeProvider);
-  return AppThemes.allThemes[currentThemeKey] ?? AppThemes.allThemes['lightTheme']!;
+  return AppThemes.allThemes[currentThemeKey] ??
+      AppThemes.allThemes['lightTheme']!;
 });
-
-

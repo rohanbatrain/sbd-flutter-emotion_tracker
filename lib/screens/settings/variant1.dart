@@ -7,7 +7,6 @@ import 'themes/variant1.dart';
 import 'account/variant1.dart';
 import 'developer/variant1.dart';
 import 'account/family/variant1.dart';
-import 'account/team/variant1.dart';
 import 'package:emotion_tracker/screens/shop/variant1/variant1.dart';
 
 // Provider to check if user has developer role
@@ -178,45 +177,6 @@ class SettingsScreenV1 extends ConsumerWidget {
               onTap: () => Navigator.of(
                 context,
               ).push(MaterialPageRoute(builder: (_) => const FamilyScreenV1())),
-            ),
-          ),
-          SizedBox(height: 12),
-          // Teams (new entry)
-          Card(
-            elevation: 3,
-            margin: EdgeInsets.symmetric(horizontal: 2, vertical: 6),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: ListTile(
-              contentPadding: EdgeInsets.symmetric(
-                horizontal: 24,
-                vertical: 14,
-              ),
-              leading: CircleAvatar(
-                radius: 22,
-                backgroundColor: theme.primaryColor.withOpacity(0.13),
-                child: Icon(
-                  Icons.group,
-                  color: theme.primaryColor,
-                  size: 26,
-                ),
-              ),
-              title: Text(
-                'Teams',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 18,
-                ),
-              ),
-              trailing: Icon(
-                Icons.arrow_forward_ios,
-                size: 20,
-                color: theme.hintColor,
-              ),
-              onTap: () => Navigator.of(
-                context,
-              ).push(MaterialPageRoute(builder: (_) => const TeamScreenV1())),
             ),
           ),
           // Developer Options (only visible for developers)

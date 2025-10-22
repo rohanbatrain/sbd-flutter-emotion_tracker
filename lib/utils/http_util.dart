@@ -69,18 +69,83 @@ class HttpUtil {
   }
 
   /// Performs an HTTP POST request with Cloudflare error detection
+  /// Includes manual redirect handling for macOS compatibility
   static Future<http.Response> post(
     Uri url, {
     Map<String, String>? headers,
     Object? body,
     Encoding? encoding,
     Duration? timeout,
+    bool followRedirects = true,
   }) async {
     _assertUserAgent(headers);
-    return _performRequest(
+
+    print('[HttpUtil] POST request to: $url');
+    print(
+      '[HttpUtil] URL scheme: ${url.scheme}, host: ${url.host}, path: ${url.path}',
+    );
+
+    // Make the initial POST request
+    var response = await _performRequest(
       () => http.post(url, headers: headers, body: body, encoding: encoding),
       timeout: timeout,
     );
+
+    // Skip redirect handling if explicitly disabled
+    if (!followRedirects) {
+      return response;
+    }
+
+    // Handle redirects manually for POST requests (important for macOS)
+    // The http package doesn't automatically follow redirects for POST by design
+    var redirectCount = 0;
+    const maxRedirects = 5;
+
+    while ((response.statusCode == 301 ||
+            response.statusCode == 302 ||
+            response.statusCode == 303 ||
+            response.statusCode == 307 ||
+            response.statusCode == 308) &&
+        redirectCount < maxRedirects) {
+      final location = response.headers['location'];
+      if (location == null || location.isEmpty) {
+        // No location header, can't redirect
+        break;
+      }
+
+      print('[HttpUtil] Following redirect ${redirectCount + 1}: $location');
+
+      // Parse the redirect URL (might be relative or absolute)
+      Uri redirectUri;
+      if (location.startsWith('http://') || location.startsWith('https://')) {
+        redirectUri = Uri.parse(location);
+      } else {
+        // Relative URL - combine with original URL
+        redirectUri = url.resolve(location);
+      }
+
+      // For API endpoints, always keep POST as POST to preserve the request method
+      // Standard HTTP spec says 301/302/303 should change to GET, but modern REST APIs
+      // expect POST to remain POST for redirects (especially for authentication endpoints)
+      // This ensures login and other POST endpoints work correctly across all platforms
+      response = await _performRequest(
+        () => http.post(
+          redirectUri,
+          headers: headers,
+          body: body,
+          encoding: encoding,
+        ),
+        timeout: timeout,
+      );
+
+      redirectCount++;
+    }
+
+    if (redirectCount >= maxRedirects) {
+      print('[HttpUtil] ⚠️ Max redirects ($maxRedirects) exceeded');
+    }
+
+    return response;
   }
 
   /// Performs an HTTP PUT request with Cloudflare error detection

@@ -5,6 +5,7 @@ import 'package:emotion_tracker/providers/family/family_provider.dart';
 import 'package:emotion_tracker/providers/family/family_models.dart' as models;
 import 'package:emotion_tracker/widgets/loading_state_widget.dart';
 import 'package:emotion_tracker/widgets/error_state_widget.dart';
+import 'package:emotion_tracker/providers/secure_storage_provider.dart';
 
 class MembersScreen extends ConsumerStatefulWidget {
   final String familyId;
@@ -30,7 +31,7 @@ class _MembersScreenState extends ConsumerState<MembersScreen> {
     final theme = Theme.of(context);
     final identifierController = TextEditingController();
     String identifierType = 'email';
-    String relationshipType = 'other';
+    String relationshipType = 'parent';
 
     final result = await showDialog<bool>(
       context: context,
@@ -79,7 +80,6 @@ class _MembersScreenState extends ConsumerState<MembersScreen> {
                     DropdownMenuItem(value: 'child', child: Text('Child')),
                     DropdownMenuItem(value: 'sibling', child: Text('Sibling')),
                     DropdownMenuItem(value: 'spouse', child: Text('Spouse')),
-                    DropdownMenuItem(value: 'other', child: Text('Other')),
                   ],
                   onChanged: (value) =>
                       setState(() => relationshipType = value!),
@@ -106,19 +106,110 @@ class _MembersScreenState extends ConsumerState<MembersScreen> {
     );
 
     if (result == true && identifierController.text.trim().isNotEmpty) {
+      final identifier = identifierController.text.trim();
+
+      // Client-side validation: Check if user is trying to invite themselves
+      final secureStorage = ref.read(secureStorageProvider);
+      final currentUsername = await secureStorage.read(key: 'user_username');
+      final currentEmail = await secureStorage.read(key: 'user_email');
+
+      if ((identifierType == 'username' && identifier == currentUsername) ||
+          (identifierType == 'email' && identifier == currentEmail)) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('You cannot invite yourself to the family'),
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+        return;
+      }
+
+      // Show loading indicator
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => Center(child: CircularProgressIndicator()),
+      );
+
       final success = await ref
           .read(familyDetailsProvider(widget.familyId).notifier)
           .inviteMember(
-            identifier: identifierController.text.trim(),
+            identifier: identifier,
             identifierType: identifierType,
             relationshipType: relationshipType,
           );
 
-      if (success && mounted) {
+      if (!mounted) return;
+      Navigator.of(context).pop(); // Close loading dialog
+
+      if (!mounted) return;
+      if (success) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Invitation sent successfully!'),
             backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        // Get the error message from the state
+        final detailsState = ref.read(familyDetailsProvider(widget.familyId));
+        String errorMessage = 'Failed to send invitation';
+
+        if (detailsState.error != null) {
+          final error = detailsState.error!.toLowerCase();
+          final identifier = identifierController.text.trim();
+
+          if (error.contains('not found')) {
+            if (identifierType == 'username') {
+              errorMessage = 'User with username "$identifier" not found';
+            } else {
+              errorMessage = 'User with email "$identifier" not found';
+            }
+          } else if (error.contains('already a member') ||
+              error.contains('already in') ||
+              error.contains('is already a member')) {
+            errorMessage =
+                'Cannot invite: This user is already a member of the family';
+          } else if (error.contains('cannot invite yourself') ||
+              error.contains('self invitation') ||
+              error.contains('invite yourself')) {
+            errorMessage = 'You cannot invite yourself to the family';
+          } else if (error.contains('already invited') ||
+              error.contains('pending invitation')) {
+            errorMessage = 'This user has already been invited';
+          } else if (error.contains('network') ||
+              error.contains('connection') ||
+              error.contains('timeout')) {
+            errorMessage = 'Network error. Please check your connection';
+          } else if (error.contains('unauthorized') ||
+              error.contains('permission')) {
+            errorMessage = 'You do not have permission to invite members';
+          } else {
+            // Show the actual error message from backend
+            errorMessage = detailsState.error!;
+          }
+
+          // Clear the error from state
+          ref
+              .read(familyDetailsProvider(widget.familyId).notifier)
+              .clearError();
+        }
+
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 4),
+            action: SnackBarAction(
+              label: 'Dismiss',
+              textColor: Colors.white,
+              onPressed: () {},
+            ),
           ),
         );
       }

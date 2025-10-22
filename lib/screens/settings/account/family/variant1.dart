@@ -6,6 +6,8 @@ import 'package:emotion_tracker/providers/family/family_models.dart' as models;
 import 'package:emotion_tracker/widgets/loading_state_widget.dart';
 import 'package:emotion_tracker/widgets/error_state_widget.dart';
 import 'package:emotion_tracker/screens/settings/account/family/family_details_screen.dart';
+import 'package:emotion_tracker/screens/settings/account/family/received_invitations_screen.dart';
+import 'package:emotion_tracker/providers/family/received_invitations_provider.dart';
 
 class FamilyScreenV1 extends ConsumerStatefulWidget {
   const FamilyScreenV1({Key? key}) : super(key: key);
@@ -102,11 +104,36 @@ class _FamilyScreenV1State extends ConsumerState<FamilyScreenV1> {
       appBar: CustomAppBar(
         title: 'Family',
         showHamburger: false,
-        showCurrency: true,
+        showCurrency: false, // SBD token display disabled
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).pop(),
         ),
+        actions: [
+          // Badge showing pending invitation count
+          Consumer(
+            builder: (context, ref, _) {
+              final invState = ref.watch(receivedInvitationsProvider);
+              final pendingCount = invState.pendingInvitations.length;
+
+              return IconButton(
+                icon: Badge(
+                  label: Text('$pendingCount'),
+                  isLabelVisible: pendingCount > 0,
+                  child: const Icon(Icons.mail_outline),
+                ),
+                tooltip: 'Family Invitations',
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const ReceivedInvitationsScreen(),
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _showCreateFamilyDialog,

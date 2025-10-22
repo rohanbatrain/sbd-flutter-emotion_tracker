@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:emotion_tracker/providers/theme_provider.dart';
 import 'package:emotion_tracker/providers/sbd_tokens_provider.dart';
-import 'package:emotion_tracker/screens/currency/variant1.dart';
+import 'package:emotion_tracker/screens/currency/variant2.dart';
 
 class CustomAppBar extends ConsumerWidget implements PreferredSizeWidget {
   final String title;
@@ -26,10 +26,10 @@ class CustomAppBar extends ConsumerWidget implements PreferredSizeWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = ref.watch(currentThemeProvider);
     final sbdState = ref.watch(sbdTokensProvider);
-    
+
     return AppBar(
       title: Text(title),
-      leading: showHamburger 
+      leading: showHamburger
           ? Builder(
               builder: (context) => IconButton(
                 icon: Icon(Icons.menu),
@@ -42,9 +42,7 @@ class CustomAppBar extends ConsumerWidget implements PreferredSizeWidget {
           GestureDetector(
             onTap: () {
               Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => CurrencyScreenV1(),
-                ),
+                MaterialPageRoute(builder: (context) => CurrencyScreenV2()),
               );
             },
             child: Container(
@@ -71,7 +69,10 @@ class CustomAppBar extends ConsumerWidget implements PreferredSizeWidget {
                     SizedBox(
                       width: 18,
                       height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: theme.colorScheme.onPrimary),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: theme.colorScheme.onPrimary,
+                      ),
                     )
                   else if (sbdState.error != null)
                     Icon(Icons.error, color: Colors.red, size: 18)
@@ -102,7 +103,8 @@ class CustomAppBar extends ConsumerWidget implements PreferredSizeWidget {
   String _formatCurrency(num? value) {
     if (value == null) return '--';
     if (value >= 1000000) {
-      return (value / 1000000).toStringAsFixed(value % 1000000 == 0 ? 0 : 1) + 'M';
+      return (value / 1000000).toStringAsFixed(value % 1000000 == 0 ? 0 : 1) +
+          'M';
     } else if (value >= 1000) {
       return (value / 1000).toStringAsFixed(value % 1000 == 0 ? 0 : 1) + 'k';
     } else {
