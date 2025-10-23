@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:emotion_tracker/widgets/custom_app_bar.dart';
 import 'package:emotion_tracker/providers/family/family_provider.dart';
+import 'package:emotion_tracker/providers/family/family_api_service.dart';
 import 'package:emotion_tracker/widgets/loading_state_widget.dart';
 import 'package:emotion_tracker/widgets/error_state_widget.dart';
 import 'package:emotion_tracker/core/global_error_handler.dart';
@@ -14,6 +15,7 @@ import 'package:local_auth/local_auth.dart';
 import 'package:emotion_tracker/core/session_manager.dart';
 import 'package:emotion_tracker/core/exceptions.dart';
 import 'package:emotion_tracker/core/error_state.dart';
+import 'package:emotion_tracker/screens/settings/account/family/purchase_requests_screen.dart';
 import 'dart:async';
 
 // Timezone helper (from variant1)
@@ -70,6 +72,7 @@ class _SBDAccountScreenState extends ConsumerState<SBDAccountScreen>
 
   final TextEditingController _recipientController = TextEditingController();
   final TextEditingController _amountController = TextEditingController();
+  final TextEditingController _reasonController = TextEditingController();
   bool _isSending = false;
   ErrorState? _errorState;
 
@@ -139,6 +142,7 @@ class _SBDAccountScreenState extends ConsumerState<SBDAccountScreen>
   void dispose() {
     _recipientController.dispose();
     _amountController.dispose();
+    _reasonController.dispose();
     super.dispose();
   }
 
@@ -189,7 +193,7 @@ class _SBDAccountScreenState extends ConsumerState<SBDAccountScreen>
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.send_rounded),
-            label: 'Send',
+            label: detailsState.family?.isAdmin ?? false ? 'Send' : 'Request',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.receipt_long_rounded),
@@ -337,7 +341,9 @@ class _SBDAccountScreenState extends ConsumerState<SBDAccountScreen>
               ),
             ),
             const SizedBox(height: 12),
-            Row(
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
               children: [
                 Expanded(
                   child: _buildQuickActionCard(
@@ -350,7 +356,6 @@ class _SBDAccountScreenState extends ConsumerState<SBDAccountScreen>
                     ),
                   ),
                 ),
-                const SizedBox(width: 12),
                 Expanded(
                   child: _buildQuickActionCard(
                     theme: theme,
@@ -360,6 +365,19 @@ class _SBDAccountScreenState extends ConsumerState<SBDAccountScreen>
                     onTap: _showQrScanDialog,
                   ),
                 ),
+                // Family Shop removed temporarily
+                // Token Requests quick action removed per request
+                if (isAdmin)
+                  Expanded(
+                    child: _buildQuickActionCard(
+                      theme: theme,
+                      icon: Icons.admin_panel_settings_rounded,
+                      label: 'Purchase Requests',
+                      color: Colors.orange,
+                      onTap: () =>
+                          _navigateToPurchaseRequests(context, widget.familyId),
+                    ),
+                  ),
               ],
             ),
             const SizedBox(height: 24),
@@ -550,7 +568,7 @@ class _SBDAccountScreenState extends ConsumerState<SBDAccountScreen>
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Send Form Card
+            // Send/Request Form Card
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(24),
@@ -571,14 +589,18 @@ class _SBDAccountScreenState extends ConsumerState<SBDAccountScreen>
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
-                          Icons.send_rounded,
+                          isAdmin
+                              ? Icons.send_rounded
+                              : Icons.request_page_rounded,
                           color: theme.primaryColor,
                           size: 24,
                         ),
                       ),
                       const SizedBox(width: 12),
                       Text(
-                        'Send from Family Account',
+                        isAdmin
+                            ? 'Send from Family Account'
+                            : 'Request SBD Tokens',
                         style: theme.textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
@@ -587,46 +609,83 @@ class _SBDAccountScreenState extends ConsumerState<SBDAccountScreen>
                   ),
                   const SizedBox(height: 24),
 
-                  // Recipient Field
-                  Text(
-                    'Recipient',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: theme.colorScheme.onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: _recipientController,
-                    maxLength: 50,
-                    decoration: InputDecoration(
-                      hintText: 'Enter username',
-                      filled: true,
-                      fillColor: theme.scaffoldBackgroundColor,
-                      counterText: '',
-                      prefixIcon: Icon(
-                        Icons.person_outline,
-                        color: theme.primaryColor,
+                  if (isAdmin) ...[
+                    // Recipient Field (Admin only)
+                    Text(
+                      'Recipient',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: theme.colorScheme.onSurface,
                       ),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          Icons.qr_code_scanner_rounded,
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _recipientController,
+                      maxLength: 50,
+                      decoration: InputDecoration(
+                        hintText: 'Enter username',
+                        filled: true,
+                        fillColor: theme.scaffoldBackgroundColor,
+                        counterText: '',
+                        prefixIcon: Icon(
+                          Icons.person_outline,
                           color: theme.primaryColor,
                         ),
-                        onPressed: _showQrScanDialog,
-                        tooltip: 'Scan QR Code',
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 16,
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            Icons.qr_code_scanner_rounded,
+                            color: theme.primaryColor,
+                          ),
+                          onPressed: _showQrScanDialog,
+                          tooltip: 'Scan QR Code',
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 16,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 20),
+                    const SizedBox(height: 20),
+                  ] else ...[
+                    // Reason Field (Non-admin only)
+                    Text(
+                      'Reason',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: theme.colorScheme.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _reasonController,
+                      maxLines: 3,
+                      maxLength: 500,
+                      decoration: InputDecoration(
+                        hintText:
+                            'Why do you need these tokens? (min 5 characters)',
+                        filled: true,
+                        fillColor: theme.scaffoldBackgroundColor,
+                        counterText: '',
+                        prefixIcon: Icon(
+                          Icons.edit_note,
+                          color: theme.primaryColor,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 16,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                  ],
 
                   // Amount Field
                   Text(
@@ -666,7 +725,7 @@ class _SBDAccountScreenState extends ConsumerState<SBDAccountScreen>
                   ),
                   const SizedBox(height: 8),
 
-                  // Available Balance Display
+                  // Balance Display
                   Row(
                     children: [
                       Icon(
@@ -676,14 +735,16 @@ class _SBDAccountScreenState extends ConsumerState<SBDAccountScreen>
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        '${account.displayName} balance: ${account.balance} SBD',
+                        isAdmin
+                            ? '${account.displayName} balance: ${account.balance} SBD'
+                            : 'Request will be reviewed by family admin',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.hintColor,
                         ),
                       ),
                     ],
                   ),
-                  if (account.isFrozen) ...[
+                  if (account.isFrozen && isAdmin) ...[
                     const SizedBox(height: 8),
                     Container(
                       padding: const EdgeInsets.all(8),
@@ -713,16 +774,18 @@ class _SBDAccountScreenState extends ConsumerState<SBDAccountScreen>
                   ],
                   const SizedBox(height: 24),
 
-                  // Send Button
+                  // Action Button
                   SizedBox(
                     width: double.infinity,
                     height: 54,
                     child: ElevatedButton(
-                      onPressed: account.isFrozen || _isSending || !isAdmin
-                          ? null
-                          : _handleSendTokens,
+                      onPressed: isAdmin
+                          ? (account.isFrozen || _isSending
+                                ? null
+                                : _handleSendTokens)
+                          : _handleRequestTokens,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: account.isFrozen
+                        backgroundColor: isAdmin && account.isFrozen
                             ? Colors.grey
                             : theme.primaryColor,
                         foregroundColor: Colors.white,
@@ -745,14 +808,19 @@ class _SBDAccountScreenState extends ConsumerState<SBDAccountScreen>
                           : Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                const Icon(Icons.send_rounded, size: 20),
+                                Icon(
+                                  isAdmin
+                                      ? Icons.send_rounded
+                                      : Icons.request_page_rounded,
+                                  size: 20,
+                                ),
                                 const SizedBox(width: 8),
                                 Text(
-                                  account.isFrozen
-                                      ? 'Account Frozen'
-                                      : !isAdmin
-                                      ? 'Admin Only'
-                                      : 'Send Tokens',
+                                  isAdmin
+                                      ? (account.isFrozen
+                                            ? 'Account Frozen'
+                                            : 'Send Tokens')
+                                      : 'Request Tokens',
                                   style: const TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
@@ -781,7 +849,9 @@ class _SBDAccountScreenState extends ConsumerState<SBDAccountScreen>
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      'Family transfers require admin approval and biometric authentication',
+                      isAdmin
+                          ? 'Family transfers require admin approval and biometric authentication'
+                          : 'Token requests will be reviewed by family administrators',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: Colors.blue.shade700,
                       ),
@@ -838,9 +908,15 @@ class _SBDAccountScreenState extends ConsumerState<SBDAccountScreen>
 
     setState(() => _isSending = true);
     try {
-      // TODO: Implement family transfer API call
-      // For now, show success dialog
-      await Future.delayed(const Duration(seconds: 1)); // Simulate API call
+      // Call the real family transfer API
+      await ref
+          .read(familyApiServiceProvider)
+          .transferTokens(
+            familyId: widget.familyId,
+            toUserId: toUser, // This should be user ID, not username
+            amount: amount,
+            reason: 'Family wallet transfer from admin',
+          );
 
       if (!mounted) return;
 
@@ -916,6 +992,122 @@ class _SBDAccountScreenState extends ConsumerState<SBDAccountScreen>
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Failed: ${e.toString()}')));
+    } finally {
+      setState(() => _isSending = false);
+    }
+  }
+
+  Future<void> _handleRequestTokens() async {
+    final amountText = _amountController.text.trim();
+    final reason = _reasonController.text.trim();
+
+    if (amountText.isEmpty || reason.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter amount and reason.')),
+      );
+      return;
+    }
+
+    final amount = int.tryParse(amountText);
+    if (amount == null || amount <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter a valid amount greater than 0.'),
+        ),
+      );
+      return;
+    }
+
+    if (reason.length < 5) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Reason must be at least 5 characters long.'),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isSending = true);
+    try {
+      final success = await ref
+          .read(tokenRequestsProvider(widget.familyId).notifier)
+          .createRequest(amount: amount, reason: reason);
+
+      if (!mounted) return;
+
+      if (success) {
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) {
+            final theme = Theme.of(context);
+            return Dialog(
+              backgroundColor: Colors.transparent,
+              child: Container(
+                padding: const EdgeInsets.all(32),
+                decoration: BoxDecoration(
+                  color: theme.cardColor,
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.check_circle_rounded,
+                        color: Colors.green,
+                        size: 48,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      'Request Submitted!',
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Your request for $amount SBD has been submitted for admin approval.',
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodyLarge,
+                    ),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: theme.primaryColor,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text('Done'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+
+        _amountController.clear();
+        _reasonController.clear();
+        setState(() => _selectedTab = 0); // Switch back to Overview tab
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to submit request: ${e.toString()}')),
+      );
     } finally {
       setState(() => _isSending = false);
     }
@@ -1785,6 +1977,18 @@ class _SBDAccountScreenState extends ConsumerState<SBDAccountScreen>
       ),
     );
   }
+
+  // Family shop navigation removed as the quick action has been hidden.
+
+  void _navigateToPurchaseRequests(BuildContext context, String familyId) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => PurchaseRequestsScreen(familyId: familyId),
+      ),
+    );
+  }
+
+  // Token requests navigation removed as quick action is hidden.
 
   Widget _buildDetailRow({
     required ThemeData theme,

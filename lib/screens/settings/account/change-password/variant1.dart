@@ -15,13 +15,16 @@ import 'package:emotion_tracker/utils/http_util.dart';
 
 class ChangePasswordScreenV1 extends ConsumerStatefulWidget {
   final VoidCallback? onBackToSettings;
-  const ChangePasswordScreenV1({Key? key, this.onBackToSettings}) : super(key: key);
+  const ChangePasswordScreenV1({Key? key, this.onBackToSettings})
+    : super(key: key);
 
   @override
-  ConsumerState<ChangePasswordScreenV1> createState() => _ChangePasswordScreenV1State();
+  ConsumerState<ChangePasswordScreenV1> createState() =>
+      _ChangePasswordScreenV1State();
 }
 
-class _ChangePasswordScreenV1State extends ConsumerState<ChangePasswordScreenV1> {
+class _ChangePasswordScreenV1State
+    extends ConsumerState<ChangePasswordScreenV1> {
   final _formKey = GlobalKey<FormState>();
   final _currentPasswordController = TextEditingController();
   final _newPasswordController = TextEditingController();
@@ -47,11 +50,15 @@ class _ChangePasswordScreenV1State extends ConsumerState<ChangePasswordScreenV1>
       final currentPassword = _currentPasswordController.text.trim();
       final newPassword = _newPasswordController.text.trim();
       // Use centralized password validation
-      final passwordValidationError = InputValidator.validatePassword(newPassword);
+      final passwordValidationError = InputValidator.validatePassword(
+        newPassword,
+      );
       if (passwordValidationError != null) {
         setState(() {
           _isLoading = false;
-          _errorState = GlobalErrorHandler.processError(Exception(passwordValidationError));
+          _errorState = GlobalErrorHandler.processError(
+            Exception(passwordValidationError),
+          );
         });
         return;
       }
@@ -70,7 +77,10 @@ class _ChangePasswordScreenV1State extends ConsumerState<ChangePasswordScreenV1>
         _errorState = errorState;
       });
       if (e is core_exceptions.UnauthorizedException) {
-        SessionManager.redirectToLogin(context, message: 'Session expired. Please log in again.');
+        SessionManager.redirectToLogin(
+          context,
+          message: 'Session expired. Please log in again.',
+        );
         return;
       }
       GlobalErrorHandler.showErrorSnackbar(
@@ -110,7 +120,10 @@ class _ChangePasswordScreenV1State extends ConsumerState<ChangePasswordScreenV1>
             const SizedBox(height: 8),
             Text(errorState.message),
             const SizedBox(height: 16),
-            const Text('Troubleshooting steps:', style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text(
+              'Troubleshooting steps:',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 8),
             Text(_getTroubleshootingSteps(errorState.type)),
           ],
@@ -158,7 +171,10 @@ class _ChangePasswordScreenV1State extends ConsumerState<ChangePasswordScreenV1>
             }
           },
         ),
-        title: const Text('Update Password', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text(
+          'Update Password',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
         centerTitle: true,
         elevation: 2,
         shape: const RoundedRectangleBorder(
@@ -168,97 +184,118 @@ class _ChangePasswordScreenV1State extends ConsumerState<ChangePasswordScreenV1>
       body: _isLoading
           ? const LoadingStateWidget(message: 'Changing your password...')
           : _errorState != null
-              ? ErrorStateWidget(
-                  error: _errorState!,
-                  onRetry: _handleRetry,
-                  onInfo: () => _showErrorInfo(_errorState),
-                  customMessage: 'Unable to change password. Please try again.',
-                )
-              : SingleChildScrollView(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 18),
-                    child: Form(
-                      key: _formKey,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          const SizedBox(height: 24),
-                          Container(
-                            padding: const EdgeInsets.all(18),
-                            decoration: BoxDecoration(
-                              color: theme.cardColor,
-                              borderRadius: BorderRadius.circular(18),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: theme.shadowColor.withOpacity(0.08),
-                                  blurRadius: 16,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
+          ? ErrorStateWidget(
+              error: _errorState!,
+              onRetry: _handleRetry,
+              onInfo: () => _showErrorInfo(_errorState),
+              customMessage: 'Unable to change password. Please try again.',
+            )
+          : SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  vertical: 18,
+                  horizontal: 18,
+                ),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const SizedBox(height: 24),
+                      Container(
+                        padding: const EdgeInsets.all(18),
+                        decoration: BoxDecoration(
+                          color: theme.cardColor,
+                          borderRadius: BorderRadius.circular(18),
+                          boxShadow: [
+                            BoxShadow(
+                              color: theme.shadowColor.withOpacity(0.08),
+                              blurRadius: 16,
+                              offset: const Offset(0, 4),
                             ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                Text(
-                                  'Change your password',
-                                  style: theme.textTheme.headlineSmall?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    color: theme.primaryColor,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                                const SizedBox(height: 18),
-                                _buildPasswordField(
-                                  theme,
-                                  label: 'Current Password',
-                                  controller: _currentPasswordController,
-                                  validator: (v) => v == null || v.isEmpty ? 'Enter current password' : null,
-                                ),
-                                const SizedBox(height: 12),
-                                _buildPasswordField(
-                                  theme,
-                                  label: 'New Password',
-                                  controller: _newPasswordController,
-                                  validator: (v) => v == null || v.length < 6 ? 'Min 6 characters' : null,
-                                ),
-                                const SizedBox(height: 12),
-                                _buildPasswordField(
-                                  theme,
-                                  label: 'Confirm New Password',
-                                  controller: _confirmPasswordController,
-                                  validator: (v) => v != _newPasswordController.text ? 'Passwords do not match' : null,
-                                ),
-                                const SizedBox(height: 24),
-                                ElevatedButton.icon(
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: theme.primaryColor,
-                                    foregroundColor: theme.colorScheme.onPrimary,
-                                    minimumSize: const Size.fromHeight(48),
-                                    textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(14),
-                                    ),
-                                    elevation: 2,
-                                  ),
-                                  icon: const Icon(Icons.lock_reset),
-                                  onPressed: _isLoading ? null : _handleChangePassword,
-                                  label: const Text('Change Password'),
-                                ),
-                                const SizedBox(height: 10),
-                                TextButton(
-                                  onPressed: () {
-                                    Navigator.of(context).pushNamed('/forgot-password/v1');
-                                  },
-                                  child: const Text('Forgot Password?', style: TextStyle(decoration: TextDecoration.underline)),
-                                ),
-                              ],
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Text(
+                              'Change your password',
+                              style: theme.textTheme.headlineSmall?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: theme.primaryColor,
+                              ),
+                              textAlign: TextAlign.center,
                             ),
-                          ),
-                        ],
+                            const SizedBox(height: 18),
+                            _buildPasswordField(
+                              theme,
+                              label: 'Current Password',
+                              controller: _currentPasswordController,
+                              validator: (v) => v == null || v.isEmpty
+                                  ? 'Enter current password'
+                                  : null,
+                            ),
+                            const SizedBox(height: 12),
+                            _buildPasswordField(
+                              theme,
+                              label: 'New Password',
+                              controller: _newPasswordController,
+                              validator: (v) => v == null || v.length < 6
+                                  ? 'Min 6 characters'
+                                  : null,
+                            ),
+                            const SizedBox(height: 12),
+                            _buildPasswordField(
+                              theme,
+                              label: 'Confirm New Password',
+                              controller: _confirmPasswordController,
+                              validator: (v) => v != _newPasswordController.text
+                                  ? 'Passwords do not match'
+                                  : null,
+                            ),
+                            const SizedBox(height: 24),
+                            ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: theme.primaryColor,
+                                foregroundColor: theme.colorScheme.onPrimary,
+                                minimumSize: const Size.fromHeight(48),
+                                textStyle: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                elevation: 2,
+                              ),
+                              icon: const Icon(Icons.lock_reset),
+                              onPressed: _isLoading
+                                  ? null
+                                  : _handleChangePassword,
+                              label: const Text('Change Password'),
+                            ),
+                            const SizedBox(height: 10),
+                            TextButton(
+                              onPressed: () {
+                                Navigator.of(
+                                  context,
+                                ).pushNamed('/forgot-password/v1');
+                              },
+                              child: const Text(
+                                'Forgot Password?',
+                                style: TextStyle(
+                                  decoration: TextDecoration.underline,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
+                    ],
                   ),
                 ),
+              ),
+            ),
     );
   }
 
@@ -271,7 +308,12 @@ class _ChangePasswordScreenV1State extends ConsumerState<ChangePasswordScreenV1>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500)),
+        Text(
+          label,
+          style: theme.textTheme.bodyLarge?.copyWith(
+            fontWeight: FontWeight.w500,
+          ),
+        ),
         const SizedBox(height: 6),
         TextFormField(
           controller: controller,
@@ -284,7 +326,10 @@ class _ChangePasswordScreenV1State extends ConsumerState<ChangePasswordScreenV1>
             border: theme.inputDecorationTheme.border,
             focusedBorder: theme.inputDecorationTheme.focusedBorder,
             enabledBorder: theme.inputDecorationTheme.enabledBorder,
-            contentPadding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+            contentPadding: const EdgeInsets.symmetric(
+              vertical: 18,
+              horizontal: 16,
+            ),
           ),
         ),
       ],
@@ -293,13 +338,19 @@ class _ChangePasswordScreenV1State extends ConsumerState<ChangePasswordScreenV1>
 }
 
 /// Calls the backend API to change the user's password
-Future<void> changePassword(WidgetRef ref, String currentPassword, String newPassword) async {
+Future<void> changePassword(
+  WidgetRef ref,
+  String currentPassword,
+  String newPassword,
+) async {
   final baseUrl = ref.read(apiBaseUrlProvider);
   final url = Uri.parse('$baseUrl/auth/change-password');
   final secureStorage = ref.read(secureStorageProvider);
   final token = await secureStorage.read(key: 'access_token');
   if (token == null || token.isEmpty) {
-    throw core_exceptions.UnauthorizedException('Session expired. Please log in again.');
+    throw core_exceptions.UnauthorizedException(
+      'Session expired. Please log in again.',
+    );
   }
   final userAgent = await getUserAgent();
   final headers = {
@@ -321,7 +372,9 @@ Future<void> changePassword(WidgetRef ref, String currentPassword, String newPas
     return;
   } else if (response.statusCode == 401) {
     await ref.read(authProvider.notifier).logout();
-    throw core_exceptions.UnauthorizedException('Session expired. Please log in again.');
+    throw core_exceptions.UnauthorizedException(
+      'Session expired. Please log in again.',
+    );
   } else if (response.statusCode == 429) {
     String message = 'Too many requests. Please wait before trying again.';
     try {
@@ -332,7 +385,10 @@ Future<void> changePassword(WidgetRef ref, String currentPassword, String newPas
     } catch (_) {}
     throw core_exceptions.RateLimitException(message);
   } else if (response.statusCode >= 500 && response.statusCode < 600) {
-    throw core_exceptions.ApiException('Server error (${response.statusCode}). Please try again later.', response.statusCode);
+    throw core_exceptions.ApiException(
+      'Server error (${response.statusCode}). Please try again later.',
+      response.statusCode,
+    );
   } else {
     String errorMsg = 'Failed to change password.';
     try {

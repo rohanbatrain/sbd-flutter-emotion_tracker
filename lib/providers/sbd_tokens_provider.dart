@@ -60,18 +60,33 @@ class SbdTokensNotifier extends StateNotifier<SbdTokensState> {
           ? Uri.parse('$baseUrl/sbd_tokens/$username')
           : Uri.parse('$baseUrl/sbd_tokens');
       final userAgent = await getUserAgent();
-      final res = await http.get(url, headers: {
-        'Authorization': 'Bearer $token',
-        'User-Agent': userAgent,
-        'X-User-Agent': userAgent,
-      });
+      final res = await http.get(
+        url,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'User-Agent': userAgent,
+          'X-User-Agent': userAgent,
+        },
+      );
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
-        state = state.copyWith(balance: data['sbd_tokens'], isLoading: false, error: null);
+        state = state.copyWith(
+          balance: data['sbd_tokens'],
+          isLoading: false,
+          error: null,
+        );
       } else if (res.statusCode == 401) {
-        state = state.copyWith(isLoading: false, error: 'Session expired. Please log in again.');
+        state = state.copyWith(
+          isLoading: false,
+          error: 'Session expired. Please log in again.',
+        );
       } else {
-        state = state.copyWith(isLoading: false, error: jsonDecode(res.body)['detail']?.toString() ?? 'Failed to fetch balance');
+        state = state.copyWith(
+          isLoading: false,
+          error:
+              jsonDecode(res.body)['detail']?.toString() ??
+              'Failed to fetch balance',
+        );
       }
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
@@ -94,10 +109,7 @@ class SbdTokensNotifier extends StateNotifier<SbdTokensState> {
           'User-Agent': userAgent,
           'X-User-Agent': userAgent,
         },
-        body: jsonEncode({
-          'to_user': toUser,
-          'amount': amount,
-        }),
+        body: jsonEncode({'to_user': toUser, 'amount': amount}),
       );
       if (res.statusCode == 200) {
         state = state.copyWith(isLoading: false, error: null);
@@ -105,7 +117,10 @@ class SbdTokensNotifier extends StateNotifier<SbdTokensState> {
         return true;
       } else {
         final err = jsonDecode(res.body);
-        state = state.copyWith(isLoading: false, error: err['detail']?.toString() ?? 'Failed to send tokens');
+        state = state.copyWith(
+          isLoading: false,
+          error: err['detail']?.toString() ?? 'Failed to send tokens',
+        );
         return false;
       }
     } on http_util.CloudflareTunnelException catch (e) {
@@ -120,32 +135,56 @@ class SbdTokensNotifier extends StateNotifier<SbdTokensState> {
     }
   }
 
-  Future<void> fetchTransactions({String? username, int skip = 0, int limit = 5}) async {
+  Future<void> fetchTransactions({
+    String? username,
+    int skip = 0,
+    int limit = 5,
+  }) async {
     await Future(() async {
       state = state.copyWith(isLoading: true, error: null);
       try {
         final token = await _getToken();
         if (token == null) throw UnauthorizedException('Not authenticated');
         final baseUrl = _getBaseUrl();
-        final userPath = username != null && username.isNotEmpty ? '/$username' : '';
-        final url = Uri.parse('$baseUrl/sbd_tokens/transactions$userPath?skip=$skip&limit=$limit');
+        final userPath = username != null && username.isNotEmpty
+            ? '/$username'
+            : '';
+        final url = Uri.parse(
+          '$baseUrl/sbd_tokens/transactions$userPath?skip=$skip&limit=$limit',
+        );
         final userAgent = await getUserAgent();
-        final res = await http_util.HttpUtil.get(url, headers: {
-          'Authorization': 'Bearer $token',
-          'User-Agent': userAgent,
-          'X-User-Agent': userAgent,
-        });
+        final res = await http_util.HttpUtil.get(
+          url,
+          headers: {
+            'Authorization': 'Bearer $token',
+            'User-Agent': userAgent,
+            'X-User-Agent': userAgent,
+          },
+        );
         if (res.statusCode == 200) {
           final data = jsonDecode(res.body);
-          state = state.copyWith(transactions: data['transactions'], isLoading: false, error: null);
+          state = state.copyWith(
+            transactions: data['transactions'],
+            isLoading: false,
+            error: null,
+          );
         } else if (res.statusCode == 404) {
-          state = state.copyWith(transactions: [], isLoading: false, error: null);
+          state = state.copyWith(
+            transactions: [],
+            isLoading: false,
+            error: null,
+          );
         } else if (res.statusCode == 401) {
           throw UnauthorizedException('Session expired. Please log in again.');
         } else if (res.statusCode == 429) {
-          throw RateLimitException('Too many requests. Please wait before trying again.');
+          throw RateLimitException(
+            'Too many requests. Please wait before trying again.',
+          );
         } else if (res.statusCode >= 500 && res.statusCode < 600) {
-          throw ApiException('Server error (${res.statusCode}). Please try again later.', res.statusCode);
+          throw ApiException(
+            'Server error (${res.statusCode}). Please try again later.',
+            res.statusCode,
+          );
         } else {
           String errorMsg = 'Failed to fetch transactions';
           try {
@@ -178,7 +217,10 @@ class SbdTokensNotifier extends StateNotifier<SbdTokensState> {
     });
   }
 
-  Future<bool> updateTransactionNote({required String transactionId, required String note}) async {
+  Future<bool> updateTransactionNote({
+    required String transactionId,
+    required String note,
+  }) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
       final token = await _getToken();
@@ -191,10 +233,7 @@ class SbdTokensNotifier extends StateNotifier<SbdTokensState> {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
         },
-        body: jsonEncode({
-          'transaction_id': transactionId,
-          'note': note,
-        }),
+        body: jsonEncode({'transaction_id': transactionId, 'note': note}),
       );
       if (res.statusCode == 200) {
         state = state.copyWith(isLoading: false, error: null);
@@ -215,6 +254,7 @@ class SbdTokensNotifier extends StateNotifier<SbdTokensState> {
   }
 }
 
-final sbdTokensProvider = StateNotifierProvider<SbdTokensNotifier, SbdTokensState>((ref) {
-  return SbdTokensNotifier(ref);
-});
+final sbdTokensProvider =
+    StateNotifierProvider<SbdTokensNotifier, SbdTokensState>((ref) {
+      return SbdTokensNotifier(ref);
+    });

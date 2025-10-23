@@ -566,6 +566,27 @@ class FamilyApiService {
     return requests.map((r) => models.TokenRequest.fromJson(r)).toList();
   }
 
+  // ==================== Direct Transfer (Admin Only) ====================
+
+  Future<Map<String, dynamic>> transferTokens({
+    required String familyId,
+    required String toUserId,
+    required int amount,
+    required String reason,
+  }) async {
+    final request = {
+      'to_user_id': toUserId,
+      'amount': amount,
+      'reason': reason,
+    };
+    final response = await _request(
+      'POST',
+      '/family/$familyId/sbd-account/transfer',
+      data: request,
+    );
+    return response;
+  }
+
   // ==================== Notification System ====================
 
   Future<List<models.FamilyNotification>> getNotifications(
@@ -641,5 +662,73 @@ class FamilyApiService {
     final actions =
         (response['admin_actions'] ?? response['items'] ?? []) as List;
     return actions.map((a) => models.AdminAction.fromJson(a)).toList();
+  }
+
+  // ==================== Family Shop Endpoints ====================
+
+  Future<List<Map<String, dynamic>>> getPaymentOptions() async {
+    final response = await _request('GET', '/shop/payment-options');
+    if (response.isEmpty) return [];
+    final options =
+        (response['payment_options'] ?? response['items'] ?? []) as List;
+    return options.map((o) => Map<String, dynamic>.from(o)).toList();
+  }
+
+  Future<Map<String, dynamic>> purchaseItem({
+    required String itemId,
+    required String itemType,
+    required int quantity,
+    required bool useFamilyWallet,
+    required String familyId,
+  }) async {
+    final request = {
+      'item_id': itemId,
+      'quantity': quantity,
+      'use_family_wallet': useFamilyWallet,
+      'family_id': familyId,
+    };
+    final response = await _request('POST', '/shop/purchase', data: request);
+    return response;
+  }
+
+  Future<List<Map<String, dynamic>>> getPurchaseRequests(
+    String familyId,
+  ) async {
+    final response = await _request(
+      'GET',
+      '/family/wallet/purchase-requests?family_id=$familyId',
+    );
+    if (response.isEmpty) return [];
+    final requests =
+        (response['purchase_requests'] ?? response['items'] ?? []) as List;
+    return requests.map((r) => Map<String, dynamic>.from(r)).toList();
+  }
+
+  Future<Map<String, dynamic>> approvePurchaseRequest(String requestId) async {
+    final response = await _request(
+      'POST',
+      '/family/wallet/purchase-requests/$requestId/approve',
+    );
+    return response;
+  }
+
+  Future<Map<String, dynamic>> denyPurchaseRequest(
+    String requestId, {
+    String? reason,
+  }) async {
+    final request = reason != null ? {'reason': reason} : <String, dynamic>{};
+    final response = await _request(
+      'POST',
+      '/family/wallet/purchase-requests/$requestId/deny',
+      data: request,
+    );
+    return response;
+  }
+
+  Future<List<Map<String, dynamic>>> getOwnedItems() async {
+    final response = await _request('GET', '/avatars/owned');
+    if (response.isEmpty) return [];
+    final items = (response['owned_items'] ?? response['items'] ?? []) as List;
+    return items.map((i) => Map<String, dynamic>.from(i)).toList();
   }
 }

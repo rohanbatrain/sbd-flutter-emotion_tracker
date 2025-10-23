@@ -45,11 +45,19 @@ final loginHistoryMigratedProvider = FutureProvider<List<Map<String, dynamic>>>(
       } else if (response.statusCode == 401) {
         throw UnauthorizedException('Session expired. Please log in again.');
       } else if (response.statusCode == 429) {
-        throw RateLimitException('Too many requests. Please wait before trying again.');
+        throw RateLimitException(
+          'Too many requests. Please wait before trying again.',
+        );
       } else if (response.statusCode >= 500) {
-        throw ApiException('Server error occurred. Please try again later.', response.statusCode);
+        throw ApiException(
+          'Server error occurred. Please try again later.',
+          response.statusCode,
+        );
       } else {
-        throw ApiException('Failed to load login history: ${response.statusCode}', response.statusCode);
+        throw ApiException(
+          'Failed to load login history: ${response.statusCode}',
+          response.statusCode,
+        );
       }
     } catch (e) {
       rethrow;
@@ -82,7 +90,8 @@ class LoginHistoryScreen extends ConsumerStatefulWidget {
   ConsumerState<LoginHistoryScreen> createState() => _LoginHistoryScreenState();
 }
 
-class _LoginHistoryScreenState extends ConsumerState<LoginHistoryScreen> with RouteAware {
+class _LoginHistoryScreenState extends ConsumerState<LoginHistoryScreen>
+    with RouteAware {
   RouteObserver<PageRoute>? _routeObserver;
   PageRoute? _pageRoute;
   BannerAd? _preloadedBannerAd;
@@ -221,7 +230,10 @@ class _LoginHistoryScreenState extends ConsumerState<LoginHistoryScreen> with Ro
             const SizedBox(height: 8),
             Text(errorState.message),
             const SizedBox(height: 16),
-            const Text('Troubleshooting steps:', style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text(
+              'Troubleshooting steps:',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 8),
             Text(_getTroubleshootingSteps(errorState.type)),
           ],
@@ -262,7 +274,9 @@ class _LoginHistoryScreenState extends ConsumerState<LoginHistoryScreen> with Ro
         final textTheme = theme.textTheme;
         final colorScheme = theme.colorScheme;
 
-        final successfulLogins = items.where((e) => e['outcome'] == 'success').toList();
+        final successfulLogins = items
+            .where((e) => e['outcome'] == 'success')
+            .toList();
         if (successfulLogins.isEmpty) {
           return Scaffold(
             appBar: AppBar(
@@ -272,7 +286,12 @@ class _LoginHistoryScreenState extends ConsumerState<LoginHistoryScreen> with Ro
               elevation: 1,
             ),
             backgroundColor: colorScheme.surface,
-            body: Center(child: Text('No recent logins found.', style: textTheme.bodyLarge)),
+            body: Center(
+              child: Text(
+                'No recent logins found.',
+                style: textTheme.bodyLarge,
+              ),
+            ),
           );
         }
 
@@ -302,7 +321,11 @@ class _LoginHistoryScreenState extends ConsumerState<LoginHistoryScreen> with Ro
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.lock_clock, color: colorScheme.primary, size: 26),
+                    Icon(
+                      Icons.lock_clock,
+                      color: colorScheme.primary,
+                      size: 26,
+                    ),
                     const SizedBox(width: 14),
                     Expanded(
                       child: Text(
@@ -331,7 +354,10 @@ class _LoginHistoryScreenState extends ConsumerState<LoginHistoryScreen> with Ro
                     itemBuilder: (ctx, i) {
                       final l = recentItems[i];
                       final color = _statusColor(l['outcome']);
-                      final formattedDate = _formatTimestamp(l['timestamp'] ?? '', userTz);
+                      final formattedDate = _formatTimestamp(
+                        l['timestamp'] ?? '',
+                        userTz,
+                      );
                       final device = _shortUserAgent(l['user_agent'] ?? '');
                       final ip = l['ip_address'] ?? '';
                       final mfa = (l['mfa_status'] ?? false) as bool;
@@ -340,18 +366,26 @@ class _LoginHistoryScreenState extends ConsumerState<LoginHistoryScreen> with Ro
                         elevation: 2,
                         color: colorScheme.surface,
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         child: ListTile(
                           leading: Tooltip(
-                            message: _platformFromUserAgent(l['user_agent'] ?? ''),
+                            message: _platformFromUserAgent(
+                              l['user_agent'] ?? '',
+                            ),
                             child: CircleAvatar(
                               backgroundColor: color,
-                              child: _buildPlatformIcon(l['user_agent'] ?? '', color),
+                              child: _buildPlatformIcon(
+                                l['user_agent'] ?? '',
+                                color,
+                              ),
                             ),
                           ),
                           title: Text(
                             formattedDate,
-                            style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                            style: textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                           subtitle: Padding(
                             padding: const EdgeInsets.only(top: 4),
@@ -362,16 +396,29 @@ class _LoginHistoryScreenState extends ConsumerState<LoginHistoryScreen> with Ro
                                 Tooltip(
                                   message: l['user_agent'] ?? '',
                                   child: Chip(
-                                    label: Text(device, style: textTheme.labelMedium),
-                                    avatar: const Icon(Icons.devices_other, size: 16),
-                                    backgroundColor: colorScheme.primary.withOpacity(0.08),
+                                    label: Text(
+                                      device,
+                                      style: textTheme.labelMedium,
+                                    ),
+                                    avatar: const Icon(
+                                      Icons.devices_other,
+                                      size: 16,
+                                    ),
+                                    backgroundColor: colorScheme.primary
+                                        .withOpacity(0.08),
                                     shape: StadiumBorder(),
                                   ),
                                 ),
                                 Chip(
-                                  label: Text(_platformFromUserAgent(l['user_agent'] ?? ''), style: textTheme.labelMedium),
+                                  label: Text(
+                                    _platformFromUserAgent(
+                                      l['user_agent'] ?? '',
+                                    ),
+                                    style: textTheme.labelMedium,
+                                  ),
                                   avatar: const Icon(Icons.computer, size: 16),
-                                  backgroundColor: colorScheme.secondary.withOpacity(0.08),
+                                  backgroundColor: colorScheme.secondary
+                                      .withOpacity(0.08),
                                   shape: StadiumBorder(),
                                 ),
                                 Tooltip(
@@ -379,20 +426,34 @@ class _LoginHistoryScreenState extends ConsumerState<LoginHistoryScreen> with Ro
                                   child: InkWell(
                                     borderRadius: BorderRadius.circular(20),
                                     onTap: () async {
-                                      await Clipboard.setData(ClipboardData(text: ip));
+                                      await Clipboard.setData(
+                                        ClipboardData(text: ip),
+                                      );
                                       if (context.mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
                                           SnackBar(
                                             content: Text('IP address copied!'),
-                                            duration: const Duration(seconds: 2),
+                                            duration: const Duration(
+                                              seconds: 2,
+                                            ),
                                           ),
                                         );
                                       }
                                     },
                                     child: Chip(
-                                      label: Text(ip, style: textTheme.labelMedium),
-                                      avatar: const Icon(Icons.public, size: 16),
-                                      backgroundColor: colorScheme.tertiaryContainer.withOpacity(0.08),
+                                      label: Text(
+                                        ip,
+                                        style: textTheme.labelMedium,
+                                      ),
+                                      avatar: const Icon(
+                                        Icons.public,
+                                        size: 16,
+                                      ),
+                                      backgroundColor: colorScheme
+                                          .tertiaryContainer
+                                          .withOpacity(0.08),
                                       shape: StadiumBorder(),
                                     ),
                                   ),
@@ -400,15 +461,22 @@ class _LoginHistoryScreenState extends ConsumerState<LoginHistoryScreen> with Ro
                                 if (mfa)
                                   Chip(
                                     label: const Text('MFA'),
-                                    avatar: const Icon(Icons.security, size: 16),
-                                    backgroundColor: colorScheme.error.withOpacity(0.08),
+                                    avatar: const Icon(
+                                      Icons.security,
+                                      size: 16,
+                                    ),
+                                    backgroundColor: colorScheme.error
+                                        .withOpacity(0.08),
                                     shape: StadiumBorder(),
                                   ),
                               ],
                             ),
                           ),
                           trailing: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
                             decoration: BoxDecoration(
                               color: color.withOpacity(.12),
                               borderRadius: BorderRadius.circular(6),
@@ -416,7 +484,9 @@ class _LoginHistoryScreenState extends ConsumerState<LoginHistoryScreen> with Ro
                             child: Text(
                               l['outcome'],
                               style: textTheme.labelLarge?.copyWith(
-                                color: color, fontWeight: FontWeight.bold),
+                                color: color,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                           onTap: () {
@@ -424,11 +494,15 @@ class _LoginHistoryScreenState extends ConsumerState<LoginHistoryScreen> with Ro
                               context: context,
                               builder: (_) => _LoginDetailsSheet(
                                 login: l,
-                                bannerAd: _bannerLoaded ? _preloadedBannerAd : null,
+                                bannerAd: _bannerLoaded
+                                    ? _preloadedBannerAd
+                                    : null,
                               ),
                               backgroundColor: colorScheme.surface,
                               shape: const RoundedRectangleBorder(
-                                borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+                                borderRadius: BorderRadius.vertical(
+                                  top: Radius.circular(18),
+                                ),
                               ),
                             );
                           },
@@ -442,15 +516,21 @@ class _LoginHistoryScreenState extends ConsumerState<LoginHistoryScreen> with Ro
           ),
         );
       },
-      loading: () => const LoadingStateWidget(message: 'Loading your login history...'),
+      loading: () =>
+          const LoadingStateWidget(message: 'Loading your login history...'),
       error: (error, stackTrace) {
         if (error is UnauthorizedException) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            SessionManager.redirectToLogin(context, message: 'Your session has expired. Please log in again.');
+            SessionManager.redirectToLogin(
+              context,
+              message: 'Your session has expired. Please log in again.',
+            );
           });
           return Scaffold(
             backgroundColor: theme.scaffoldBackgroundColor,
-            body: Center(child: Text('Session expired. Redirecting to login...')),
+            body: Center(
+              child: Text('Session expired. Redirecting to login...'),
+            ),
           );
         }
         return ErrorStateWidget(
@@ -484,20 +564,30 @@ class _LoginDetailsSheet extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text('Login details',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        )),
+                Text(
+                  'Login details',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 const SizedBox(height: 12),
                 ...login.entries
-                    .where((e) => e.value != null && e.value.toString().trim().isNotEmpty)
-                    .map((e) => Row(
-                          children: [
-                            Text('${e.key}: ',
-                                style: const TextStyle(fontWeight: FontWeight.w600)),
-                            Expanded(child: Text(e.value?.toString() ?? '')),
-                          ],
-                        )),
+                    .where(
+                      (e) =>
+                          e.value != null &&
+                          e.value.toString().trim().isNotEmpty,
+                    )
+                    .map(
+                      (e) => Row(
+                        children: [
+                          Text(
+                            '${e.key}: ',
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          Expanded(child: Text(e.value?.toString() ?? '')),
+                        ],
+                      ),
+                    ),
                 const SizedBox(height: 12),
               ],
             ),

@@ -397,7 +397,20 @@ class TokenRequestsNotifier extends StateNotifier<TokenRequestsState> {
         familyId,
         request,
       );
-      state = state.copyWith(myRequests: [...state.myRequests, tokenRequest]);
+
+      // Server may auto-approve some requests. For non-admin users we want the
+      // newly created request to show as 'pending' locally until the app reloads
+      // the true state from the server. Create a local copy forcing status to
+      // 'pending' unless the server explicitly returns something we should trust.
+      models.TokenRequest localPending = tokenRequest;
+      try {
+        if (tokenRequest.isPending == false) {
+          // Force a pending representation locally for immediate UI feedback.
+          localPending = tokenRequest.copyWith(status: 'pending');
+        }
+      } catch (_) {}
+
+      state = state.copyWith(myRequests: [...state.myRequests, localPending]);
       return true;
     } catch (e) {
       state = state.copyWith(error: e.toString());
@@ -612,4 +625,196 @@ final transactionsProvider =
     >((ref, familyId) {
       final apiService = ref.watch(familyApiServiceProvider);
       return TransactionsNotifier(apiService, familyId);
+    });
+
+// ==================== Family Shop Providers ====================
+
+class FamilyShopState {
+  final List<Map<String, dynamic>> paymentOptions;
+  final List<Map<String, dynamic>> purchaseRequests;
+  final List<Map<String, dynamic>> ownedItems;
+  final bool isLoading;
+  final String? error;
+
+  FamilyShopState({
+    required this.paymentOptions,
+    required this.purchaseRequests,
+    required this.ownedItems,
+    required this.isLoading,
+    this.error,
+  });
+
+  FamilyShopState copyWith({
+    List<Map<String, dynamic>>? paymentOptions,
+    List<Map<String, dynamic>>? purchaseRequests,
+    List<Map<String, dynamic>>? ownedItems,
+    bool? isLoading,
+    String? error,
+  }) {
+    return FamilyShopState(
+      paymentOptions: paymentOptions ?? this.paymentOptions,
+      purchaseRequests: purchaseRequests ?? this.purchaseRequests,
+      ownedItems: ownedItems ?? this.ownedItems,
+      isLoading: isLoading ?? this.isLoading,
+      error: error,
+    );
+  }
+}
+
+class FamilyShopNotifier extends StateNotifier<FamilyShopState> {
+  final FamilyApiService _apiService;
+  final String familyId;
+
+  FamilyShopNotifier(this._apiService, this.familyId)
+    : super(
+        FamilyShopState(
+          paymentOptions: [],
+          purchaseRequests: [],
+          ownedItems: [],
+          isLoading: false,
+        ),
+      );
+
+  Future<void> loadPaymentOptions() async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final options = await _apiService.getPaymentOptions();
+      state = state.copyWith(paymentOptions: options, isLoading: false);
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+    }
+  }
+
+  Future<bool> purchaseItem({
+    required String itemId,
+    required String itemType,
+    required int quantity,
+  }) async {
+    try {
+      await _apiService.purchaseItem(
+        itemId: itemId,
+        itemType: itemType,
+        quantity: quantity,
+        useFamilyWallet: true,
+        familyId: familyId,
+      );
+      // Refresh owned items after purchase
+      await loadOwnedItems();
+      return true;
+    } catch (e) {
+      state = state.copyWith(error: e.toString());
+      return false;
+    }
+  }
+
+  Future<void> loadPurchaseRequests() async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final requests = await _apiService.getPurchaseRequests(familyId);
+      state = state.copyWith(purchaseRequests: requests, isLoading: false);
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+    }
+  }
+
+  Future<bool> approvePurchaseRequest(String requestId) async {
+    try {
+      await _apiService.approvePurchaseRequest(requestId);
+      // Refresh requests
+      await loadPurchaseRequests();
+      return true;
+    } catch (e) {
+      state = state.copyWith(error: e.toString());
+      return false;
+    }
+  }
+
+  Future<bool> denyPurchaseRequest(String requestId, {String? reason}) async {
+    try {
+      await _apiService.denyPurchaseRequest(requestId, reason: reason);
+      // Refresh requests
+      await loadPurchaseRequests();
+      return true;
+    } catch (e) {
+      state = state.copyWith(error: e.toString());
+      return false;
+    }
+  }
+
+  Future<void> loadOwnedItems() async {
+    try {
+      final items = await _apiService.getOwnedItems();
+      state = state.copyWith(ownedItems: items);
+    } catch (e) {
+      state = state.copyWith(error: e.toString());
+    }
+  }
+
+  void clearError() {
+    state = state.copyWith(error: null);
+  }
+}
+
+final familyShopProvider =
+    StateNotifierProvider.family<FamilyShopNotifier, FamilyShopState, String>((
+      ref,
+      familyId,
+    ) {
+      final apiService = ref.watch(familyApiServiceProvider);
+      return FamilyShopNotifier(apiService, familyId);
+    });
+
+// Family Wallet Provider
+class FamilyWalletState {
+  final Map<String, dynamic>? walletInfo;
+  final bool isLoading;
+  final String? error;
+
+  FamilyWalletState({this.walletInfo, required this.isLoading, this.error});
+
+  FamilyWalletState copyWith({
+    Map<String, dynamic>? walletInfo,
+    bool? isLoading,
+    String? error,
+  }) {
+    return FamilyWalletState(
+      walletInfo: walletInfo ?? this.walletInfo,
+      isLoading: isLoading ?? this.isLoading,
+      error: error,
+    );
+  }
+}
+
+class FamilyWalletNotifier extends StateNotifier<FamilyWalletState> {
+  final FamilyApiService _apiService;
+  final String familyId;
+
+  FamilyWalletNotifier(this._apiService, this.familyId)
+    : super(FamilyWalletState(isLoading: false));
+
+  Future<void> loadWalletInfo() async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      // Assuming getFamilyDetails or similar provides wallet info
+      final family = await _apiService.getMyFamilies().then(
+        (families) => families.firstWhere((f) => f.familyId == familyId),
+      );
+      state = state.copyWith(
+        walletInfo: family.sbdAccount?.toJson(),
+        isLoading: false,
+      );
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+    }
+  }
+}
+
+final familyWalletProvider =
+    StateNotifierProvider.family<
+      FamilyWalletNotifier,
+      FamilyWalletState,
+      String
+    >((ref, familyId) {
+      final apiService = ref.watch(familyApiServiceProvider);
+      return FamilyWalletNotifier(apiService, familyId);
     });

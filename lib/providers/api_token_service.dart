@@ -84,10 +84,9 @@ class ApiToken {
       tokenId: json['token_id'] as String,
       description: json['description'] as String,
       createdAt: DateTime.parse(json['created_at'] as String),
-      lastUsed:
-          json['last_used'] != null
-              ? DateTime.parse(json['last_used'] as String)
-              : null,
+      lastUsed: json['last_used'] != null
+          ? DateTime.parse(json['last_used'] as String)
+          : null,
       revoked: json['revoked'] as bool? ?? false,
       tokenValue: json['token'] as String?,
     );

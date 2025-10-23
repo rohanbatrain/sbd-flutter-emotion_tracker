@@ -44,8 +44,9 @@ class GlobalErrorHandler {
       type: ErrorType.rateLimited,
       config: config,
       title: ErrorConstants.rateLimitTitle,
-      message:
-          error.message.isNotEmpty ? error.message : ErrorConstants.rateLimited,
+      message: error.message.isNotEmpty
+          ? error.message
+          : ErrorConstants.rateLimited,
       metadata: {'originalError': error},
     );
   }
@@ -57,10 +58,9 @@ class GlobalErrorHandler {
       type: ErrorType.cloudflareError,
       config: config,
       title: ErrorConstants.cloudflareTitle,
-      message:
-          error.message.isNotEmpty
-              ? error.message
-              : ErrorConstants.cloudflareDown,
+      message: error.message.isNotEmpty
+          ? error.message
+          : ErrorConstants.cloudflareDown,
       metadata: {
         'originalError': error,
         'statusCode': error.statusCode,
@@ -76,10 +76,9 @@ class GlobalErrorHandler {
       type: ErrorType.networkError,
       config: config,
       title: ErrorConstants.networkTitle,
-      message:
-          error.message.isNotEmpty
-              ? error.message
-              : ErrorConstants.networkError,
+      message: error.message.isNotEmpty
+          ? error.message
+          : ErrorConstants.networkError,
       metadata: {'originalError': error},
     );
   }

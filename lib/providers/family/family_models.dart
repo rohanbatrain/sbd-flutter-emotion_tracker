@@ -454,53 +454,52 @@ class ReceivedInvitation {
   }
 }
 
-class TokenRequest {
+class PurchaseRequest {
   final String requestId;
   final String familyId;
-  final String requestedBy;
-  final String requestedByUsername;
-  final int amount;
-  final String reason;
+  final PurchaseRequester requester;
+  final PurchaseItem item;
+  final int cost;
   final String status;
   final DateTime createdAt;
-  final String? reviewedBy;
-  final String? reviewedByUsername;
+  final PurchaseReviewer? reviewedBy;
   final DateTime? reviewedAt;
-  final String? reviewComments;
+  final String? denialReason;
+  final String? transactionId;
 
-  TokenRequest({
+  PurchaseRequest({
     required this.requestId,
     required this.familyId,
-    required this.requestedBy,
-    required this.requestedByUsername,
-    required this.amount,
-    required this.reason,
+    required this.requester,
+    required this.item,
+    required this.cost,
     required this.status,
     required this.createdAt,
     this.reviewedBy,
-    this.reviewedByUsername,
     this.reviewedAt,
-    this.reviewComments,
+    this.denialReason,
+    this.transactionId,
   });
 
-  factory TokenRequest.fromJson(Map<String, dynamic> json) {
-    return TokenRequest(
+  factory PurchaseRequest.fromJson(Map<String, dynamic> json) {
+    return PurchaseRequest(
       requestId: json['request_id'] ?? '',
       familyId: json['family_id'] ?? '',
-      requestedBy: json['requested_by'] ?? '',
-      requestedByUsername: json['requested_by_username'] ?? '',
-      amount: json['amount'] ?? 0,
-      reason: json['reason'] ?? '',
+      requester: PurchaseRequester.fromJson(json['requester'] ?? {}),
+      item: PurchaseItem.fromJson(json['item'] ?? {}),
+      cost: json['cost'] ?? 0,
       status: json['status'] ?? 'pending',
       createdAt: DateTime.parse(
         json['created_at'] ?? DateTime.now().toIso8601String(),
       ),
-      reviewedBy: json['reviewed_by'],
-      reviewedByUsername: json['reviewed_by_username'],
+      reviewedBy: json['reviewed_by'] != null
+          ? PurchaseReviewer.fromJson(json['reviewed_by'])
+          : null,
       reviewedAt: json['reviewed_at'] != null
           ? DateTime.parse(json['reviewed_at'])
           : null,
-      reviewComments: json['review_comments'],
+      denialReason: json['denial_reason'],
+      transactionId: json['transaction_id'],
     );
   }
 
@@ -508,23 +507,286 @@ class TokenRequest {
     return {
       'request_id': requestId,
       'family_id': familyId,
-      'requested_by': requestedBy,
-      'requested_by_username': requestedByUsername,
-      'amount': amount,
-      'reason': reason,
+      'requester': requester.toJson(),
+      'item': item.toJson(),
+      'cost': cost,
       'status': status,
       'created_at': createdAt.toIso8601String(),
-      if (reviewedBy != null) 'reviewed_by': reviewedBy,
-      if (reviewedByUsername != null)
-        'reviewed_by_username': reviewedByUsername,
+      if (reviewedBy != null) 'reviewed_by': reviewedBy!.toJson(),
       if (reviewedAt != null) 'reviewed_at': reviewedAt!.toIso8601String(),
-      if (reviewComments != null) 'review_comments': reviewComments,
+      if (denialReason != null) 'denial_reason': denialReason,
+      if (transactionId != null) 'transaction_id': transactionId,
     };
   }
 
   bool get isPending => status == 'pending';
   bool get isApproved => status == 'approved';
   bool get isDenied => status == 'denied';
+}
+
+class PurchaseRequester {
+  final String userId;
+  final String username;
+
+  PurchaseRequester({required this.userId, required this.username});
+
+  factory PurchaseRequester.fromJson(Map<String, dynamic> json) {
+    return PurchaseRequester(
+      userId: json['user_id'] ?? '',
+      username: json['username'] ?? '',
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {'user_id': userId, 'username': username};
+  }
+}
+
+class PurchaseItem {
+  final String itemId;
+  final String name;
+  final String itemType;
+  final String? imageUrl;
+
+  PurchaseItem({
+    required this.itemId,
+    required this.name,
+    required this.itemType,
+    this.imageUrl,
+  });
+
+  factory PurchaseItem.fromJson(Map<String, dynamic> json) {
+    return PurchaseItem(
+      itemId: json['item_id'] ?? '',
+      name: json['name'] ?? '',
+      itemType: json['item_type'] ?? '',
+      imageUrl: json['image_url'],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'item_id': itemId,
+      'name': name,
+      'item_type': itemType,
+      if (imageUrl != null) 'image_url': imageUrl,
+    };
+  }
+}
+
+class TokenRequest {
+  final String requestId;
+  final TokenRequester requester;
+  final String? fromUserId;
+  final String? fromUsername;
+  final int amount;
+  final String reason;
+  final String status;
+  final DateTime createdAt;
+  final TokenReviewer? reviewedBy;
+  final DateTime? reviewedAt;
+  final String? denialReason;
+  final String? reviewComments;
+  final bool? autoApproved;
+
+  TokenRequest({
+    required this.requestId,
+    required this.requester,
+    this.fromUserId,
+    this.fromUsername,
+    required this.amount,
+    required this.reason,
+    required this.status,
+    required this.createdAt,
+    this.reviewedBy,
+    this.reviewedAt,
+    this.denialReason,
+    this.reviewComments,
+    this.autoApproved,
+  });
+
+  factory TokenRequest.fromJson(Map<String, dynamic> json) {
+    // If a nested 'requester' object exists, use it; otherwise allow TokenRequester
+    // to inspect the top-level JSON for common fields (requester_username, from_username, username).
+    final requesterSource = json['requester'] is Map
+        ? Map<String, dynamic>.from(json['requester'])
+        : Map<String, dynamic>.from(json);
+
+    return TokenRequest(
+      requestId: json['request_id'] ?? '',
+      requester: TokenRequester.fromJson(requesterSource),
+      fromUserId: json['from_user_id'] ?? json['fromUserId'],
+      fromUsername: json['from_username'] ?? json['fromUsername'],
+      amount: json['amount'] ?? 0,
+      reason: json['reason'] ?? '',
+      status: json['status'] ?? 'pending',
+      createdAt: DateTime.parse(
+        json['created_at'] ?? DateTime.now().toIso8601String(),
+      ),
+      reviewedBy: json['reviewed_by'] != null
+          ? TokenReviewer.fromJson(json['reviewed_by'])
+          : null,
+      reviewedAt: json['reviewed_at'] != null
+          ? DateTime.parse(json['reviewed_at'])
+          : null,
+      denialReason: json['denial_reason'],
+      reviewComments: json['review_comments'],
+      autoApproved: json['auto_approved'] ?? json['autoApproved'],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'request_id': requestId,
+      'requester': requester.toJson(),
+      if (fromUserId != null) 'from_user_id': fromUserId,
+      if (fromUsername != null) 'from_username': fromUsername,
+      'amount': amount,
+      'reason': reason,
+      'status': status,
+      'created_at': createdAt.toIso8601String(),
+      if (reviewedBy != null) 'reviewed_by': reviewedBy!.toJson(),
+      if (reviewedAt != null) 'reviewed_at': reviewedAt!.toIso8601String(),
+      if (denialReason != null) 'denial_reason': denialReason,
+      if (reviewComments != null) 'review_comments': reviewComments,
+      if (autoApproved != null) 'auto_approved': autoApproved,
+    };
+  }
+
+    TokenRequest copyWith({
+      String? requestId,
+      TokenRequester? requester,
+      String? fromUserId,
+      String? fromUsername,
+      int? amount,
+      String? reason,
+      String? status,
+      DateTime? createdAt,
+      TokenReviewer? reviewedBy,
+      DateTime? reviewedAt,
+      String? denialReason,
+      String? reviewComments,
+      bool? autoApproved,
+    }) {
+      return TokenRequest(
+        requestId: requestId ?? this.requestId,
+        requester: requester ?? this.requester,
+        fromUserId: fromUserId ?? this.fromUserId,
+        fromUsername: fromUsername ?? this.fromUsername,
+        amount: amount ?? this.amount,
+        reason: reason ?? this.reason,
+        status: status ?? this.status,
+        createdAt: createdAt ?? this.createdAt,
+        reviewedBy: reviewedBy ?? this.reviewedBy,
+        reviewedAt: reviewedAt ?? this.reviewedAt,
+        denialReason: denialReason ?? this.denialReason,
+        reviewComments: reviewComments ?? this.reviewComments,
+        autoApproved: autoApproved ?? this.autoApproved,
+      );
+    }
+
+  bool get isPending => status == 'pending';
+  bool get isApproved => status == 'approved';
+  bool get isDenied => status == 'denied';
+}
+
+class TokenRequester {
+  final String userId;
+  final String username;
+
+  TokenRequester({required this.userId, required this.username});
+
+  factory TokenRequester.fromJson(Map<String, dynamic> json) {
+    // Be defensive: backend may return different shapes for requester.
+    // Try several keys / nested objects and fall back to userId or 'Unknown'.
+    String userId = '';
+    try {
+      userId =
+          (json['user_id'] ?? json['requester_user_id'] ?? json['userId'] ?? '')
+              as String? ??
+          '';
+    } catch (_) {
+      userId = '';
+    }
+
+    String username = '';
+    try {
+      // Common locations / keys
+      if (json.containsKey('username') &&
+          json['username'] != null &&
+          json['username'].toString().trim().isNotEmpty) {
+        username = json['username'].toString();
+      } else if (json.containsKey('requester_username') &&
+          json['requester_username'] != null &&
+          json['requester_username'].toString().trim().isNotEmpty) {
+        username = json['requester_username'].toString();
+      } else if (json.containsKey('user') &&
+          json['user'] is Map &&
+          (json['user']['username'] ?? json['user']['user_name']) != null) {
+        username = (json['user']['username'] ?? json['user']['user_name'])
+            .toString();
+      } else if (json.containsKey('requester') &&
+          json['requester'] is Map &&
+          (json['requester']['username'] ?? json['requester']['user_name']) !=
+              null) {
+        username =
+            (json['requester']['username'] ?? json['requester']['user_name'])
+                .toString();
+      } else if (json.containsKey('email') &&
+          json['email'] != null &&
+          json['email'].toString().trim().isNotEmpty) {
+        username = json['email'].toString();
+      } else if (userId.isNotEmpty) {
+        username = userId;
+      } else {
+        username = 'Unknown';
+      }
+    } catch (_) {
+      username = userId.isNotEmpty ? userId : 'Unknown';
+    }
+
+    return TokenRequester(userId: userId, username: username);
+  }
+
+  Map<String, dynamic> toJson() {
+    return {'user_id': userId, 'username': username};
+  }
+}
+
+class TokenReviewer {
+  final String userId;
+  final String username;
+
+  TokenReviewer({required this.userId, required this.username});
+
+  factory TokenReviewer.fromJson(Map<String, dynamic> json) {
+    return TokenReviewer(
+      userId: json['user_id'] ?? '',
+      username: json['username'] ?? '',
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {'user_id': userId, 'username': username};
+  }
+}
+
+class PurchaseReviewer {
+  final String userId;
+  final String username;
+
+  PurchaseReviewer({required this.userId, required this.username});
+
+  factory PurchaseReviewer.fromJson(Map<String, dynamic> json) {
+    return PurchaseReviewer(
+      userId: json['user_id'] ?? '',
+      username: json['username'] ?? '',
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {'user_id': userId, 'username': username};
+  }
 }
 
 class FamilyNotification {

@@ -16,11 +16,16 @@ final twoFAServiceProvider = Provider((ref) => TwoFAService(ref));
 // Centralized constants for secure storage keys and error messages
 class TwoFAConstants {
   static const String backupCodesKey = '2fa_backup_codes';
-  static const String backupCodesRegeneratedAtKey = '2fa_backup_codes_regenerated_at';
-  static const String errorInvalidTOTP = 'Invalid authentication code. Please try again.';
-  static const String errorInvalidBackupCode = 'Invalid or already used backup code.';
-  static const String errorSessionExpired = 'Your session has expired. Please log in again.';
-  static const String errorNetwork = 'Network error: Please check your connection.';
+  static const String backupCodesRegeneratedAtKey =
+      '2fa_backup_codes_regenerated_at';
+  static const String errorInvalidTOTP =
+      'Invalid authentication code. Please try again.';
+  static const String errorInvalidBackupCode =
+      'Invalid or already used backup code.';
+  static const String errorSessionExpired =
+      'Your session has expired. Please log in again.';
+  static const String errorNetwork =
+      'Network error: Please check your connection.';
   static const String errorTimeout = 'The request timed out. Please try again.';
   static const String errorUnknown = 'An unknown error occurred.';
 }
@@ -119,9 +124,9 @@ class TwoFAService {
 
   Future<Map<String, dynamic>> _request(
     String method,
-    String endpoint,
-    {Map<String, dynamic>? data,}
-  ) async {
+    String endpoint, {
+    Map<String, dynamic>? data,
+  }) async {
     final url = Uri.parse('$_baseUrl$endpoint');
     final headers = await _getHeaders();
     http.Response response;
@@ -130,7 +135,10 @@ class TwoFAService {
     try {
       switch (method.toUpperCase()) {
         case 'GET':
-          response = await HttpUtil.get(url, headers: headers).timeout(timeoutDuration);
+          response = await HttpUtil.get(
+            url,
+            headers: headers,
+          ).timeout(timeoutDuration);
           break;
         case 'POST':
           response = await HttpUtil.post(
@@ -166,7 +174,11 @@ class TwoFAService {
 
   Future<Map<String, dynamic>> verify2FA(String code) async {
     // Only returns backup_codes on first successful verification
-    return _request('POST', _Endpoints.verify, data: {'method': 'totp', 'code': code});
+    return _request(
+      'POST',
+      _Endpoints.verify,
+      data: {'method': 'totp', 'code': code},
+    );
   }
 
   Future<Map<String, dynamic>> disable2FA() async {
@@ -186,7 +198,9 @@ class TwoFAService {
   /// Returns the last backup code regeneration time, if available.
   Future<DateTime?> getBackupCodesRegeneratedAt() async {
     final secureStorage = _ref.read(secureStorageProvider);
-    final value = await secureStorage.read(key: TwoFAConstants.backupCodesRegeneratedAtKey);
+    final value = await secureStorage.read(
+      key: TwoFAConstants.backupCodesRegeneratedAtKey,
+    );
     if (value == null) return null;
     try {
       return DateTime.parse(value);

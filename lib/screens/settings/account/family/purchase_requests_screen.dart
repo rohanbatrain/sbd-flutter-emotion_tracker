@@ -2,22 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:emotion_tracker/widgets/custom_app_bar.dart';
 import 'package:emotion_tracker/providers/family/family_provider.dart';
-import 'package:emotion_tracker/providers/family/family_models.dart' as models;
 import 'package:emotion_tracker/widgets/loading_state_widget.dart';
 import 'package:emotion_tracker/widgets/error_state_widget.dart';
 
-class TokenRequestsScreen extends ConsumerStatefulWidget {
+class PurchaseRequestsScreen extends ConsumerStatefulWidget {
   final String familyId;
 
-  const TokenRequestsScreen({Key? key, required this.familyId})
+  const PurchaseRequestsScreen({Key? key, required this.familyId})
     : super(key: key);
 
   @override
-  ConsumerState<TokenRequestsScreen> createState() =>
-      _TokenRequestsScreenState();
+  ConsumerState<PurchaseRequestsScreen> createState() =>
+      _PurchaseRequestsScreenState();
 }
 
-class _TokenRequestsScreenState extends ConsumerState<TokenRequestsScreen>
+class _PurchaseRequestsScreenState extends ConsumerState<PurchaseRequestsScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
@@ -26,7 +25,9 @@ class _TokenRequestsScreenState extends ConsumerState<TokenRequestsScreen>
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     Future.microtask(() {
-      ref.read(tokenRequestsProvider(widget.familyId).notifier).loadRequests();
+      ref
+          .read(familyShopProvider(widget.familyId).notifier)
+          .loadPurchaseRequests();
       ref
           .read(familyDetailsProvider(widget.familyId).notifier)
           .loadFamilyDetails();
@@ -39,120 +40,31 @@ class _TokenRequestsScreenState extends ConsumerState<TokenRequestsScreen>
     super.dispose();
   }
 
-  Future<void> _showCreateTokenRequestDialog() async {
-    final theme = Theme.of(context);
-    final amountController = TextEditingController();
-    final reasonController = TextEditingController();
-
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Request SBD Tokens'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: amountController,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: 'Amount',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.currency_exchange),
-                  suffixText: 'SBD',
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: reasonController,
-                maxLines: 3,
-                maxLength: 500,
-                decoration: InputDecoration(
-                  labelText: 'Reason (min 5 characters)',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.edit_note),
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text('Cancel'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: theme.primaryColor,
-              foregroundColor: Colors.white,
-            ),
-            onPressed: () => Navigator.of(context).pop(true),
-            child: Text('Submit Request'),
-          ),
-        ],
-      ),
-    );
-
-    if (result == true) {
-      final amount = int.tryParse(amountController.text.trim());
-      final reason = reasonController.text.trim();
-
-      if (amount == null || amount <= 0) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Please enter a valid amount'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return;
-      }
-
-      if (reason.length < 5) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Reason must be at least 5 characters'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return;
-      }
-
-      final success = await ref
-          .read(tokenRequestsProvider(widget.familyId).notifier)
-          .createRequest(amount: amount, reason: reason);
-
-      if (success && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Token request submitted successfully!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    }
-  }
-
-  Future<void> _showReviewRequestDialog(models.TokenRequest request) async {
+  Future<void> _showReviewRequestDialog(Map<String, dynamic> request) async {
     final commentsController = TextEditingController();
+    final requestId = request['request_id'] as String;
+    final itemName = request['item_name'] as String? ?? 'Unknown Item';
+    final cost = request['cost'] as int? ?? 0;
+    final requesterUsername =
+        request['requester_username'] as String? ?? 'Unknown';
 
     final action = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Review Token Request'),
+        title: Text('Review Purchase Request'),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Amount: ${request.amount} SBD',
+                'Item: $itemName',
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
               ),
               const SizedBox(height: 8),
-              Text('From: ${_renderFrom(request)}'),
+              Text('Cost: $cost SBD'),
               const SizedBox(height: 8),
-              Text('Reason:', style: TextStyle(fontWeight: FontWeight.w500)),
-              Text(request.reason),
+              Text('Requested by: $requesterUsername'),
               const SizedBox(height: 16),
               TextField(
                 controller: commentsController,
@@ -193,15 +105,18 @@ class _TokenRequestsScreenState extends ConsumerState<TokenRequestsScreen>
     );
 
     if (action != null && action.isNotEmpty) {
-      final success = await ref
-          .read(tokenRequestsProvider(widget.familyId).notifier)
-          .reviewRequest(
-            requestId: request.requestId,
-            action: action,
-            comments: commentsController.text.trim().isNotEmpty
-                ? commentsController.text.trim()
-                : null,
-          );
+      final success = action == 'approve'
+          ? await ref
+                .read(familyShopProvider(widget.familyId).notifier)
+                .approvePurchaseRequest(requestId)
+          : await ref
+                .read(familyShopProvider(widget.familyId).notifier)
+                .denyPurchaseRequest(
+                  requestId,
+                  reason: commentsController.text.trim().isNotEmpty
+                      ? commentsController.text.trim()
+                      : null,
+                );
 
       if (success && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -214,38 +129,44 @@ class _TokenRequestsScreenState extends ConsumerState<TokenRequestsScreen>
     }
   }
 
-  // Render a defensive "From" value for a TokenRequest or Notification-like object
-  String _renderFrom(models.TokenRequest request) {
-    // 1. response.from_username
-    try {
-      if (request.fromUsername != null && request.fromUsername!.isNotEmpty) {
-        return request.fromUsername!;
-      }
-    } catch (_) {}
-
-    // 2. (notification payloads) - not available here unless passed; keep helper in utils for notifications
-
-    // 3. response.requester_username (existing)
-    try {
-      final requester = request.requester;
-      if (requester.username.isNotEmpty) return requester.username;
-      if (requester.userId.isNotEmpty) return requester.userId;
-    } catch (_) {}
-
-    // 4. fallback
-    return 'Family Account';
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final requestsState = ref.watch(tokenRequestsProvider(widget.familyId));
+    final shopState = ref.watch(familyShopProvider(widget.familyId));
     final detailsState = ref.watch(familyDetailsProvider(widget.familyId));
     final isAdmin = detailsState.family?.isAdmin ?? false;
 
+    // Only admins can see this screen
+    if (!isAdmin) {
+      return Scaffold(
+        appBar: CustomAppBar(
+          title: 'Purchase Requests',
+          showHamburger: false,
+          showCurrency: true,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+        ),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.admin_panel_settings, size: 64, color: Colors.grey),
+              const SizedBox(height: 16),
+              Text(
+                'Admin access required',
+                style: TextStyle(fontSize: 16, color: Colors.grey),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: CustomAppBar(
-        title: 'Token Requests',
+        title: 'Purchase Requests',
         showHamburger: false,
         showCurrency: true,
         leading: IconButton(
@@ -253,53 +174,42 @@ class _TokenRequestsScreenState extends ConsumerState<TokenRequestsScreen>
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
-      floatingActionButton: !isAdmin
-          ? FloatingActionButton.extended(
-              onPressed: _showCreateTokenRequestDialog,
-              icon: Icon(Icons.add),
-              label: Text('Request Tokens'),
-              backgroundColor: theme.primaryColor,
-            )
-          : null,
       body: Column(
         children: [
-          if (isAdmin)
-            TabBar(
-              controller: _tabController,
-              tabs: [
-                Tab(text: 'Pending (${requestsState.pendingRequests.length})'),
-                Tab(text: 'My Requests'),
-              ],
-            ),
+          TabBar(
+            controller: _tabController,
+            tabs: [
+              Tab(
+                text:
+                    'Pending (${shopState.purchaseRequests.where((r) => r['status'] == 'pending').length})',
+              ),
+              Tab(text: 'All Requests (${shopState.purchaseRequests.length})'),
+            ],
+          ),
           Expanded(
-            child: requestsState.isLoading
+            child: shopState.isLoading
                 ? LoadingStateWidget(message: 'Loading requests...')
-                : requestsState.error != null
+                : shopState.error != null
                 ? ErrorStateWidget(
-                    error: requestsState.error,
+                    error: shopState.error!,
                     onRetry: () {
                       ref
-                          .read(tokenRequestsProvider(widget.familyId).notifier)
-                          .loadRequests();
+                          .read(familyShopProvider(widget.familyId).notifier)
+                          .loadPurchaseRequests();
                     },
                   )
-                : isAdmin
-                ? TabBarView(
+                : TabBarView(
                     controller: _tabController,
                     children: [
                       _buildRequestsList(
-                        requestsState.pendingRequests,
-                        isAdmin,
+                        shopState.purchaseRequests
+                            .where((r) => r['status'] == 'pending')
+                            .toList(),
                         theme,
                       ),
-                      _buildRequestsList(
-                        requestsState.myRequests,
-                        false,
-                        theme,
-                      ),
+                      _buildRequestsList(shopState.purchaseRequests, theme),
                     ],
-                  )
-                : _buildRequestsList(requestsState.myRequests, false, theme),
+                  ),
           ),
         ],
       ),
@@ -307,8 +217,7 @@ class _TokenRequestsScreenState extends ConsumerState<TokenRequestsScreen>
   }
 
   Widget _buildRequestsList(
-    List<models.TokenRequest> requests,
-    bool showReviewButton,
+    List<Map<String, dynamic>> requests,
     ThemeData theme,
   ) {
     if (requests.isEmpty) {
@@ -316,7 +225,7 @@ class _TokenRequestsScreenState extends ConsumerState<TokenRequestsScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.inbox, size: 64, color: Colors.grey),
+            Icon(Icons.shopping_cart, size: 64, color: Colors.grey),
             const SizedBox(height: 16),
             Text(
               'No requests',
@@ -330,14 +239,22 @@ class _TokenRequestsScreenState extends ConsumerState<TokenRequestsScreen>
     return RefreshIndicator(
       onRefresh: () async {
         await ref
-            .read(tokenRequestsProvider(widget.familyId).notifier)
-            .loadRequests();
+            .read(familyShopProvider(widget.familyId).notifier)
+            .loadPurchaseRequests();
       },
       child: ListView.builder(
         padding: EdgeInsets.all(16),
         itemCount: requests.length,
         itemBuilder: (context, index) {
           final request = requests[index];
+          final itemName = request['item_name'] as String? ?? 'Unknown Item';
+          final itemType = request['item_type'] as String? ?? '';
+          final cost = request['cost'] as int? ?? 0;
+          final status = request['status'] as String? ?? 'pending';
+          final requesterUsername =
+              request['requester_username'] as String? ?? 'Unknown';
+          final createdAt = request['created_at'] as String?;
+          final denialReason = request['denial_reason'] as String?;
 
           return Card(
             margin: EdgeInsets.only(bottom: 12),
@@ -350,42 +267,62 @@ class _TokenRequestsScreenState extends ConsumerState<TokenRequestsScreen>
                     children: [
                       Expanded(
                         child: Text(
-                          '${request.amount} SBD Tokens',
+                          itemName,
                           style: theme.textTheme.titleLarge?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),
-                      _buildStatusChip(request.status, theme),
+                      _buildStatusChip(status, theme),
                     ],
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'From: ${_renderFrom(request)}',
-                    style: theme.textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    request.reason,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.textTheme.bodySmall?.color?.withOpacity(0.7),
+                    'Type: $itemType',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.hintColor,
                     ),
                   ),
-                  if (request.reviewComments != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'Cost: $cost SBD',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: theme.primaryColor,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Requested by: $requesterUsername',
+                    style: theme.textTheme.bodyMedium,
+                  ),
+                  if (createdAt != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Requested: ${_formatDate(createdAt)}',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.hintColor,
+                      ),
+                    ),
+                  ],
+                  if (denialReason != null && denialReason.isNotEmpty) ...[
                     const SizedBox(height: 8),
                     Container(
                       padding: EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: theme.primaryColor.withOpacity(0.05),
+                        color: Colors.red.withOpacity(0.05),
                         borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.red.withOpacity(0.2)),
                       ),
                       child: Text(
-                        'Admin: ${request.reviewComments}',
-                        style: theme.textTheme.bodySmall,
+                        'Denial reason: $denialReason',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: Colors.red.shade700,
+                        ),
                       ),
                     ),
                   ],
-                  if (showReviewButton && request.status == 'pending') ...[
+                  if (status == 'pending') ...[
                     const SizedBox(height: 12),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
@@ -415,7 +352,7 @@ class _TokenRequestsScreenState extends ConsumerState<TokenRequestsScreen>
     Color textColor;
     IconData icon;
 
-    switch (status) {
+    switch (status.toLowerCase()) {
       case 'approved':
         backgroundColor = Colors.green.withOpacity(0.1);
         textColor = Colors.green.shade700;
@@ -454,5 +391,25 @@ class _TokenRequestsScreenState extends ConsumerState<TokenRequestsScreen>
         ],
       ),
     );
+  }
+
+  String _formatDate(String dateString) {
+    try {
+      final date = DateTime.parse(dateString);
+      final now = DateTime.now();
+      final difference = now.difference(date);
+
+      if (difference.inDays == 0) {
+        return 'Today';
+      } else if (difference.inDays == 1) {
+        return 'Yesterday';
+      } else if (difference.inDays < 7) {
+        return '${difference.inDays} days ago';
+      } else {
+        return '${date.month}/${date.day}/${date.year}';
+      }
+    } catch (e) {
+      return dateString;
+    }
   }
 }

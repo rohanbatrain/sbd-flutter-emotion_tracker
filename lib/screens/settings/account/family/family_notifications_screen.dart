@@ -5,6 +5,7 @@ import 'package:emotion_tracker/providers/family/family_provider.dart';
 import 'package:emotion_tracker/widgets/loading_state_widget.dart';
 import 'package:emotion_tracker/widgets/error_state_widget.dart';
 import 'notification_preferences_screen.dart';
+import 'package:emotion_tracker/utils/notification_helpers.dart';
 
 class FamilyNotificationsScreen extends ConsumerStatefulWidget {
   final String familyId;
@@ -135,6 +136,11 @@ class _FamilyNotificationsScreenState
                       children: [
                         const SizedBox(height: 4),
                         Text(notification.message),
+                        const SizedBox(height: 6),
+                        Text(
+                          'From: ${renderFromForNotification(notification.metadata)}',
+                          style: TextStyle(fontSize: 13),
+                        ),
                         const SizedBox(height: 4),
                         Text(
                           _formatDate(notification.createdAt),
