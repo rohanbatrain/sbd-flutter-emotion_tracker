@@ -345,39 +345,69 @@ class _SBDAccountScreenState extends ConsumerState<SBDAccountScreen>
               spacing: 12,
               runSpacing: 12,
               children: [
-                Expanded(
-                  child: _buildQuickActionCard(
-                    theme: theme,
-                    icon: Icons.qr_code_rounded,
-                    label: 'Family QR',
-                    color: Colors.blue,
-                    onTap: () => _showQrCodeDialog(
-                      detailsState.family?.name ?? 'Family',
-                    ),
-                  ),
+                // Use a consistent size for quick-action tiles so the grid
+                // looks uniform for admins and non-admins.
+                Builder(
+                  builder: (ctx) {
+                    final double totalHorizontalPadding = 40; // parent padding
+                    final double spacingBetween = 12; // Wrap spacing
+                    final double screenWidth = MediaQuery.of(ctx).size.width;
+                    // Aim for two tiles per row on typical phone widths.
+                    final double quickActionWidth =
+                        (screenWidth -
+                            totalHorizontalPadding -
+                            spacingBetween) /
+                        2;
+
+                    return Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
+                      children: [
+                        SizedBox(
+                          width: quickActionWidth,
+                          height: 140,
+                          child: _buildQuickActionCard(
+                            theme: theme,
+                            icon: Icons.qr_code_rounded,
+                            label: 'Family QR',
+                            color: Colors.blue,
+                            onTap: () => _showQrCodeDialog(
+                              detailsState.family?.name ?? 'Family',
+                            ),
+                          ),
+                        ),
+                        SizedBox(
+                          width: quickActionWidth,
+                          height: 140,
+                          child: _buildQuickActionCard(
+                            theme: theme,
+                            icon: Icons.qr_code_scanner_rounded,
+                            label: 'Scan QR',
+                            color: Colors.green,
+                            onTap: _showQrScanDialog,
+                          ),
+                        ),
+                        // Family Shop removed temporarily
+                        // Token Requests quick action removed per request
+                        if (isAdmin)
+                          SizedBox(
+                            width: quickActionWidth,
+                            height: 140,
+                            child: _buildQuickActionCard(
+                              theme: theme,
+                              icon: Icons.admin_panel_settings_rounded,
+                              label: 'Purchase Requests',
+                              color: Colors.orange,
+                              onTap: () => _navigateToPurchaseRequests(
+                                context,
+                                widget.familyId,
+                              ),
+                            ),
+                          ),
+                      ],
+                    );
+                  },
                 ),
-                Expanded(
-                  child: _buildQuickActionCard(
-                    theme: theme,
-                    icon: Icons.qr_code_scanner_rounded,
-                    label: 'Scan QR',
-                    color: Colors.green,
-                    onTap: _showQrScanDialog,
-                  ),
-                ),
-                // Family Shop removed temporarily
-                // Token Requests quick action removed per request
-                if (isAdmin)
-                  Expanded(
-                    child: _buildQuickActionCard(
-                      theme: theme,
-                      icon: Icons.admin_panel_settings_rounded,
-                      label: 'Purchase Requests',
-                      color: Colors.orange,
-                      onTap: () =>
-                          _navigateToPurchaseRequests(context, widget.familyId),
-                    ),
-                  ),
               ],
             ),
             const SizedBox(height: 24),
@@ -984,14 +1014,21 @@ class _SBDAccountScreenState extends ConsumerState<SBDAccountScreen>
         },
       );
 
+      // The user may have navigated away while the dialog was open. Guard
+      // against using the BuildContext or calling setState if disposed.
+      if (!mounted) return;
+
       _amountController.clear();
       _recipientController.clear();
       await _refreshWalletData();
+      if (!mounted) return;
       setState(() => _selectedTab = 0); // Switch back to Overview tab
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Failed: ${e.toString()}')));
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed: ${e.toString()}')));
+      }
     } finally {
       setState(() => _isSending = false);
     }
@@ -1100,14 +1137,19 @@ class _SBDAccountScreenState extends ConsumerState<SBDAccountScreen>
           },
         );
 
+        // Guard against disposed widget after the dialog returns.
+        if (!mounted) return;
+
         _amountController.clear();
         _reasonController.clear();
         setState(() => _selectedTab = 0); // Switch back to Overview tab
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to submit request: ${e.toString()}')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to submit request: ${e.toString()}')),
+        );
+      }
     } finally {
       setState(() => _isSending = false);
     }
@@ -1346,11 +1388,13 @@ class _SBDAccountScreenState extends ConsumerState<SBDAccountScreen>
                                                         'Failed to update permissions',
                                                       ),
                                                     );
-                                                GlobalErrorHandler.showErrorSnackbar(
-                                                  context,
-                                                  errorState.message,
-                                                  errorState.type,
-                                                );
+                                                if (mounted) {
+                                                  GlobalErrorHandler.showErrorSnackbar(
+                                                    context,
+                                                    errorState.message,
+                                                    errorState.type,
+                                                  );
+                                                }
                                               } else {
                                                 // refresh to ensure members list is up-to-date
                                                 await ref
@@ -1360,16 +1404,18 @@ class _SBDAccountScreenState extends ConsumerState<SBDAccountScreen>
                                                       ).notifier,
                                                     )
                                                     .loadFamilyDetails();
-                                                ScaffoldMessenger.of(
-                                                  context,
-                                                ).showSnackBar(
-                                                  SnackBar(
-                                                    content: Text(
-                                                      result['message'] ??
-                                                          'Permissions updated',
+                                                if (mounted) {
+                                                  ScaffoldMessenger.of(
+                                                    context,
+                                                  ).showSnackBar(
+                                                    SnackBar(
+                                                      content: Text(
+                                                        result['message'] ??
+                                                            'Permissions updated',
+                                                      ),
                                                     ),
-                                                  ),
-                                                );
+                                                  );
+                                                }
                                               }
                                             } catch (e) {
                                               final errorState =
@@ -1616,20 +1662,26 @@ class _SBDAccountScreenState extends ConsumerState<SBDAccountScreen>
                                                                     ).notifier,
                                                                   )
                                                                   .loadFamilyDetails();
-                                                              if (mounted)
+                                                              // Close the dialog (use dialogContext). Showing a
+                                                              // SnackBar uses the parent widget context so guard
+                                                              // with mounted.
+                                                              try {
                                                                 Navigator.of(
                                                                   dialogContext,
                                                                 ).pop();
-                                                              ScaffoldMessenger.of(
-                                                                context,
-                                                              ).showSnackBar(
-                                                                SnackBar(
-                                                                  content: Text(
-                                                                    result['message'] ??
-                                                                        'Spending limit updated',
+                                                              } catch (_) {}
+                                                              if (mounted) {
+                                                                ScaffoldMessenger.of(
+                                                                  context,
+                                                                ).showSnackBar(
+                                                                  SnackBar(
+                                                                    content: Text(
+                                                                      result['message'] ??
+                                                                          'Spending limit updated',
+                                                                    ),
                                                                   ),
-                                                                ),
-                                                              );
+                                                                );
+                                                              }
                                                             } else {
                                                               final errorState =
                                                                   GlobalErrorHandler.processError(
@@ -1637,12 +1689,15 @@ class _SBDAccountScreenState extends ConsumerState<SBDAccountScreen>
                                                                       'Failed to update spending limit',
                                                                     ),
                                                                   );
-                                                              GlobalErrorHandler.showErrorSnackbar(
-                                                                context,
-                                                                errorState
-                                                                    .message,
-                                                                errorState.type,
-                                                              );
+                                                              if (mounted) {
+                                                                GlobalErrorHandler.showErrorSnackbar(
+                                                                  context,
+                                                                  errorState
+                                                                      .message,
+                                                                  errorState
+                                                                      .type,
+                                                                );
+                                                              }
                                                             }
                                                           } catch (e) {
                                                             final errorState =

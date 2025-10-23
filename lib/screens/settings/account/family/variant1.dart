@@ -29,51 +29,73 @@ class _FamilyScreenV1State extends ConsumerState<FamilyScreenV1> {
     final theme = Theme.of(context);
     final nameController = TextEditingController();
 
+    // Require a non-empty family name. Use StatefulBuilder to enable/disable
+    // the Create button based on the text field contents.
     final result = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Create New Family'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Create a new family group to manage members and shared resources.',
-              style: theme.textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 20),
-            TextField(
-              controller: nameController,
-              decoration: InputDecoration(
-                labelText: 'Family Name (Optional)',
-                hintText: 'e.g., Smith Family',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.family_restroom),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            final raw = nameController.text.trim();
+            // Programmable-safe name: only allow letters, numbers, '.', '_' and '-'.
+            final validNameRegex = RegExp(r'^[a-zA-Z0-9._-]+$');
+            final isEmpty = raw.isEmpty;
+            final isValid = !isEmpty && validNameRegex.hasMatch(raw);
+            String? errorText;
+            if (isEmpty) {
+              errorText = 'Family name is required';
+            } else if (!validNameRegex.hasMatch(raw)) {
+              errorText = 'Only letters, numbers, dot, underscore and hyphen allowed; no spaces';
+            }
+
+            return AlertDialog(
+              title: Text('Create New Family'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Create a new family group to manage members and shared resources.',
+                    style: theme.textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: 20),
+                  TextField(
+                    controller: nameController,
+                    decoration: InputDecoration(
+                      labelText: 'Family Name',
+                      hintText: 'e.g., smith_family or Smith-Family',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.family_restroom),
+                      errorText: errorText,
+                    ),
+                    maxLength: 100,
+                    onChanged: (_) => setState(() {}),
+                  ),
+                ],
               ),
-              maxLength: 100,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text('Cancel'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: theme.primaryColor,
-              foregroundColor: Colors.white,
-            ),
-            onPressed: () => Navigator.of(context).pop(true),
-            child: Text('Create'),
-          ),
-        ],
-      ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: Text('Cancel'),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: theme.primaryColor,
+                    foregroundColor: Colors.white,
+                  ),
+                  onPressed: isValid
+                      ? () => Navigator.of(context).pop(true)
+                      : null,
+                  child: Text('Create'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
 
     if (result == true) {
-      final name = nameController.text.trim().isEmpty
-          ? null
-          : nameController.text.trim();
+      final name = nameController.text.trim();
       final family = await ref
           .read(familyListProvider.notifier)
           .createFamily(name: name);

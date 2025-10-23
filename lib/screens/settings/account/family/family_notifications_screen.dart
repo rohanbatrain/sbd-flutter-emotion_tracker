@@ -41,38 +41,47 @@ class _FamilyNotificationsScreenState
       appBar: CustomAppBar(
         title: 'Notifications',
         showHamburger: false,
-        showCurrency: true,
+        // Notifications screen is an admin view — hide the currency widget
+        // to keep the app bar compact and actions aligned.
+        showCurrency: false,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).pop(),
         ),
         actions: [
-          IconButton(
-            icon: Icon(Icons.settings),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) =>
-                      NotificationPreferencesScreen(familyId: widget.familyId),
-                ),
-              );
-            },
-          ),
+          // Show 'Mark All Read' first (left-most of the action area) so the
+          // settings icon can be placed at the far right edge.
           if (notificationsState.unreadCount > 0)
             TextButton(
               onPressed: () async {
+                final messenger = ScaffoldMessenger.of(context);
                 final success = await ref
                     .read(notificationsProvider(widget.familyId).notifier)
                     .markAllAsRead();
                 if (success && mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  messenger.showSnackBar(
                     SnackBar(content: Text('All notifications marked as read')),
                   );
                 }
               },
               child: Text('Mark All Read'),
             ),
+          Padding(
+            padding: const EdgeInsets.only(right: 6.0),
+            child: IconButton(
+              icon: Icon(Icons.settings),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => NotificationPreferencesScreen(
+                      familyId: widget.familyId,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
         ],
       ),
       body: notificationsState.isLoading
@@ -110,12 +119,12 @@ class _FamilyNotificationsScreenState
                   margin: EdgeInsets.only(bottom: 12),
                   color: notification.isRead
                       ? null
-                      : theme.primaryColor.withOpacity(0.05),
+                      : theme.primaryColor.withAlpha(13),
                   child: ListTile(
                     leading: CircleAvatar(
                       backgroundColor: notification.isRead
-                          ? theme.hintColor.withOpacity(0.2)
-                          : theme.primaryColor.withOpacity(0.2),
+                          ? theme.hintColor.withAlpha(51)
+                          : theme.primaryColor.withAlpha(51),
                       child: Icon(
                         _getNotificationIcon(notification.type),
                         color: notification.isRead

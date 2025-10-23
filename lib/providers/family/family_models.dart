@@ -653,37 +653,37 @@ class TokenRequest {
     };
   }
 
-    TokenRequest copyWith({
-      String? requestId,
-      TokenRequester? requester,
-      String? fromUserId,
-      String? fromUsername,
-      int? amount,
-      String? reason,
-      String? status,
-      DateTime? createdAt,
-      TokenReviewer? reviewedBy,
-      DateTime? reviewedAt,
-      String? denialReason,
-      String? reviewComments,
-      bool? autoApproved,
-    }) {
-      return TokenRequest(
-        requestId: requestId ?? this.requestId,
-        requester: requester ?? this.requester,
-        fromUserId: fromUserId ?? this.fromUserId,
-        fromUsername: fromUsername ?? this.fromUsername,
-        amount: amount ?? this.amount,
-        reason: reason ?? this.reason,
-        status: status ?? this.status,
-        createdAt: createdAt ?? this.createdAt,
-        reviewedBy: reviewedBy ?? this.reviewedBy,
-        reviewedAt: reviewedAt ?? this.reviewedAt,
-        denialReason: denialReason ?? this.denialReason,
-        reviewComments: reviewComments ?? this.reviewComments,
-        autoApproved: autoApproved ?? this.autoApproved,
-      );
-    }
+  TokenRequest copyWith({
+    String? requestId,
+    TokenRequester? requester,
+    String? fromUserId,
+    String? fromUsername,
+    int? amount,
+    String? reason,
+    String? status,
+    DateTime? createdAt,
+    TokenReviewer? reviewedBy,
+    DateTime? reviewedAt,
+    String? denialReason,
+    String? reviewComments,
+    bool? autoApproved,
+  }) {
+    return TokenRequest(
+      requestId: requestId ?? this.requestId,
+      requester: requester ?? this.requester,
+      fromUserId: fromUserId ?? this.fromUserId,
+      fromUsername: fromUsername ?? this.fromUsername,
+      amount: amount ?? this.amount,
+      reason: reason ?? this.reason,
+      status: status ?? this.status,
+      createdAt: createdAt ?? this.createdAt,
+      reviewedBy: reviewedBy ?? this.reviewedBy,
+      reviewedAt: reviewedAt ?? this.reviewedAt,
+      denialReason: denialReason ?? this.denialReason,
+      reviewComments: reviewComments ?? this.reviewComments,
+      autoApproved: autoApproved ?? this.autoApproved,
+    );
+  }
 
   bool get isPending => status == 'pending';
   bool get isApproved => status == 'approved';
@@ -888,6 +888,14 @@ class Transaction {
   final String familyId;
   final String userId;
   final String username;
+  // Optional convenience fields to match backend shapes used across the UI.
+  // Some backend responses use `to`, `from` and `timestamp` keys directly while
+  // others use `username`/`created_at`. Provide nullable fields and populate
+  // them from common JSON keys so UI code that references `tx.to`, `tx.from`
+  // and `tx.timestamp` continues to work.
+  final String? to;
+  final String? from;
+  final String? timestamp;
   final String type;
   final int amount;
   final String? description;
@@ -898,6 +906,9 @@ class Transaction {
     required this.familyId,
     required this.userId,
     required this.username,
+    this.to,
+    this.from,
+    this.timestamp,
     required this.type,
     required this.amount,
     this.description,
@@ -910,6 +921,21 @@ class Transaction {
       familyId: json['family_id'] ?? '',
       userId: json['user_id'] ?? '',
       username: json['username'] ?? '',
+      // Map commonly-used keys for recipients/senders and timestamp so UI
+      // code that expects `tx.to`, `tx.from` or `tx.timestamp` works.
+      to:
+          json['to'] ??
+          json['to_username'] ??
+          json['recipient_username'] ??
+          null,
+      from:
+          json['from'] ??
+          json['from_username'] ??
+          json['sender_username'] ??
+          json['username'] ??
+          null,
+      timestamp:
+          json['timestamp'] ?? json['created_at'] ?? json['createdAt'] ?? null,
       type: json['type'] ?? '',
       amount: json['amount'] ?? 0,
       description: json['description'],
@@ -925,6 +951,9 @@ class Transaction {
       'family_id': familyId,
       'user_id': userId,
       'username': username,
+      if (to != null) 'to': to,
+      if (from != null) 'from': from,
+      if (timestamp != null) 'timestamp': timestamp,
       'type': type,
       'amount': amount,
       if (description != null) 'description': description,

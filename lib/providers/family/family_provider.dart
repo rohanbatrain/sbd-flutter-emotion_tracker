@@ -133,6 +133,8 @@ class FamilyDetailsNotifier extends StateNotifier<FamilyDetailsState> {
       final family = await _apiService.getFamilyDetails(familyId);
       final members = await _apiService.getFamilyMembers(familyId);
       final invitations = await _apiService.getFamilyInvitations(familyId);
+      // Sort invitations by created_at newest first as per UX recommendations
+      invitations.sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
       models.SBDAccount? sbdAccount;
       try {
@@ -153,6 +155,17 @@ class FamilyDetailsNotifier extends StateNotifier<FamilyDetailsState> {
     }
   }
 
+  Future<void> loadInvitations() async {
+    try {
+      final invitations = await _apiService.getFamilyInvitations(familyId);
+      // Sort invitations by created_at newest first
+      invitations.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      state = state.copyWith(invitations: invitations);
+    } catch (e) {
+      state = state.copyWith(error: e.toString());
+    }
+  }
+
   Future<bool> inviteMember({
     required String identifier,
     required String identifierType,
@@ -164,8 +177,9 @@ class FamilyDetailsNotifier extends StateNotifier<FamilyDetailsState> {
         identifierType: identifierType,
         relationshipType: relationshipType,
       );
-      final invitation = await _apiService.inviteMember(familyId, request);
-      state = state.copyWith(invitations: [...state.invitations, invitation]);
+      await _apiService.inviteMember(familyId, request);
+      // Refresh the invitations list as per contract
+      await loadInvitations();
       return true;
     } catch (e) {
       state = state.copyWith(error: e.toString());

@@ -116,9 +116,6 @@ class _InvitationsScreenState extends ConsumerState<InvitationsScreen> {
           );
 
       if (success && mounted) {
-        // Reload to sync with backend (backend validation may filter invitations)
-        await _refreshInvitations();
-
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Invitation sent successfully!'),

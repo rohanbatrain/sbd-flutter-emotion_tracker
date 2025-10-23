@@ -93,6 +93,10 @@ class _TokenRequestsScreenState extends ConsumerState<TokenRequestsScreen>
       ),
     );
 
+    // Guard: the user may have navigated away while the dialog was open.
+    // Avoid using the BuildContext if the widget is disposed.
+    if (!mounted) return;
+
     if (result == true) {
       final amount = int.tryParse(amountController.text.trim());
       final reason = reasonController.text.trim();
@@ -191,6 +195,9 @@ class _TokenRequestsScreenState extends ConsumerState<TokenRequestsScreen>
         ],
       ),
     );
+
+    // Guard: the dialog may have been dismissed and the widget disposed.
+    if (!mounted) return;
 
     if (action != null && action.isNotEmpty) {
       final success = await ref
