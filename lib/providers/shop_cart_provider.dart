@@ -69,10 +69,7 @@ class ShopCartService {
           'X-User-Agent': userAgent,
           'Content-Type': 'application/json',
         },
-        body: jsonEncode({
-          'item_id': itemId,
-          'item_type': itemType,
-        }),
+        body: jsonEncode({'item_id': itemId, 'item_type': itemType}),
       );
       final data = jsonDecode(response.body);
       if (response.statusCode == 200 && data['status'] == 'success') {
@@ -82,8 +79,10 @@ class ShopCartService {
       }
     } catch (e) {
       if (itemType == 'theme') {
-        throw Exception('Failed to add theme to cart: '
-            '${e.toString()}');
+        throw Exception(
+          'Failed to add theme to cart: '
+          '${e.toString()}',
+        );
       } else {
         rethrow;
       }
@@ -109,10 +108,7 @@ class ShopCartService {
         'X-User-Agent': userAgent,
         'Content-Type': 'application/json',
       },
-      body: jsonEncode({
-        'item_id': itemId,
-        'item_type': itemType,
-      }),
+      body: jsonEncode({'item_id': itemId, 'item_type': itemType}),
     );
     final data = jsonDecode(response.body);
     if (response.statusCode == 200 && data['status'] == 'success') {

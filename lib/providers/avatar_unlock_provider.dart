@@ -31,7 +31,10 @@ class AvatarUnlockService {
       unlockedMap = {};
     }
     unlockedMap[avatarId] = DateTime.now().millisecondsSinceEpoch;
-    await storage.write(key: 'unlocked_avatars', value: jsonEncode(unlockedMap));
+    await storage.write(
+      key: 'unlocked_avatars',
+      value: jsonEncode(unlockedMap),
+    );
   }
 
   /// Returns unlock status and unlock timestamp for UI logic.
@@ -48,7 +51,9 @@ class AvatarUnlockService {
     }
     // Fetch from storage/server
     final unlocks = await _getMergedUnlockedAvatarsWithTimes();
-    final info = unlocks[avatarId] ?? AvatarUnlockInfo(isUnlocked: false, unlockTime: null);
+    final info =
+        unlocks[avatarId] ??
+        AvatarUnlockInfo(isUnlocked: false, unlockTime: null);
     _unlockCache[avatarId] = _AvatarUnlockCache(
       isUnlocked: info.isUnlocked,
       unlockTime: info.unlockTime,
@@ -63,7 +68,8 @@ class AvatarUnlockService {
   }
 
   /// Helper: like getMergedUnlockedAvatars, but returns unlock time for each avatar.
-  Future<Map<String, AvatarUnlockInfo>> _getMergedUnlockedAvatarsWithTimes() async {
+  Future<Map<String, AvatarUnlockInfo>>
+  _getMergedUnlockedAvatarsWithTimes() async {
     final storage = ref.read(secureStorageProvider);
     final accessToken = await storage.read(key: 'access_token');
     final protocol = ref.read(serverProtocolProvider);
@@ -101,7 +107,9 @@ class AvatarUnlockService {
             }
           }
           for (final avatarId in grouped.keys) {
-            final latest = grouped[avatarId]!.reduce((a, b) => a.isAfter(b) ? a : b);
+            final latest = grouped[avatarId]!.reduce(
+              (a, b) => a.isAfter(b) ? a : b,
+            );
             serverUnlocks[avatarId] = latest;
           }
         }
@@ -157,18 +165,27 @@ class AvatarUnlockService {
       unlockedMap.remove(key);
     }
     if (expired.isNotEmpty) {
-      await storage.write(key: 'unlocked_avatars', value: jsonEncode(unlockedMap));
+      await storage.write(
+        key: 'unlocked_avatars',
+        value: jsonEncode(unlockedMap),
+      );
     }
 
     // Merge: ownedPermanent always unlocked, then server rentals, then local unlocks
     final result = <String, AvatarUnlockInfo>{};
     for (final avatar in allAvatars) {
       if (avatar.id == 'person') {
-        result[avatar.id] = AvatarUnlockInfo(isUnlocked: true, unlockTime: null);
+        result[avatar.id] = AvatarUnlockInfo(
+          isUnlocked: true,
+          unlockTime: null,
+        );
         continue;
       }
       if (ownedPermanent.contains(avatar.id)) {
-        result[avatar.id] = AvatarUnlockInfo(isUnlocked: true, unlockTime: null);
+        result[avatar.id] = AvatarUnlockInfo(
+          isUnlocked: true,
+          unlockTime: null,
+        );
         continue;
       }
       final serverValid = serverUnlocks[avatar.id];
@@ -180,7 +197,8 @@ class AvatarUnlockService {
         continue;
       }
       final localValid = validLocal[avatar.id];
-      if (localValid != null && now.isBefore(localValid.add(const Duration(hours: 1)))) {
+      if (localValid != null &&
+          now.isBefore(localValid.add(const Duration(hours: 1)))) {
         result[avatar.id] = AvatarUnlockInfo(
           isUnlocked: true,
           unlockTime: localValid,
@@ -195,7 +213,10 @@ class AvatarUnlockService {
   /// Helper to fetch and merge server and local unlocks. Server always wins if locked.
   Future<Set<String>> getMergedUnlockedAvatars() async {
     final unlocks = await _getMergedUnlockedAvatarsWithTimes();
-    return unlocks.entries.where((entry) => entry.value.isUnlocked).map((entry) => entry.key).toSet();
+    return unlocks.entries
+        .where((entry) => entry.value.isUnlocked)
+        .map((entry) => entry.key)
+        .toSet();
   }
 
   /// Checks if an avatar is currently unlocked (for global enforcement)
@@ -206,8 +227,15 @@ class AvatarUnlockService {
 
   /// Loads and shows a rewarded ad for avatar unlock, passing username as SSV custom data.
   /// No confirmation popup, ad loads immediately.
-  Future<void> showAvatarUnlockAd(BuildContext context, String avatarId, {VoidCallback? onAvatarUnlocked}) async {
-    final avatar = allAvatars.firstWhere((a) => a.id == avatarId, orElse: () => allAvatars.first);
+  Future<void> showAvatarUnlockAd(
+    BuildContext context,
+    String avatarId, {
+    VoidCallback? onAvatarUnlocked,
+  }) async {
+    final avatar = allAvatars.firstWhere(
+      (a) => a.id == avatarId,
+      orElse: () => allAvatars.first,
+    );
     final adUnitId = avatar.rewardedAdId;
     if (adUnitId == null || adUnitId.isEmpty) return;
     final storage = ref.read(secureStorageProvider);
@@ -230,18 +258,24 @@ class AvatarUnlockService {
           onAdLoaded: (ad) async {
             if (Navigator.of(context).canPop()) Navigator.of(context).pop();
 
-            ad.setServerSideOptions(ServerSideVerificationOptions(userId: username));
+            ad.setServerSideOptions(
+              ServerSideVerificationOptions(userId: username),
+            );
             ad.fullScreenContentCallback = FullScreenContentCallback(
               onAdDismissedFullScreenContent: (ad) {
                 ad.dispose();
                 if (!rewardGiven && context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Ad closed before reward.')));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Ad closed before reward.')),
+                  );
                 }
               },
               onAdFailedToShowFullScreenContent: (ad, err) {
                 ad.dispose();
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to show ad.')));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Failed to show ad.')),
+                  );
                 }
               },
             );
@@ -260,7 +294,9 @@ class AvatarUnlockService {
           onAdFailedToLoad: (err) {
             if (Navigator.of(context).canPop()) Navigator.of(context).pop();
             if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to load ad.')));
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Failed to load ad.')),
+              );
             }
           },
         ),
@@ -268,7 +304,9 @@ class AvatarUnlockService {
     } catch (e) {
       if (Navigator.of(context).canPop()) Navigator.of(context).pop();
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ad error: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Ad error: $e')));
       }
     }
   }
@@ -322,9 +360,12 @@ class AvatarUnlockService {
       final detail = data['detail'] ?? 'Unknown error';
       if (response.statusCode == 400 && detail == 'Avatar already owned') {
         throw Exception('You already own this avatar.');
-      } else if (response.statusCode == 400 && (detail == 'Not enough SBD tokens' || detail == 'Insufficient SBD tokens or race condition')) {
+      } else if (response.statusCode == 400 &&
+          (detail == 'Not enough SBD tokens' ||
+              detail == 'Insufficient SBD tokens or race condition')) {
         throw Exception('You do not have enough SBD tokens.');
-      } else if (response.statusCode == 400 && detail == 'Invalid or missing avatar_id') {
+      } else if (response.statusCode == 400 &&
+          detail == 'Invalid or missing avatar_id') {
         throw Exception('Invalid avatar.');
       } else if (response.statusCode == 404 && detail == 'User not found') {
         throw Exception('User not found. Please log in again.');
@@ -350,5 +391,9 @@ class _AvatarUnlockCache {
   final bool isUnlocked;
   final DateTime? unlockTime;
   final DateTime lastChecked;
-  _AvatarUnlockCache({required this.isUnlocked, required this.unlockTime, required this.lastChecked});
+  _AvatarUnlockCache({
+    required this.isUnlocked,
+    required this.unlockTime,
+    required this.lastChecked,
+  });
 }

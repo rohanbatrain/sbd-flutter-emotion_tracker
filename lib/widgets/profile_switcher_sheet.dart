@@ -37,81 +37,86 @@ class ProfileSwitcherSheet extends ConsumerWidget {
                 ],
               ),
               const SizedBox(height: 8),
-              ...state.profiles.map((p) {
-                final isCurrent = state.current?.id == p.id;
-                final isExpired = authTokenManager.isProfileExpired(p);
-                final expiresSoon =
-                    p.expiresAtMs != null &&
-                    (p.expiresAtMs! - DateTime.now().millisecondsSinceEpoch) <
-                        (24 * 60 * 60 * 1000); // < 24 hours
+              // Exclude any profile with displayName equal to 'You' (case-insensitive)
+              ...state.profiles
+                  .where((p) => p.displayName.toLowerCase() != 'you')
+                  .map((p) {
+                    final isCurrent = state.current?.id == p.id;
+                    final isExpired = authTokenManager.isProfileExpired(p);
+                    final expiresSoon =
+                        p.expiresAtMs != null &&
+                        (p.expiresAtMs! -
+                                DateTime.now().millisecondsSinceEpoch) <
+                            (24 * 60 * 60 * 1000); // < 24 hours
 
-                return ListTile(
-                  leading: CircleAvatar(
-                    child: Text(p.displayName[0].toUpperCase()),
-                  ),
-                  title: Row(
-                    children: [
-                      Expanded(child: Text(p.displayName)),
-                      if (isExpired)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          margin: const EdgeInsets.only(left: 8),
-                          decoration: BoxDecoration(
-                            color: Colors.red.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: Colors.red.withOpacity(0.3),
+                    return ListTile(
+                      leading: CircleAvatar(
+                        child: Text(p.displayName[0].toUpperCase()),
+                      ),
+                      title: Row(
+                        children: [
+                          Expanded(child: Text(p.displayName)),
+                          if (isExpired)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              margin: const EdgeInsets.only(left: 8),
+                              decoration: BoxDecoration(
+                                color: Colors.red.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: Colors.red.withOpacity(0.3),
+                                ),
+                              ),
+                              child: Text(
+                                'Expired',
+                                style: TextStyle(
+                                  color: Colors.red,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            )
+                          else if (expiresSoon)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              margin: const EdgeInsets.only(left: 8),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: Colors.orange.withOpacity(0.3),
+                                ),
+                              ),
+                              child: Text(
+                                'Expires soon',
+                                style: TextStyle(
+                                  color: Colors.orange,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                             ),
-                          ),
-                          child: Text(
-                            'Expired',
-                            style: TextStyle(
-                              color: Colors.red,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        )
-                      else if (expiresSoon)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          margin: const EdgeInsets.only(left: 8),
-                          decoration: BoxDecoration(
-                            color: Colors.orange.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: Colors.orange.withOpacity(0.3),
-                            ),
-                          ),
-                          child: Text(
-                            'Expires soon',
-                            style: TextStyle(
-                              color: Colors.orange,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                  subtitle: p.email != null ? Text(p.email!) : null,
-                  trailing: isCurrent
-                      ? const Icon(Icons.check, color: Colors.green)
-                      : null,
-                  onTap: isCurrent
-                      ? null
-                      : () async {
-                          await notifier.switchTo(p.id);
-                          Navigator.of(context).pop();
-                        },
-                );
-              }).toList(),
+                        ],
+                      ),
+                      subtitle: p.email != null ? Text(p.email!) : null,
+                      trailing: isCurrent
+                          ? const Icon(Icons.check, color: Colors.green)
+                          : null,
+                      onTap: isCurrent
+                          ? null
+                          : () async {
+                              await notifier.switchTo(p.id);
+                              Navigator.of(context).pop();
+                            },
+                    );
+                  })
+                  .toList(),
               const Divider(),
               Row(
                 children: [

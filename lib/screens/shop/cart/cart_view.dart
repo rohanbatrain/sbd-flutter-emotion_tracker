@@ -53,12 +53,24 @@ class _CartViewState extends ConsumerState<CartView> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(_checkoutMessage!, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green)),
+                  Text(
+                    _checkoutMessage!,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.green,
+                    ),
+                  ),
                   const SizedBox(height: 6),
                   Row(
                     children: [
-                      const Text('Transaction ID: ', style: TextStyle(fontWeight: FontWeight.w500)),
-                      SelectableText(_transactionId!, style: const TextStyle(fontSize: 13)),
+                      const Text(
+                        'Transaction ID: ',
+                        style: TextStyle(fontWeight: FontWeight.w500),
+                      ),
+                      SelectableText(
+                        _transactionId!,
+                        style: const TextStyle(fontSize: 13),
+                      ),
                     ],
                   ),
                 ],
@@ -67,7 +79,10 @@ class _CartViewState extends ConsumerState<CartView> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Your Cart', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              const Text(
+                'Your Cart',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
               IconButton(
                 icon: const Icon(Icons.close),
                 onPressed: () => Navigator.of(context).maybePop(),
@@ -89,7 +104,10 @@ class _CartViewState extends ConsumerState<CartView> {
                 if (cartItems.isEmpty) {
                   return const Center(child: Text('Your cart is empty.'));
                 }
-                int totalPrice = cartItems.fold<int>(0, (sum, item) => sum + ((item['price'] ?? 0) as int));
+                int totalPrice = cartItems.fold<int>(
+                  0,
+                  (sum, item) => sum + ((item['price'] ?? 0) as int),
+                );
                 return ListView.separated(
                   itemCount: cartItems.length,
                   separatorBuilder: (_, __) => const Divider(height: 1),
@@ -100,11 +118,24 @@ class _CartViewState extends ConsumerState<CartView> {
                     final price = item['price'] ?? 0;
                     return ListTile(
                       leading: CircleAvatar(
-                        backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-                        child: Icon(_iconForType(type), color: Theme.of(context).colorScheme.primary),
+                        backgroundColor: Theme.of(
+                          context,
+                        ).colorScheme.primary.withOpacity(0.1),
+                        child: Icon(
+                          _iconForType(type),
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
                       ),
-                      title: Text(name, style: const TextStyle(fontWeight: FontWeight.w600)),
-                      subtitle: Text(type, style: TextStyle(color: Theme.of(context).colorScheme.secondary)),
+                      title: Text(
+                        name,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      subtitle: Text(
+                        type,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.secondary,
+                        ),
+                      ),
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -124,7 +155,9 @@ class _CartViewState extends ConsumerState<CartView> {
                                 _refreshCart();
                               } catch (e) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Failed to remove: $e')),
+                                  SnackBar(
+                                    content: Text('Failed to remove: $e'),
+                                  ),
                                 );
                               }
                             },
@@ -139,7 +172,10 @@ class _CartViewState extends ConsumerState<CartView> {
           ),
           const Divider(),
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 8.0),
+            padding: const EdgeInsets.symmetric(
+              vertical: 12.0,
+              horizontal: 8.0,
+            ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -147,8 +183,17 @@ class _CartViewState extends ConsumerState<CartView> {
                   future: _cartFuture,
                   builder: (context, snapshot) {
                     final cartItems = snapshot.data ?? [];
-                    int totalPrice = cartItems.fold<int>(0, (sum, item) => sum + ((item['price'] ?? 0) as int));
-                    return Text('Total: $totalPrice SBD', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16));
+                    int totalPrice = cartItems.fold<int>(
+                      0,
+                      (sum, item) => sum + ((item['price'] ?? 0) as int),
+                    );
+                    return Text(
+                      'Total: $totalPrice SBD',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    );
                   },
                 ),
                 Row(
@@ -175,14 +220,20 @@ class _CartViewState extends ConsumerState<CartView> {
                       icon: const Icon(Icons.payment),
                       label: const Text('Checkout'),
                       style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
                       onPressed: () async {
                         try {
                           final result = await cartProvider.checkoutCart();
                           setState(() {
-                            _checkoutMessage = '🎉 Checkout successful! Congratulations on your purchase.';
+                            _checkoutMessage =
+                                '🎉 Checkout successful! Congratulations on your purchase.';
                             _transactionId = result['transaction_id'] ?? '';
                           });
                           _refreshCart();

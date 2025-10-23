@@ -50,7 +50,11 @@ class AccountButton extends ConsumerWidget {
                   overflow: TextOverflow.ellipsis,
                   maxLines: 1,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onPrimary,
+                    // Use onSurface to contrast with the card panel placed below
+                    // the banner (cardColor). When AccountButton is used inside
+                    // the sidebar header (primaryColor), onPrimary will still
+                    // be applied by the surrounding theme for other usages.
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
               ),

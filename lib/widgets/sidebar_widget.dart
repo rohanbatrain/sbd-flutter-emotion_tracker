@@ -169,15 +169,17 @@ class _SidebarWidgetState extends ConsumerState<SidebarWidget> {
               ),
             ),
 
-            // Footer
+            // Footer: banner remains visible, but the account/copyright
+            // area below the banner is placed on a contrasting card-style
+            // panel so it doesn't visually merge with the sidebar primary color.
             Padding(
               padding: EdgeInsets.all(16),
               child: Column(
                 children: [
-                  // Banner Ad
+                  // Banner Ad (kept visually separate)
                   if (!isLinux && isBannerAdReady && bannerAd != null)
                     Container(
-                      margin: EdgeInsets.only(bottom: 16),
+                      margin: EdgeInsets.only(bottom: 12),
                       width: 248, // Sidebar width (280) - padding (32)
                       height: bannerAd.size.height.toDouble(),
                       child: FittedBox(
@@ -189,23 +191,53 @@ class _SidebarWidgetState extends ConsumerState<SidebarWidget> {
                         ),
                       ),
                     ),
-                  // Account control (profile switcher + logout)
+
+                  // Panel that contains the Account control only
                   Container(
                     width: double.infinity,
-                    margin: const EdgeInsets.only(bottom: 12),
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 4.0),
-                        child: AccountButton(),
-                      ),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: theme.cardColor,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.04),
+                          blurRadius: 6,
+                          offset: Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Account control (profile switcher + logout)
+                        Container(
+                          width: double.infinity,
+                          margin: const EdgeInsets.only(bottom: 8),
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 4.0),
+                              child: AccountButton(),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  // Copyright
-                  Text(
-                    '© 2024 Emotion Tracker',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onPrimary.withOpacity(0.7),
+
+                  // Copyright separated from the card panel to provide visual separation
+                  Container(
+                    width: double.infinity,
+                    margin: const EdgeInsets.only(top: 10),
+                    child: Align(
+                      alignment: Alignment.center,
+                      child: Text(
+                        '© 2024 Emotion Tracker',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onPrimary.withOpacity(0.85),
+                        ),
+                      ),
                     ),
                   ),
                 ],
