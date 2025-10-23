@@ -13,6 +13,7 @@ import 'package:emotion_tracker/screens/auth/verify-email/variant1.dart';
 import 'package:emotion_tracker/screens/auth/client-side-encryption/variant1.dart';
 import 'package:emotion_tracker/screens/auth/forgot-password/variant1.dart';
 import 'package:emotion_tracker/screens/auth/login-with-token/variant1.dart';
+import 'package:emotion_tracker/screens/settings/account/family/family_shop_screen.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 
 const String registrationAppId = 'emotion_tracker';
@@ -83,6 +84,15 @@ class MyApp extends ConsumerWidget {
             const ClientSideEncryptionScreenV1(),
         '/login-with-token/v1': (context) =>
             const LoginWithTokenScreenV1(), // <-- Added route
+        '/family/shop/v1': (context) {
+          final args =
+              ModalRoute.of(context)?.settings.arguments
+                  as Map<String, dynamic>?;
+          final familyId = args != null && args['familyId'] is String
+              ? args['familyId'] as String
+              : '';
+          return FamilyShopScreen(familyId: familyId);
+        },
         // Variant 2 Routes
       },
     );
@@ -120,6 +130,14 @@ class MyApp extends ConsumerWidget {
         break;
       case '/login-with-token/v1':
         page = const LoginWithTokenScreenV1();
+        config = PageTransitionService.modalTransition;
+        break;
+      case '/family/shop/v1':
+        final args = settings.arguments as Map<String, dynamic>?;
+        final familyId = args != null && args['familyId'] is String
+            ? args['familyId'] as String
+            : '';
+        page = FamilyShopScreen(familyId: familyId);
         config = PageTransitionService.modalTransition;
         break;
       default:

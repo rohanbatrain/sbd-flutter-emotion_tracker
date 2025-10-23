@@ -225,6 +225,22 @@ class _FamilyDetailsScreenState extends ConsumerState<FamilyDetailsScreen> {
                           const SizedBox(height: 12),
                         ],
 
+                        // Family Shop tile - visible to all members
+                        _buildMenuTile(
+                          context: context,
+                          icon: Icons.storefront,
+                          title: 'Family Shop',
+                          subtitle: 'Browse and request items for your family',
+                          onTap: () {
+                            Navigator.of(context).pushNamed(
+                              '/family/shop/v1',
+                              arguments: {'familyId': widget.familyId},
+                            );
+                          },
+                          theme: theme,
+                        ),
+                        const SizedBox(height: 12),
+
                         const SizedBox(height: 24),
 
                         // Financial Section

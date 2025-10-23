@@ -45,7 +45,8 @@ class _FamilyScreenV1State extends ConsumerState<FamilyScreenV1> {
             if (isEmpty) {
               errorText = 'Family name is required';
             } else if (!validNameRegex.hasMatch(raw)) {
-              errorText = 'Only letters, numbers, dot, underscore and hyphen allowed; no spaces';
+              errorText =
+                  'Only letters, numbers, dot, underscore and hyphen allowed; no spaces';
             }
 
             return AlertDialog(

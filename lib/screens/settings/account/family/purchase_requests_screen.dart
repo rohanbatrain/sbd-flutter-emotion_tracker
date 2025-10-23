@@ -4,6 +4,7 @@ import 'package:emotion_tracker/widgets/custom_app_bar.dart';
 import 'package:emotion_tracker/providers/family/family_provider.dart';
 import 'package:emotion_tracker/widgets/loading_state_widget.dart';
 import 'package:emotion_tracker/widgets/error_state_widget.dart';
+import 'package:emotion_tracker/providers/family/family_models.dart' as models;
 
 class PurchaseRequestsScreen extends ConsumerStatefulWidget {
   final String familyId;
@@ -40,13 +41,8 @@ class _PurchaseRequestsScreenState extends ConsumerState<PurchaseRequestsScreen>
     super.dispose();
   }
 
-  Future<void> _showReviewRequestDialog(Map<String, dynamic> request) async {
+  Future<void> _showReviewRequestDialog(models.PurchaseRequest request) async {
     final commentsController = TextEditingController();
-    final requestId = request['request_id'] as String;
-    final itemName = request['item_name'] as String? ?? 'Unknown Item';
-    final cost = request['cost'] as int? ?? 0;
-    final requesterUsername =
-        request['requester_username'] as String? ?? 'Unknown';
 
     final action = await showDialog<String>(
       context: context,
@@ -58,13 +54,13 @@ class _PurchaseRequestsScreenState extends ConsumerState<PurchaseRequestsScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Item: $itemName',
+                'Item: ${request.item.name}',
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
               ),
               const SizedBox(height: 8),
-              Text('Cost: $cost SBD'),
+              Text('Cost: ${request.cost} SBD'),
               const SizedBox(height: 8),
-              Text('Requested by: $requesterUsername'),
+              Text('Requested by: ${request.requester.username}'),
               const SizedBox(height: 16),
               TextField(
                 controller: commentsController,
@@ -108,11 +104,11 @@ class _PurchaseRequestsScreenState extends ConsumerState<PurchaseRequestsScreen>
       final success = action == 'approve'
           ? await ref
                 .read(familyShopProvider(widget.familyId).notifier)
-                .approvePurchaseRequest(requestId)
+                .approvePurchaseRequest(request.requestId)
           : await ref
                 .read(familyShopProvider(widget.familyId).notifier)
                 .denyPurchaseRequest(
-                  requestId,
+                  request.requestId,
                   reason: commentsController.text.trim().isNotEmpty
                       ? commentsController.text.trim()
                       : null,
@@ -181,7 +177,7 @@ class _PurchaseRequestsScreenState extends ConsumerState<PurchaseRequestsScreen>
             tabs: [
               Tab(
                 text:
-                    'Pending (${shopState.purchaseRequests.where((r) => r['status'] == 'pending').length})',
+                    'Pending (${shopState.purchaseRequests.where((r) => r.isPending).length})',
               ),
               Tab(text: 'All Requests (${shopState.purchaseRequests.length})'),
             ],
@@ -203,7 +199,7 @@ class _PurchaseRequestsScreenState extends ConsumerState<PurchaseRequestsScreen>
                     children: [
                       _buildRequestsList(
                         shopState.purchaseRequests
-                            .where((r) => r['status'] == 'pending')
+                            .where((r) => r.isPending)
                             .toList(),
                         theme,
                       ),
@@ -217,7 +213,7 @@ class _PurchaseRequestsScreenState extends ConsumerState<PurchaseRequestsScreen>
   }
 
   Widget _buildRequestsList(
-    List<Map<String, dynamic>> requests,
+    List<models.PurchaseRequest> requests,
     ThemeData theme,
   ) {
     if (requests.isEmpty) {
@@ -247,14 +243,6 @@ class _PurchaseRequestsScreenState extends ConsumerState<PurchaseRequestsScreen>
         itemCount: requests.length,
         itemBuilder: (context, index) {
           final request = requests[index];
-          final itemName = request['item_name'] as String? ?? 'Unknown Item';
-          final itemType = request['item_type'] as String? ?? '';
-          final cost = request['cost'] as int? ?? 0;
-          final status = request['status'] as String? ?? 'pending';
-          final requesterUsername =
-              request['requester_username'] as String? ?? 'Unknown';
-          final createdAt = request['created_at'] as String?;
-          final denialReason = request['denial_reason'] as String?;
 
           return Card(
             margin: EdgeInsets.only(bottom: 12),
@@ -267,25 +255,25 @@ class _PurchaseRequestsScreenState extends ConsumerState<PurchaseRequestsScreen>
                     children: [
                       Expanded(
                         child: Text(
-                          itemName,
+                          request.item.name,
                           style: theme.textTheme.titleLarge?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),
-                      _buildStatusChip(status, theme),
+                      _buildStatusChip(request.status, theme),
                     ],
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Type: $itemType',
+                    'Type: ${request.item.itemType}',
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: theme.hintColor,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Cost: $cost SBD',
+                    'Cost: ${request.cost} SBD',
                     style: theme.textTheme.bodyMedium?.copyWith(
                       fontWeight: FontWeight.w600,
                       color: theme.primaryColor,
@@ -293,19 +281,18 @@ class _PurchaseRequestsScreenState extends ConsumerState<PurchaseRequestsScreen>
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Requested by: $requesterUsername',
+                    'Requested by: ${request.requester.username}',
                     style: theme.textTheme.bodyMedium,
                   ),
-                  if (createdAt != null) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      'Requested: ${_formatDate(createdAt)}',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.hintColor,
-                      ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Requested: ${_formatDate(request.createdAt.toIso8601String())}',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.hintColor,
                     ),
-                  ],
-                  if (denialReason != null && denialReason.isNotEmpty) ...[
+                  ),
+                  if (request.denialReason != null &&
+                      request.denialReason!.isNotEmpty) ...[
                     const SizedBox(height: 8),
                     Container(
                       padding: EdgeInsets.all(8),
@@ -315,14 +302,14 @@ class _PurchaseRequestsScreenState extends ConsumerState<PurchaseRequestsScreen>
                         border: Border.all(color: Colors.red.withOpacity(0.2)),
                       ),
                       child: Text(
-                        'Denial reason: $denialReason',
+                        'Denial reason: ${request.denialReason}',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: Colors.red.shade700,
                         ),
                       ),
                     ),
                   ],
-                  if (status == 'pending') ...[
+                  if (request.isPending) ...[
                     const SizedBox(height: 12),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,

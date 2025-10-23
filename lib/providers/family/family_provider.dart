@@ -644,31 +644,39 @@ final transactionsProvider =
 // ==================== Family Shop Providers ====================
 
 class FamilyShopState {
-  final List<Map<String, dynamic>> paymentOptions;
-  final List<Map<String, dynamic>> purchaseRequests;
-  final List<Map<String, dynamic>> ownedItems;
+  final List<models.PaymentOption> paymentOptions;
+  final List<models.PurchaseRequest> purchaseRequests;
+  final List<models.ShopItem> shopItems;
+  final List<models.OwnedItem> ownedItems;
+  final List<models.PurchaseHistoryItem> purchaseHistory;
   final bool isLoading;
   final String? error;
 
   FamilyShopState({
     required this.paymentOptions,
     required this.purchaseRequests,
+    required this.shopItems,
     required this.ownedItems,
+    required this.purchaseHistory,
     required this.isLoading,
     this.error,
   });
 
   FamilyShopState copyWith({
-    List<Map<String, dynamic>>? paymentOptions,
-    List<Map<String, dynamic>>? purchaseRequests,
-    List<Map<String, dynamic>>? ownedItems,
+    List<models.PaymentOption>? paymentOptions,
+    List<models.PurchaseRequest>? purchaseRequests,
+    List<models.ShopItem>? shopItems,
+    List<models.OwnedItem>? ownedItems,
+    List<models.PurchaseHistoryItem>? purchaseHistory,
     bool? isLoading,
     String? error,
   }) {
     return FamilyShopState(
       paymentOptions: paymentOptions ?? this.paymentOptions,
       purchaseRequests: purchaseRequests ?? this.purchaseRequests,
+      shopItems: shopItems ?? this.shopItems,
       ownedItems: ownedItems ?? this.ownedItems,
+      purchaseHistory: purchaseHistory ?? this.purchaseHistory,
       isLoading: isLoading ?? this.isLoading,
       error: error,
     );
@@ -684,7 +692,9 @@ class FamilyShopNotifier extends StateNotifier<FamilyShopState> {
         FamilyShopState(
           paymentOptions: [],
           purchaseRequests: [],
+          shopItems: [],
           ownedItems: [],
+          purchaseHistory: [],
           isLoading: false,
         ),
       );
@@ -699,25 +709,48 @@ class FamilyShopNotifier extends StateNotifier<FamilyShopState> {
     }
   }
 
-  Future<bool> purchaseItem({
+  Future<void> loadShopItems({String? itemType}) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final items = await _apiService.getShopItems(itemType: itemType);
+      state = state.copyWith(shopItems: items, isLoading: false);
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+    }
+  }
+
+  Future<Map<String, dynamic>> purchaseItem({
     required String itemId,
     required String itemType,
     required int quantity,
+    required bool useFamilyWallet,
+    String? paymentSourceId,
+    String? reason,
   }) async {
     try {
-      await _apiService.purchaseItem(
+      final result = await _apiService.purchaseItem(
         itemId: itemId,
         itemType: itemType,
         quantity: quantity,
-        useFamilyWallet: true,
+        useFamilyWallet: useFamilyWallet,
         familyId: familyId,
+        paymentSourceId: paymentSourceId,
+        reason: reason,
       );
-      // Refresh owned items after purchase
-      await loadOwnedItems();
-      return true;
+
+      // If it's a pending request, refresh purchase requests
+      if (result['status'] == 'pending') {
+        await loadPurchaseRequests();
+      } else if (result['status'] == 'success') {
+        // Refresh owned items after successful purchase
+        await loadOwnedItems();
+        await loadPurchaseHistory();
+      }
+
+      return result;
     } catch (e) {
       state = state.copyWith(error: e.toString());
-      return false;
+      rethrow;
     }
   }
 
@@ -734,8 +767,10 @@ class FamilyShopNotifier extends StateNotifier<FamilyShopState> {
   Future<bool> approvePurchaseRequest(String requestId) async {
     try {
       await _apiService.approvePurchaseRequest(requestId);
-      // Refresh requests
+      // Refresh requests and owned items
       await loadPurchaseRequests();
+      await loadOwnedItems();
+      await loadPurchaseHistory();
       return true;
     } catch (e) {
       state = state.copyWith(error: e.toString());
@@ -764,8 +799,38 @@ class FamilyShopNotifier extends StateNotifier<FamilyShopState> {
     }
   }
 
+  Future<void> loadPurchaseHistory() async {
+    try {
+      final history = await _apiService.getPurchaseHistory(familyId);
+      state = state.copyWith(purchaseHistory: history);
+    } catch (e) {
+      state = state.copyWith(error: e.toString());
+    }
+  }
+
   void clearError() {
     state = state.copyWith(error: null);
+  }
+
+  // Helper methods
+  bool isItemOwned(String itemId) {
+    return state.ownedItems.any((item) => item.itemId == itemId);
+  }
+
+  models.PaymentOption? getFamilyWalletOption() {
+    return state.paymentOptions
+        .where((option) => option.isFamilyWallet)
+        .firstOrNull;
+  }
+
+  List<models.PaymentOption> getAvailablePaymentOptions() {
+    return state.paymentOptions.where((option) => option.canSpend).toList();
+  }
+
+  List<models.PurchaseRequest> getPendingRequests() {
+    return state.purchaseRequests
+        .where((request) => request.isPending)
+        .toList();
   }
 }
 

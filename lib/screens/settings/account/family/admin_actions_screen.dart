@@ -381,7 +381,7 @@ class _AdminActionsScreenState extends ConsumerState<AdminActionsScreen>
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    request['item']['name'] ?? 'Unknown Item',
+                                    request.item.name,
                                     style: TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 16,
@@ -389,7 +389,7 @@ class _AdminActionsScreenState extends ConsumerState<AdminActionsScreen>
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    'By ${request['requester']['username']}',
+                                    'By ${request.requester.username}',
                                     style: TextStyle(
                                       color: Colors.grey[600],
                                       fontSize: 14,
@@ -399,7 +399,7 @@ class _AdminActionsScreenState extends ConsumerState<AdminActionsScreen>
                               ),
                             ),
                             Text(
-                              'Cost: ${request['cost']}',
+                              'Cost: ${request.cost}',
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 color: theme.primaryColor,
@@ -409,14 +409,14 @@ class _AdminActionsScreenState extends ConsumerState<AdminActionsScreen>
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Status: ${request['status']}',
+                          'Status: ${request.status}',
                           style: TextStyle(
-                            color: request['status'] == 'pending'
+                            color: request.isPending
                                 ? Colors.orange
                                 : Colors.green,
                           ),
                         ),
-                        if (request['status'] == 'pending') ...[
+                        if (request.isPending) ...[
                           const SizedBox(height: 8),
                           Row(
                             children: [
@@ -427,15 +427,13 @@ class _AdminActionsScreenState extends ConsumerState<AdminActionsScreen>
                                         widget.familyId,
                                       ).notifier,
                                     )
-                                    .approvePurchaseRequest(
-                                      request['request_id'],
-                                    ),
+                                    .approvePurchaseRequest(request.requestId),
                                 child: Text('Approve'),
                               ),
                               const SizedBox(width: 8),
                               OutlinedButton(
                                 onPressed: () =>
-                                    _showDenyDialog(request['request_id']),
+                                    _showDenyDialog(request.requestId),
                                 child: Text('Deny'),
                               ),
                             ],

@@ -1103,6 +1103,210 @@ class AdminAction {
   }
 }
 
+// ==================== Family Shop Models ====================
+
+class ShopItem {
+  final String itemId;
+  final String name;
+  final String description;
+  final String itemType; // 'avatar', 'banner', 'theme', 'bundle', 'currency'
+  final int price;
+  final String? imageUrl;
+  final Map<String, dynamic>? metadata;
+  final bool isAvailable;
+  final DateTime? createdAt;
+
+  ShopItem({
+    required this.itemId,
+    required this.name,
+    required this.description,
+    required this.itemType,
+    required this.price,
+    this.imageUrl,
+    this.metadata,
+    required this.isAvailable,
+    this.createdAt,
+  });
+
+  factory ShopItem.fromJson(Map<String, dynamic> json) {
+    return ShopItem(
+      itemId: json['item_id'] ?? '',
+      name: json['name'] ?? '',
+      description: json['description'] ?? '',
+      itemType: json['item_type'] ?? '',
+      price: json['price'] ?? 0,
+      imageUrl: json['image_url'],
+      metadata: json['metadata'],
+      isAvailable: json['is_available'] ?? true,
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'])
+          : null,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'item_id': itemId,
+      'name': name,
+      'description': description,
+      'item_type': itemType,
+      'price': price,
+      if (imageUrl != null) 'image_url': imageUrl,
+      if (metadata != null) 'metadata': metadata,
+      'is_available': isAvailable,
+      if (createdAt != null) 'created_at': createdAt!.toIso8601String(),
+    };
+  }
+
+  bool get isAvatar => itemType == 'avatar';
+  bool get isBanner => itemType == 'banner';
+  bool get isTheme => itemType == 'theme';
+  bool get isBundle => itemType == 'bundle';
+  bool get isCurrency => itemType == 'currency';
+}
+
+class PaymentOption {
+  final String sourceId;
+  final String type; // 'personal' or 'family'
+  final bool canSpend;
+  final int spendingLimit;
+  final String? familyId;
+  final String label;
+  final String? description;
+
+  PaymentOption({
+    required this.sourceId,
+    required this.type,
+    required this.canSpend,
+    required this.spendingLimit,
+    this.familyId,
+    required this.label,
+    this.description,
+  });
+
+  factory PaymentOption.fromJson(Map<String, dynamic> json) {
+    return PaymentOption(
+      sourceId: json['source_id'] ?? '',
+      type: json['type'] ?? 'personal',
+      canSpend: json['can_spend'] ?? false,
+      spendingLimit: json['spending_limit'] ?? 0,
+      familyId: json['family_id'],
+      label: json['label'] ?? '',
+      description: json['description'],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'source_id': sourceId,
+      'type': type,
+      'can_spend': canSpend,
+      'spending_limit': spendingLimit,
+      if (familyId != null) 'family_id': familyId,
+      'label': label,
+      if (description != null) 'description': description,
+    };
+  }
+
+  bool get isFamilyWallet => type == 'family';
+  bool get isPersonal => type == 'personal';
+  bool get hasUnlimitedLimit => spendingLimit == -1;
+  String get limitText =>
+      hasUnlimitedLimit ? 'Unlimited' : '$spendingLimit SBD';
+}
+
+class OwnedItem {
+  final String itemId;
+  final String name;
+  final String itemType;
+  final String? imageUrl;
+  final DateTime? acquiredAt;
+  final Map<String, dynamic>? metadata;
+
+  OwnedItem({
+    required this.itemId,
+    required this.name,
+    required this.itemType,
+    this.imageUrl,
+    this.acquiredAt,
+    this.metadata,
+  });
+
+  factory OwnedItem.fromJson(Map<String, dynamic> json) {
+    return OwnedItem(
+      itemId: json['item_id'] ?? '',
+      name: json['name'] ?? '',
+      itemType: json['item_type'] ?? '',
+      imageUrl: json['image_url'],
+      acquiredAt: json['acquired_at'] != null
+          ? DateTime.parse(json['acquired_at'])
+          : null,
+      metadata: json['metadata'],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'item_id': itemId,
+      'name': name,
+      'item_type': itemType,
+      if (imageUrl != null) 'image_url': imageUrl,
+      if (acquiredAt != null) 'acquired_at': acquiredAt!.toIso8601String(),
+      if (metadata != null) 'metadata': metadata,
+    };
+  }
+}
+
+class PurchaseHistoryItem {
+  final String transactionId;
+  final String itemId;
+  final String itemName;
+  final String itemType;
+  final int cost;
+  final DateTime purchasedAt;
+  final String paymentMethod; // 'personal' or 'family'
+  final bool wasApproved;
+
+  PurchaseHistoryItem({
+    required this.transactionId,
+    required this.itemId,
+    required this.itemName,
+    required this.itemType,
+    required this.cost,
+    required this.purchasedAt,
+    required this.paymentMethod,
+    required this.wasApproved,
+  });
+
+  factory PurchaseHistoryItem.fromJson(Map<String, dynamic> json) {
+    return PurchaseHistoryItem(
+      transactionId: json['transaction_id'] ?? '',
+      itemId: json['item_id'] ?? '',
+      itemName: json['item_name'] ?? '',
+      itemType: json['item_type'] ?? '',
+      cost: json['cost'] ?? 0,
+      purchasedAt: DateTime.parse(
+        json['purchased_at'] ?? DateTime.now().toIso8601String(),
+      ),
+      paymentMethod: json['payment_method'] ?? 'personal',
+      wasApproved: json['was_approved'] ?? false,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'transaction_id': transactionId,
+      'item_id': itemId,
+      'item_name': itemName,
+      'item_type': itemType,
+      'cost': cost,
+      'purchased_at': purchasedAt.toIso8601String(),
+      'payment_method': paymentMethod,
+      'was_approved': wasApproved,
+    };
+  }
+}
+
 // Request models
 class CreateFamilyRequest {
   final String? name;

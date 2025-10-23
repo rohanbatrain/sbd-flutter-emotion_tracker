@@ -4,6 +4,11 @@ import 'package:emotion_tracker/widgets/custom_app_bar.dart';
 import 'package:emotion_tracker/providers/family/family_provider.dart';
 import 'package:emotion_tracker/widgets/loading_state_widget.dart';
 import 'package:emotion_tracker/widgets/error_state_widget.dart';
+import 'package:emotion_tracker/providers/family/family_models.dart' as models;
+import 'package:emotion_tracker/screens/settings/account/family/family_avatars_tab.dart';
+import 'package:emotion_tracker/screens/settings/account/family/family_banners_tab.dart';
+import 'package:emotion_tracker/screens/settings/account/family/family_themes_tab.dart';
+import 'package:emotion_tracker/screens/settings/account/family/family_bundles_tab.dart';
 
 class FamilyShopScreen extends ConsumerStatefulWidget {
   final String familyId;
@@ -21,12 +26,16 @@ class _FamilyShopScreenState extends ConsumerState<FamilyShopScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
     Future.microtask(() {
       ref
           .read(familyShopProvider(widget.familyId).notifier)
           .loadPaymentOptions();
+      ref.read(familyShopProvider(widget.familyId).notifier).loadShopItems();
       ref.read(familyShopProvider(widget.familyId).notifier).loadOwnedItems();
+      ref
+          .read(familyShopProvider(widget.familyId).notifier)
+          .loadPurchaseHistory();
       ref
           .read(familyDetailsProvider(widget.familyId).notifier)
           .loadFamilyDetails();
@@ -39,87 +48,324 @@ class _FamilyShopScreenState extends ConsumerState<FamilyShopScreen>
     super.dispose();
   }
 
-  Future<void> _showPurchaseDialog(Map<String, dynamic> item) async {
+  Future<void> _showPurchaseDialog(models.ShopItem item) async {
     final theme = Theme.of(context);
-    final itemName = item['name'] as String? ?? 'Unknown Item';
-    final price = item['price'] as int? ?? 0;
-    final description = item['description'] as String? ?? '';
-
     final quantityController = TextEditingController(text: '1');
     final reasonController = TextEditingController();
 
+    final shopNotifier = ref.read(familyShopProvider(widget.familyId).notifier);
+    final availableOptions = shopNotifier.getAvailablePaymentOptions();
+    final familyWalletOption = shopNotifier.getFamilyWalletOption();
+
+    String? selectedPaymentOptionId = familyWalletOption?.sourceId;
+
     final result = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Purchase $itemName'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (description.isNotEmpty) ...[
-                Text(description),
-                const SizedBox(height: 16),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => Dialog(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 400),
+            decoration: BoxDecoration(
+              color: theme.cardColor,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 20,
+                  offset: const Offset(0, 5),
+                ),
               ],
-              Text(
-                'Price: $price SBD per item',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: quantityController,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: 'Quantity',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.shopping_cart),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Header with item info
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: theme.primaryColor.withOpacity(0.1),
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(20),
+                      topRight: Radius.circular(20),
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      if (item.imageUrl != null)
+                        Container(
+                          width: 80,
+                          height: 80,
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.onSurface.withOpacity(
+                              0.05,
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            _getItemIcon(item.itemType),
+                            size: 40,
+                            color: theme.primaryColor,
+                          ),
+                        )
+                      else
+                        Container(
+                          width: 80,
+                          height: 80,
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.onSurface.withOpacity(
+                              0.05,
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            _getItemIcon(item.itemType),
+                            size: 40,
+                            color: theme.primaryColor,
+                          ),
+                        ),
+                      const SizedBox(height: 16),
+                      Text(
+                        item.name,
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      if (item.description.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          item.description,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.hintColor,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: theme.primaryColor,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          '${item.price} SBD',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: reasonController,
-                maxLines: 3,
-                maxLength: 500,
-                decoration: InputDecoration(
-                  labelText: 'Reason for purchase (optional)',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.edit_note),
+
+                // Content
+                Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Quantity
+                      Text(
+                        'Quantity',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: quantityController,
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          hintText: 'Enter quantity',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          prefixIcon: const Icon(Icons.shopping_cart),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Payment Method
+                      Text(
+                        'Payment Method',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      ...availableOptions.map(
+                        (option) => Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color: selectedPaymentOptionId == option.sourceId
+                                  ? theme.primaryColor
+                                  : theme.dividerColor,
+                              width: selectedPaymentOptionId == option.sourceId
+                                  ? 2
+                                  : 1,
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                            color: selectedPaymentOptionId == option.sourceId
+                                ? theme.primaryColor.withOpacity(0.05)
+                                : null,
+                          ),
+                          child: RadioListTile<String>(
+                            title: Text(
+                              option.label,
+                              style: theme.textTheme.bodyLarge?.copyWith(
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            subtitle: option.description != null
+                                ? Text(
+                                    option.description!,
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: theme.hintColor,
+                                    ),
+                                  )
+                                : null,
+                            value: option.sourceId,
+                            groupValue: selectedPaymentOptionId,
+                            onChanged: (value) {
+                              setState(() => selectedPaymentOptionId = value);
+                            },
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Family wallet notice
+                      if (selectedPaymentOptionId ==
+                          familyWalletOption?.sourceId) ...[
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Colors.blue.withOpacity(0.3),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.info_outline,
+                                color: Colors.blue.shade700,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  'This purchase requires admin approval before it will be processed.',
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: Colors.blue.shade700,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+
+                      // Reason (optional)
+                      Text(
+                        'Reason (Optional)',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: reasonController,
+                        maxLines: 3,
+                        maxLength: 500,
+                        decoration: InputDecoration(
+                          hintText: 'Why are you purchasing this item?',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          contentPadding: const EdgeInsets.all(16),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              Container(
-                padding: EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.blue.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
+
+                // Actions
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surface,
+                    borderRadius: const BorderRadius.only(
+                      bottomLeft: Radius.circular(20),
+                      bottomRight: Radius.circular(20),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.of(context).pop(false),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: const Text('Cancel'),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: selectedPaymentOptionId != null
+                              ? () => Navigator.of(context).pop(true)
+                              : null,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: theme.primaryColor,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 2,
+                          ),
+                          child: const Text('Purchase'),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                child: Text(
-                  'This purchase requires admin approval before it will be processed.',
-                  style: TextStyle(color: Colors.blue.shade700, fontSize: 12),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text('Cancel'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: theme.primaryColor,
-              foregroundColor: Colors.white,
-            ),
-            onPressed: () => Navigator.of(context).pop(true),
-            child: Text('Submit Request'),
-          ),
-        ],
       ),
     );
 
-    if (result == true) {
+    if (result == true && selectedPaymentOptionId != null) {
       final quantity = int.tryParse(quantityController.text.trim()) ?? 1;
+      final useFamilyWallet =
+          selectedPaymentOptionId == familyWalletOption?.sourceId;
 
       if (quantity <= 0) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -131,14 +377,45 @@ class _FamilyShopScreenState extends ConsumerState<FamilyShopScreen>
         return;
       }
 
-      // For now, we'll create a purchase request instead of direct purchase
-      // This would need to be implemented in the backend API
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Purchase request feature coming soon!'),
-          backgroundColor: Colors.orange,
-        ),
-      );
+      try {
+        final purchaseResult = await ref
+            .read(familyShopProvider(widget.familyId).notifier)
+            .purchaseItem(
+              itemId: item.itemId,
+              itemType: item.itemType,
+              quantity: quantity,
+              useFamilyWallet: useFamilyWallet,
+              paymentSourceId: selectedPaymentOptionId,
+              reason: reasonController.text.trim().isNotEmpty
+                  ? reasonController.text.trim()
+                  : null,
+            );
+
+        if (purchaseResult['status'] == 'success') {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Purchase successful!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        } else if (purchaseResult['status'] == 'pending') {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Purchase request submitted for approval.'),
+              backgroundColor: Colors.blue,
+            ),
+          );
+        }
+      } catch (e) {
+        print('[FAMILY_SHOP] Purchase error: $e');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Purchase failed: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
     }
   }
 
@@ -244,10 +521,31 @@ class _FamilyShopScreenState extends ConsumerState<FamilyShopScreen>
           // Tabs
           TabBar(
             controller: _tabController,
-            tabs: [
-              Tab(text: 'Browse Items'),
-              Tab(text: 'My Items'),
-              Tab(text: 'Purchase History'),
+            isScrollable: true,
+            tabAlignment: TabAlignment.start,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            indicatorPadding: const EdgeInsets.symmetric(horizontal: 8),
+            labelColor: theme.primaryColor,
+            unselectedLabelColor: theme.colorScheme.onSurface.withOpacity(0.7),
+            indicatorColor: theme.primaryColor,
+            indicator: BoxDecoration(
+              color: theme.primaryColor.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            labelStyle: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+            ),
+            unselectedLabelStyle: const TextStyle(
+              fontWeight: FontWeight.normal,
+              fontSize: 14,
+            ),
+            tabs: const [
+              Tab(text: 'Avatars'),
+              Tab(text: 'Banners'),
+              Tab(text: 'Themes'),
+              Tab(text: 'Bundles'),
+              Tab(text: 'History'),
             ],
           ),
 
@@ -270,9 +568,23 @@ class _FamilyShopScreenState extends ConsumerState<FamilyShopScreen>
                 : TabBarView(
                     controller: _tabController,
                     children: [
-                      _buildBrowseTab(theme, shopState),
-                      _buildOwnedTab(theme, shopState),
-                      _buildHistoryTab(theme),
+                      FamilyAvatarsTab(
+                        familyId: widget.familyId,
+                        onPurchase: _showPurchaseDialog,
+                      ),
+                      FamilyBannersTab(
+                        familyId: widget.familyId,
+                        onPurchase: _showPurchaseDialog,
+                      ),
+                      FamilyThemesTab(
+                        familyId: widget.familyId,
+                        onPurchase: _showPurchaseDialog,
+                      ),
+                      FamilyBundlesTab(
+                        familyId: widget.familyId,
+                        onPurchase: _showPurchaseDialog,
+                      ),
+                      _buildHistoryTab(theme, shopState),
                     ],
                   ),
           ),
@@ -281,240 +593,8 @@ class _FamilyShopScreenState extends ConsumerState<FamilyShopScreen>
     );
   }
 
-  Widget _buildBrowseTab(ThemeData theme, FamilyShopState shopState) {
-    // Mock items for demonstration - in real app, this would come from API
-    final mockItems = [
-      {
-        'id': 'avatar_001',
-        'name': 'Happy Panda Avatar',
-        'type': 'avatar',
-        'price': 50,
-        'description': 'A cute panda avatar to brighten your day!',
-        'image_url': null,
-      },
-      {
-        'id': 'banner_001',
-        'name': 'Ocean Sunset Banner',
-        'type': 'banner',
-        'price': 75,
-        'description': 'Beautiful ocean sunset banner for your profile.',
-        'image_url': null,
-      },
-      {
-        'id': 'theme_001',
-        'name': 'Forest Theme',
-        'type': 'theme',
-        'price': 100,
-        'description': 'Relaxing forest theme with nature sounds.',
-        'image_url': null,
-      },
-    ];
-
-    return RefreshIndicator(
-      onRefresh: () async {
-        await ref
-            .read(familyShopProvider(widget.familyId).notifier)
-            .loadPaymentOptions();
-      },
-      child: ListView.builder(
-        padding: EdgeInsets.all(16),
-        itemCount: mockItems.length,
-        itemBuilder: (context, index) {
-          final item = mockItems[index];
-          final isOwned = shopState.ownedItems.any(
-            (owned) =>
-                owned['item_id'] == item['id'] &&
-                owned['item_type'] == item['type'],
-          );
-
-          return Card(
-            margin: EdgeInsets.only(bottom: 12),
-            child: Padding(
-              padding: EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  // Item Icon/Image placeholder
-                  Container(
-                    width: 60,
-                    height: 60,
-                    decoration: BoxDecoration(
-                      color: theme.primaryColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      _getItemIcon(item['type'] as String),
-                      color: theme.primaryColor,
-                      size: 30,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          item['name'] as String,
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          item['description'] as String,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.hintColor,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          '${item['price']} SBD',
-                          style: TextStyle(
-                            color: theme.primaryColor,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  ElevatedButton(
-                    onPressed: isOwned ? null : () => _showPurchaseDialog(item),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: isOwned
-                          ? Colors.grey
-                          : theme.primaryColor,
-                      foregroundColor: Colors.white,
-                    ),
-                    child: Text(isOwned ? 'Owned' : 'Buy'),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildOwnedTab(ThemeData theme, FamilyShopState shopState) {
-    if (shopState.ownedItems.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.inventory, size: 64, color: Colors.grey),
-            const SizedBox(height: 16),
-            Text(
-              'No items owned yet',
-              style: TextStyle(fontSize: 16, color: Colors.grey),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Purchase items from the shop to see them here',
-              style: TextStyle(fontSize: 12, color: Colors.grey),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      );
-    }
-
-    return RefreshIndicator(
-      onRefresh: () async {
-        await ref
-            .read(familyShopProvider(widget.familyId).notifier)
-            .loadOwnedItems();
-      },
-      child: ListView.builder(
-        padding: EdgeInsets.all(16),
-        itemCount: shopState.ownedItems.length,
-        itemBuilder: (context, index) {
-          final item = shopState.ownedItems[index];
-          final itemName = item['name'] as String? ?? 'Unknown Item';
-          final itemType = item['type'] as String? ?? '';
-          final acquiredAt = item['acquired_at'] as String?;
-
-          return Card(
-            margin: EdgeInsets.only(bottom: 12),
-            child: Padding(
-              padding: EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  Container(
-                    width: 50,
-                    height: 50,
-                    decoration: BoxDecoration(
-                      color: theme.primaryColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(
-                      _getItemIcon(itemType),
-                      color: theme.primaryColor,
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          itemName,
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Type: ${itemType.toUpperCase()}',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.hintColor,
-                          ),
-                        ),
-                        if (acquiredAt != null) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            'Acquired: ${_formatDate(acquiredAt)}',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.hintColor,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.green.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      'OWNED',
-                      style: TextStyle(
-                        color: Colors.green.shade700,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildHistoryTab(ThemeData theme) {
-    // Mock purchase history - in real app, this would come from API
-    final mockHistory = <Map<String, dynamic>>[];
-
-    if (mockHistory.isEmpty) {
+  Widget _buildHistoryTab(ThemeData theme, FamilyShopState shopState) {
+    if (shopState.purchaseHistory.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -530,18 +610,97 @@ class _FamilyShopScreenState extends ConsumerState<FamilyShopScreen>
       );
     }
 
-    return ListView.builder(
-      padding: EdgeInsets.all(16),
-      itemCount: mockHistory.length,
-      itemBuilder: (context, index) {
-        return Card(
-          margin: EdgeInsets.only(bottom: 12),
-          child: Padding(
-            padding: EdgeInsets.all(16),
-            child: Text('Purchase history item ${index + 1}'),
-          ),
-        );
+    return RefreshIndicator(
+      onRefresh: () async {
+        await ref
+            .read(familyShopProvider(widget.familyId).notifier)
+            .loadPurchaseHistory();
       },
+      child: ListView.builder(
+        padding: EdgeInsets.all(16),
+        itemCount: shopState.purchaseHistory.length,
+        itemBuilder: (context, index) {
+          final historyItem = shopState.purchaseHistory[index];
+
+          return Card(
+            margin: EdgeInsets.only(bottom: 12),
+            child: Padding(
+              padding: EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Container(
+                    width: 50,
+                    height: 50,
+                    decoration: BoxDecoration(
+                      color: theme.primaryColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      _getItemIcon(historyItem.itemType),
+                      color: theme.primaryColor,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          historyItem.itemName,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Type: ${historyItem.itemType.toUpperCase()}',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.hintColor,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Purchased: ${_formatDate(historyItem.purchasedAt.toIso8601String())}',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.hintColor,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Cost: ${historyItem.cost} SBD (${historyItem.paymentMethod})',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.hintColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: historyItem.wasApproved
+                          ? Colors.green.withOpacity(0.1)
+                          : Colors.orange.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      historyItem.wasApproved ? 'APPROVED' : 'DIRECT',
+                      style: TextStyle(
+                        color: historyItem.wasApproved
+                            ? Colors.green.shade700
+                            : Colors.orange.shade700,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 

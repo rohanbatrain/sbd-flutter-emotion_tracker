@@ -12,6 +12,10 @@ import 'package:emotion_tracker/providers/user_agent_util.dart';
 import 'package:emotion_tracker/core/exceptions.dart' as core_exceptions;
 import 'family_models.dart' as models;
 import 'family_exceptions.dart' as family_ex;
+import 'package:emotion_tracker/providers/custom_avatar.dart';
+import 'package:emotion_tracker/providers/custom_banner.dart';
+import 'package:emotion_tracker/providers/custom_bundle.dart';
+import 'package:emotion_tracker/providers/theme_provider.dart';
 
 final familyApiServiceProvider = Provider((ref) => FamilyApiService(ref));
 
@@ -666,12 +670,12 @@ class FamilyApiService {
 
   // ==================== Family Shop Endpoints ====================
 
-  Future<List<Map<String, dynamic>>> getPaymentOptions() async {
+  Future<List<models.PaymentOption>> getPaymentOptions() async {
     final response = await _request('GET', '/shop/payment-options');
     if (response.isEmpty) return [];
     final options =
         (response['payment_options'] ?? response['items'] ?? []) as List;
-    return options.map((o) => Map<String, dynamic>.from(o)).toList();
+    return options.map((o) => models.PaymentOption.fromJson(o)).toList();
   }
 
   Future<Map<String, dynamic>> purchaseItem({
@@ -680,18 +684,34 @@ class FamilyApiService {
     required int quantity,
     required bool useFamilyWallet,
     required String familyId,
+    String? paymentSourceId,
+    String? reason,
   }) async {
     final request = {
       'item_id': itemId,
+      'item_type': itemType,
       'quantity': quantity,
       'use_family_wallet': useFamilyWallet,
       'family_id': familyId,
+      if (paymentSourceId != null) 'payment_source_id': paymentSourceId,
+      if (reason != null) 'reason': reason,
     };
-    final response = await _request('POST', '/shop/purchase', data: request);
-    return response;
+
+    print('[FAMILY_API] PurchaseItem request: $request');
+
+    try {
+      final response = await _request('POST', '/shop/purchase', data: request);
+      print('[FAMILY_API] PurchaseItem success: $response');
+      return response;
+    } catch (e) {
+      // Surface server error detail for easier debugging
+      print('[FAMILY_API] PurchaseItem failed: ${e.toString()}');
+      print('[FAMILY_API] PurchaseItem request data: $request');
+      rethrow;
+    }
   }
 
-  Future<List<Map<String, dynamic>>> getPurchaseRequests(
+  Future<List<models.PurchaseRequest>> getPurchaseRequests(
     String familyId,
   ) async {
     final response = await _request(
@@ -701,18 +721,20 @@ class FamilyApiService {
     if (response.isEmpty) return [];
     final requests =
         (response['purchase_requests'] ?? response['items'] ?? []) as List;
-    return requests.map((r) => Map<String, dynamic>.from(r)).toList();
+    return requests.map((r) => models.PurchaseRequest.fromJson(r)).toList();
   }
 
-  Future<Map<String, dynamic>> approvePurchaseRequest(String requestId) async {
+  Future<models.PurchaseRequest> approvePurchaseRequest(
+    String requestId,
+  ) async {
     final response = await _request(
       'POST',
       '/family/wallet/purchase-requests/$requestId/approve',
     );
-    return response;
+    return models.PurchaseRequest.fromJson(response);
   }
 
-  Future<Map<String, dynamic>> denyPurchaseRequest(
+  Future<models.PurchaseRequest> denyPurchaseRequest(
     String requestId, {
     String? reason,
   }) async {
@@ -722,13 +744,118 @@ class FamilyApiService {
       '/family/wallet/purchase-requests/$requestId/deny',
       data: request,
     );
-    return response;
+    return models.PurchaseRequest.fromJson(response);
   }
 
-  Future<List<Map<String, dynamic>>> getOwnedItems() async {
+  Future<List<models.ShopItem>> getShopItems({String? itemType}) async {
+    // The backend does not expose a /shop/items endpoint in this environment.
+    // For family shop we always use the in-repo local catalog (same data
+    // used by the personal shop) so the feature works without backend support.
+
+    final List<models.ShopItem> localItems = [];
+
+    // Avatars
+    for (final a in allAvatars) {
+      final image = a.type == AvatarType.static
+          ? a.imageAsset
+          : a.animationAsset;
+      localItems.add(
+        models.ShopItem(
+          itemId: a.id,
+          name: a.name,
+          description: '',
+          itemType: 'avatar',
+          price: a.price,
+          imageUrl: image,
+          metadata: {
+            'avatar_type': a.type.toString(),
+            if (a.rewardedAdId != null) 'rewarded_ad_id': a.rewardedAdId,
+          },
+          isAvailable: true,
+        ),
+      );
+    }
+
+    // Banners
+    for (final b in allProfileBanners) {
+      final image = b.type == BannerType.static
+          ? b.imageAsset
+          : b.animationAsset;
+      localItems.add(
+        models.ShopItem(
+          itemId: b.id,
+          name: b.name ?? b.id,
+          description: b.description ?? '',
+          itemType: 'banner',
+          price: b.price,
+          imageUrl: image,
+          metadata: {
+            if (b.rewardedAdId != null) 'rewarded_ad_id': b.rewardedAdId,
+          },
+          isAvailable: true,
+        ),
+      );
+    }
+
+    // Bundles
+    for (final bs in bundles) {
+      localItems.add(
+        models.ShopItem(
+          itemId: bs.id,
+          name: bs.name,
+          description: bs.description,
+          itemType: 'bundle',
+          price: bs.price,
+          imageUrl: bs.image,
+          metadata: {'included_items': bs.includedItems},
+          isAvailable: true,
+        ),
+      );
+    }
+
+    // Themes (use keys from AppThemes)
+    AppThemes.themeNames.forEach((key, name) {
+      final price = AppThemes.themePrices[key] ?? 0;
+      final themeItemId = 'emotion_tracker-$key';
+      localItems.add(
+        models.ShopItem(
+          itemId: themeItemId,
+          name: name,
+          description: '',
+          itemType: 'theme',
+          price: price,
+          imageUrl: null,
+          metadata: {'theme_key': key},
+          isAvailable: true,
+        ),
+      );
+    });
+
+    // Apply itemType filter if provided
+    if (itemType != null) {
+      return localItems.where((i) => i.itemType == itemType).toList();
+    }
+
+    return localItems;
+  }
+
+  Future<List<models.OwnedItem>> getOwnedItems() async {
     final response = await _request('GET', '/avatars/owned');
     if (response.isEmpty) return [];
     final items = (response['owned_items'] ?? response['items'] ?? []) as List;
-    return items.map((i) => Map<String, dynamic>.from(i)).toList();
+    return items.map((i) => models.OwnedItem.fromJson(i)).toList();
+  }
+
+  Future<List<models.PurchaseHistoryItem>> getPurchaseHistory(
+    String familyId,
+  ) async {
+    final response = await _request(
+      'GET',
+      '/family/$familyId/shop/purchase-history',
+    );
+    if (response.isEmpty) return [];
+    final items =
+        (response['purchase_history'] ?? response['items'] ?? []) as List;
+    return items.map((i) => models.PurchaseHistoryItem.fromJson(i)).toList();
   }
 }
