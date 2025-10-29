@@ -14,6 +14,8 @@ import 'package:emotion_tracker/screens/auth/client-side-encryption/variant1.dar
 import 'package:emotion_tracker/screens/auth/forgot-password/variant1.dart';
 import 'package:emotion_tracker/screens/auth/login-with-token/variant1.dart';
 import 'package:emotion_tracker/screens/settings/account/family/family_shop_screen.dart';
+import 'package:emotion_tracker/screens/settings/team/enhanced_team_wallet_screen.dart';
+import 'package:emotion_tracker/screens/settings/team/workspace_list_screen.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 
 const String registrationAppId = 'emotion_tracker';
@@ -94,6 +96,8 @@ class MyApp extends ConsumerWidget {
           return FamilyShopScreen(familyId: familyId);
         },
         // Variant 2 Routes
+        '/team/wallets': (context) => const EnhancedTeamWalletScreen(),
+        '/team/workspaces': (context) => const WorkspaceListScreen(),
       },
     );
   }

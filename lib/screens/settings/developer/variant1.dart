@@ -9,10 +9,13 @@ class DeveloperOptionsScreenV1 extends ConsumerStatefulWidget {
   const DeveloperOptionsScreenV1({Key? key}) : super(key: key);
 
   @override
-  ConsumerState<DeveloperOptionsScreenV1> createState() => _DeveloperOptionsScreenV1State();
+  ConsumerState<DeveloperOptionsScreenV1> createState() =>
+      _DeveloperOptionsScreenV1State();
 }
 
-class _DeveloperOptionsScreenV1State extends ConsumerState<DeveloperOptionsScreenV1> with SingleTickerProviderStateMixin {
+class _DeveloperOptionsScreenV1State
+    extends ConsumerState<DeveloperOptionsScreenV1>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   bool isLoading = true;
   Map<String, dynamic> sharedPrefsData = {};
@@ -96,7 +99,10 @@ class _DeveloperOptionsScreenV1State extends ConsumerState<DeveloperOptionsScree
       }
 
       final memoryMap = <String, dynamic>{};
-      memoryMap['currentTheme'] = ref.read(currentThemeProvider).brightness.toString();
+      memoryMap['currentTheme'] = ref
+          .read(currentThemeProvider)
+          .brightness
+          .toString();
 
       setState(() {
         sharedPrefsData = prefsMap;
@@ -107,7 +113,9 @@ class _DeveloperOptionsScreenV1State extends ConsumerState<DeveloperOptionsScree
     } catch (e) {
       setState(() => isLoading = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error loading data: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error loading data: $e')));
       }
     }
   }
@@ -115,7 +123,10 @@ class _DeveloperOptionsScreenV1State extends ConsumerState<DeveloperOptionsScree
   void _copyToClipboard(String text, String label) {
     Clipboard.setData(ClipboardData(text: text));
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$label copied to clipboard'), duration: const Duration(seconds: 2)),
+      SnackBar(
+        content: Text('$label copied to clipboard'),
+        duration: const Duration(seconds: 2),
+      ),
     );
   }
 
@@ -125,15 +136,22 @@ class _DeveloperOptionsScreenV1State extends ConsumerState<DeveloperOptionsScree
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Clear All Data'),
-        content: const Text('Are you sure you want to clear all SharedPreferences and Secure Storage data? This action cannot be undone.'),
+        content: const Text(
+          'Are you sure you want to clear all SharedPreferences and Secure Storage data? This action cannot be undone.',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(context);
               await _performClearAll();
             },
-            style: ElevatedButton.styleFrom(backgroundColor: theme.colorScheme.error),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: theme.colorScheme.error,
+            ),
             child: const Text('Clear All'),
           ),
         ],
@@ -149,17 +167,32 @@ class _DeveloperOptionsScreenV1State extends ConsumerState<DeveloperOptionsScree
       await secureStorage.deleteAll();
       await _loadData();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('All data cleared successfully')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('All data cleared successfully')),
+        );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error clearing data: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error clearing data: $e')));
       }
     }
   }
 
-  Widget _buildDataItem(ThemeData theme, String key, String value, bool isSecure, {bool editable = true}) {
-    final shouldMask = isSecure && (key.contains('token') || key.contains('key') || key.contains('secret') || key.contains('password'));
+  Widget _buildDataItem(
+    ThemeData theme,
+    String key,
+    String value,
+    bool isSecure, {
+    bool editable = true,
+  }) {
+    final shouldMask =
+        isSecure &&
+        (key.contains('token') ||
+            key.contains('key') ||
+            key.contains('secret') ||
+            key.contains('password'));
     final displayValue = shouldMask ? '•' * (value.length.clamp(8, 32)) : value;
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
@@ -174,7 +207,13 @@ class _DeveloperOptionsScreenV1State extends ConsumerState<DeveloperOptionsScree
             Row(
               children: [
                 Expanded(
-                  child: Text(key, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.primaryColor)),
+                  child: Text(
+                    key,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: theme.primaryColor,
+                    ),
+                  ),
                 ),
                 if (shouldMask)
                   Icon(Icons.lock, color: theme.colorScheme.error, size: 18),
@@ -185,7 +224,13 @@ class _DeveloperOptionsScreenV1State extends ConsumerState<DeveloperOptionsScree
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
-                  child: SelectableText(displayValue, style: theme.textTheme.bodyLarge?.copyWith(fontFamily: 'monospace', fontSize: 14)),
+                  child: SelectableText(
+                    displayValue,
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      fontFamily: 'monospace',
+                      fontSize: 14,
+                    ),
+                  ),
                 ),
                 const SizedBox(width: 8),
                 Column(
@@ -200,9 +245,15 @@ class _DeveloperOptionsScreenV1State extends ConsumerState<DeveloperOptionsScree
                             context: context,
                             builder: (context) => AlertDialog(
                               title: Text(key),
-                              content: SelectableText(value, style: const TextStyle(fontFamily: 'monospace')),
+                              content: SelectableText(
+                                value,
+                                style: const TextStyle(fontFamily: 'monospace'),
+                              ),
                               actions: [
-                                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context),
+                                  child: const Text('Close'),
+                                ),
                                 ElevatedButton(
                                   onPressed: () {
                                     _copyToClipboard(value, key);
@@ -215,7 +266,11 @@ class _DeveloperOptionsScreenV1State extends ConsumerState<DeveloperOptionsScree
                           );
                         },
                       ),
-                    IconButton(icon: const Icon(Icons.copy, size: 20), tooltip: 'Copy', onPressed: () => _copyToClipboard(value, key)),
+                    IconButton(
+                      icon: const Icon(Icons.copy, size: 20),
+                      tooltip: 'Copy',
+                      onPressed: () => _copyToClipboard(value, key),
+                    ),
                     if (editable)
                       IconButton(
                         icon: const Icon(Icons.edit, size: 20),
@@ -224,32 +279,53 @@ class _DeveloperOptionsScreenV1State extends ConsumerState<DeveloperOptionsScree
                           final newValue = await showDialog<String>(
                             context: context,
                             builder: (context) {
-                              final controller = TextEditingController(text: value);
+                              final controller = TextEditingController(
+                                text: value,
+                              );
                               return AlertDialog(
                                 title: Text('Edit $key'),
                                 content: TextField(
                                   controller: controller,
                                   maxLines: 3,
-                                  decoration: const InputDecoration(labelText: 'Value'),
+                                  decoration: const InputDecoration(
+                                    labelText: 'Value',
+                                  ),
                                 ),
                                 actions: [
-                                  TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-                                  ElevatedButton(onPressed: () => Navigator.pop(context, controller.text), child: const Text('Save')),
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(context),
+                                    child: const Text('Cancel'),
+                                  ),
+                                  ElevatedButton(
+                                    onPressed: () =>
+                                        Navigator.pop(context, controller.text),
+                                    child: const Text('Save'),
+                                  ),
                                 ],
                               );
                             },
                           );
                           if (newValue != null && newValue != value) {
                             if (isSecure) {
-                              final secureStorage = ref.read(secureStorageProvider);
-                              await secureStorage.write(key: key, value: newValue);
+                              final secureStorage = ref.read(
+                                secureStorageProvider,
+                              );
+                              await secureStorage.write(
+                                key: key,
+                                value: newValue,
+                              );
                             } else {
-                              final prefs = await SharedPreferences.getInstance();
+                              final prefs =
+                                  await SharedPreferences.getInstance();
                               await prefs.setString(key, newValue);
                             }
                             await _loadData();
                             if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$key updated successfully')));
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('$key updated successfully'),
+                                ),
+                              );
                             }
                           }
                         },
@@ -274,17 +350,32 @@ class _DeveloperOptionsScreenV1State extends ConsumerState<DeveloperOptionsScree
     return RefreshIndicator(
       onRefresh: onRefresh,
       child: data.isEmpty
-          ? ListView(children: [
-              const SizedBox(height: 80),
-              Center(child: Text('No data found', style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.error))),
-            ])
+          ? ListView(
+              children: [
+                const SizedBox(height: 80),
+                Center(
+                  child: Text(
+                    'No data found',
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      color: theme.colorScheme.error,
+                    ),
+                  ),
+                ),
+              ],
+            )
           : ListView.separated(
               padding: const EdgeInsets.all(20),
               itemCount: data.length,
               separatorBuilder: (context, i) => const SizedBox(height: 8),
               itemBuilder: (context, i) {
                 final entry = data.entries.elementAt(i);
-                return _buildDataItem(theme, entry.key, entry.value, isSecure, editable: editable);
+                return _buildDataItem(
+                  theme,
+                  entry.key,
+                  entry.value,
+                  isSecure,
+                  editable: editable,
+                );
               },
             ),
     );
@@ -301,15 +392,28 @@ class _DeveloperOptionsScreenV1State extends ConsumerState<DeveloperOptionsScree
         foregroundColor: theme.colorScheme.onPrimary,
         elevation: 2,
         actions: [
-          IconButton(icon: const Icon(Icons.refresh), tooltip: 'Reload', onPressed: _loadData),
-          IconButton(icon: const Icon(Icons.delete_forever), tooltip: 'Clear All', onPressed: _clearAllData),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Reload',
+            onPressed: _loadData,
+          ),
+          IconButton(
+            icon: const Icon(Icons.delete_forever),
+            tooltip: 'Clear All',
+            onPressed: _clearAllData,
+          ),
           PopupMenuButton<String>(
             onSelected: (value) {
               if (value == 'about') {
-                showAboutDialog(context: context, applicationName: 'Emotion Tracker');
+                showAboutDialog(
+                  context: context,
+                  applicationName: 'Emotion Tracker',
+                );
               }
             },
-            itemBuilder: (context) => [const PopupMenuItem(value: 'about', child: Text('About App'))],
+            itemBuilder: (context) => [
+              const PopupMenuItem(value: 'about', child: Text('About App')),
+            ],
           ),
         ],
         bottom: TabBar(
@@ -329,7 +433,9 @@ class _DeveloperOptionsScreenV1State extends ConsumerState<DeveloperOptionsScree
               children: [
                 _buildTabContent(
                   theme: theme,
-                  data: sharedPrefsData.map((k, v) => MapEntry(k, v.toString())),
+                  data: sharedPrefsData.map(
+                    (k, v) => MapEntry(k, v.toString()),
+                  ),
                   isSecure: false,
                   onRefresh: _loadData,
                 ),

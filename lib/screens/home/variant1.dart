@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:emotion_tracker/screens/settings/variant1.dart';
 import 'package:emotion_tracker/screens/shop/variant1/variant1.dart';
-import 'package:emotion_tracker/screens/home/dashboard_screen_v1.dart';
 import 'package:emotion_tracker/widgets/app_scaffold.dart';
+import 'package:emotion_tracker/providers/workspace_provider.dart';
+import 'package:emotion_tracker/screens/home/personal_dashboard_screen.dart';
+import 'package:emotion_tracker/screens/home/family_dashboard_screen.dart';
+import 'package:emotion_tracker/screens/home/team_dashboard_screen.dart';
 
 class HomeScreenV1 extends ConsumerStatefulWidget {
   const HomeScreenV1({Key? key}) : super(key: key);
@@ -16,13 +19,13 @@ class _HomeScreenV1State extends ConsumerState<HomeScreenV1> {
   void _onItemSelected(String item) {
     Navigator.of(context).pop(); // Close drawer
     if (item == 'settings') {
-      Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const SettingsScreenV1()),
-      );
+      Navigator.of(
+        context,
+      ).push(MaterialPageRoute(builder: (_) => const SettingsScreenV1()));
     } else if (item == 'shop') {
-      Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const ShopScreenV1()),
-      );
+      Navigator.of(
+        context,
+      ).push(MaterialPageRoute(builder: (_) => const ShopScreenV1()));
     } else if (item == 'dashboard') {
       // Instead of popping to root, push dashboard if not already on it
       final isDashboard = ModalRoute.of(context)?.settings.name == 'dashboard';
@@ -61,14 +64,38 @@ class _HomeScreenV1State extends ConsumerState<HomeScreenV1> {
 
   @override
   Widget build(BuildContext context) {
+    final currentWorkspace = ref.watch(currentWorkspaceProvider);
+
     return WillPopScope(
       onWillPop: _onWillPop,
       child: AppScaffold(
-        title: 'Emotion Tracker',
+        title: _getTitleForWorkspace(currentWorkspace),
         selectedItem: 'dashboard',
         onItemSelected: _onItemSelected,
-        body: const DashboardScreenV1(),
+        body: _getBodyForWorkspace(currentWorkspace),
       ),
     );
+  }
+
+  String _getTitleForWorkspace(Workspace workspace) {
+    switch (workspace.type) {
+      case WorkspaceType.personal:
+        return 'Emotion Tracker';
+      case WorkspaceType.family:
+        return workspace.name;
+      case WorkspaceType.team:
+        return workspace.name;
+    }
+  }
+
+  Widget _getBodyForWorkspace(Workspace workspace) {
+    switch (workspace.type) {
+      case WorkspaceType.personal:
+        return const PersonalDashboardScreen();
+      case WorkspaceType.family:
+        return const FamilyDashboardScreen();
+      case WorkspaceType.team:
+        return const TeamDashboardScreen();
+    }
   }
 }

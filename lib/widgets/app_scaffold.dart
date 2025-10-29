@@ -10,6 +10,7 @@ class AppScaffold extends StatelessWidget {
   final PreferredSizeWidget? bottom;
   final List<Widget>? actions;
   final bool showCurrency;
+  final Widget? floatingActionButton;
 
   const AppScaffold({
     Key? key,
@@ -20,17 +21,24 @@ class AppScaffold extends StatelessWidget {
     this.bottom,
     this.actions,
     this.showCurrency = true,
+    this.floatingActionButton,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: CustomAppBar(title: title, bottom: bottom, actions: actions, showCurrency: showCurrency),
+      appBar: CustomAppBar(
+        title: title,
+        bottom: bottom,
+        actions: actions,
+        showCurrency: showCurrency,
+      ),
       drawer: SidebarWidget(
         selectedItem: selectedItem,
         onItemSelected: onItemSelected,
       ),
       body: body,
+      floatingActionButton: floatingActionButton,
     );
   }
 }

@@ -28,7 +28,7 @@ class CustomAppBar extends ConsumerWidget implements PreferredSizeWidget {
     final sbdState = ref.watch(sbdTokensProvider);
 
     return AppBar(
-      title: Text(title),
+      title: Text(title, overflow: TextOverflow.ellipsis, maxLines: 1),
       leading: showHamburger
           ? Builder(
               builder: (context) => IconButton(

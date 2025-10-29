@@ -10,6 +10,7 @@ import 'package:emotion_tracker/screens/settings/account/family/sbd_account_scre
 import 'package:emotion_tracker/screens/settings/account/family/token_requests_screen.dart';
 import 'package:emotion_tracker/screens/settings/account/family/family_notifications_screen.dart';
 import 'package:emotion_tracker/screens/settings/account/family/invitations_screen.dart';
+import 'package:emotion_tracker/providers/profiles_provider.dart';
 import 'package:emotion_tracker/screens/settings/account/family/admin_actions_screen.dart';
 
 class FamilyDetailsScreen extends ConsumerStatefulWidget {
@@ -81,12 +82,111 @@ class _FamilyDetailsScreenState extends ConsumerState<FamilyDetailsScreen> {
                     ],
                   ),
                   onTap: () {
-                    // TODO: Implement leave family
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Leave family feature coming soon'),
-                      ),
-                    );
+                    // Attempt to remove the current profile from the family
+                    Future.delayed(const Duration(milliseconds: 100), () async {
+                      final profilesState = ref.read(profilesProvider);
+                      final current = profilesState.current;
+                      if (current == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('No active profile to leave with'),
+                          ),
+                        );
+                        return;
+                      }
+
+                      final family = detailsState.family;
+                      if (family == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Family details not available'),
+                          ),
+                        );
+                        return;
+                      }
+
+                      // Heuristic: match by userId, then email, then username/displayName
+                      models.FamilyMember? matched;
+                      for (final m in detailsState.members) {
+                        if (m.userId == current.id) {
+                          matched = m;
+                          break;
+                        }
+                      }
+                      if (matched == null && current.email != null) {
+                        for (final m in detailsState.members) {
+                          if (m.email != null && m.email == current.email) {
+                            matched = m;
+                            break;
+                          }
+                        }
+                      }
+                      if (matched == null) {
+                        for (final m in detailsState.members) {
+                          if (m.username == current.displayName) {
+                            matched = m;
+                            break;
+                          }
+                        }
+                      }
+
+                      if (matched == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Could not determine your family membership. Please remove yourself manually.',
+                            ),
+                          ),
+                        );
+                        return;
+                      }
+
+                      // Confirm
+                      final leavingAs = matched.username;
+                      final should = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text('Leave Family'),
+                          content: Text(
+                            'Are you sure you want to leave the family as $leavingAs?',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx, false),
+                              child: const Text('Cancel'),
+                            ),
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.orange,
+                              ),
+                              onPressed: () => Navigator.pop(ctx, true),
+                              child: const Text('Leave'),
+                            ),
+                          ],
+                        ),
+                      );
+
+                      if (should != true) return;
+
+                      final ok = await ref
+                          .read(familyDetailsProvider(widget.familyId).notifier)
+                          .removeMember(matched.userId);
+
+                      if (ok) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('You have left the family'),
+                          ),
+                        );
+                        Navigator.of(context).pop();
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Failed to leave family'),
+                          ),
+                        );
+                      }
+                    });
                   },
                 ),
               ],

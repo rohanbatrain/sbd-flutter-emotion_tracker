@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:emotion_tracker/providers/theme_provider.dart';
 // app_providers import removed; AccountButton handles auth actions.
 import 'package:emotion_tracker/providers/ad_provider.dart';
+import 'package:emotion_tracker/widgets/workspace_switcher.dart';
 
 class SidebarWidget extends ConsumerStatefulWidget {
   final String selectedItem;
@@ -134,6 +135,9 @@ class _SidebarWidgetState extends ConsumerState<SidebarWidget> {
                 ],
               ),
             ),
+
+            // Workspace Switcher
+            const WorkspaceSwitcher(),
 
             // Menu Items
             Expanded(
