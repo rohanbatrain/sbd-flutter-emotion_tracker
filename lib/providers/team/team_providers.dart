@@ -313,12 +313,14 @@ class TokenRequestsNotifier
 }
 
 // Aggregated Pending Requests Provider (across all workspaces)
-final allPendingRequestsProvider = NotifierProvider<
-  AllPendingRequestsNotifier,
-  AsyncValue<List<TokenRequest>>
->(AllPendingRequestsNotifier.new);
+final allPendingRequestsProvider =
+    NotifierProvider<
+      AllPendingRequestsNotifier,
+      AsyncValue<List<TokenRequest>>
+    >(AllPendingRequestsNotifier.new);
 
-class AllPendingRequestsNotifier extends Notifier<AsyncValue<List<TokenRequest>>> {
+class AllPendingRequestsNotifier
+    extends Notifier<AsyncValue<List<TokenRequest>>> {
   late final TeamApiService _api;
 
   @override
@@ -338,7 +340,9 @@ class AllPendingRequestsNotifier extends Notifier<AsyncValue<List<TokenRequest>>
       );
 
       // Load pending requests for all workspaces concurrently
-      final futures = workspaces.map((workspace) => _api.getTokenRequests(workspace.workspaceId));
+      final futures = workspaces.map(
+        (workspace) => _api.getTokenRequests(workspace.workspaceId),
+      );
       final results = await Future.wait(futures);
 
       // Flatten all requests into a single list

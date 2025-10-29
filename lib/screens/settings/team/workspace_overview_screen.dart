@@ -21,7 +21,9 @@ class WorkspaceOverviewScreen extends ConsumerWidget {
     ref.listen(teamWorkspacesProvider, (previous, next) {
       next.whenData((workspaces) {
         if (workspaces.isNotEmpty) {
-          ref.read(allPendingRequestsProvider.notifier).loadAllPendingRequests();
+          ref
+              .read(allPendingRequestsProvider.notifier)
+              .loadAllPendingRequests();
         }
       });
     });
@@ -97,7 +99,9 @@ class WorkspaceOverviewScreen extends ConsumerWidget {
           familiesOk = false;
         }
         try {
-          await ref.read(allPendingRequestsProvider.notifier).loadAllPendingRequests();
+          await ref
+              .read(allPendingRequestsProvider.notifier)
+              .loadAllPendingRequests();
         } catch (_) {
           pendingRequestsOk = false;
         }
@@ -110,26 +114,30 @@ class WorkspaceOverviewScreen extends ConsumerWidget {
         } else if (workspacesOk && familiesOk) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Workspaces and families refreshed (requests failed)'),
+              content: Text(
+                'Workspaces and families refreshed (requests failed)',
+              ),
             ),
           );
         } else if (workspacesOk) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Workspaces refreshed (families and requests failed)'),
+              content: Text(
+                'Workspaces refreshed (families and requests failed)',
+              ),
             ),
           );
         } else if (familiesOk) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Families refreshed (workspaces and requests failed)'),
+              content: Text(
+                'Families refreshed (workspaces and requests failed)',
+              ),
             ),
           );
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Failed to refresh data'),
-            ),
+            const SnackBar(content: Text('Failed to refresh data')),
           );
         }
       },
@@ -658,10 +666,8 @@ class WorkspaceOverviewScreen extends ConsumerWidget {
                         ),
                         const Spacer(),
                         TextButton(
-                          onPressed: () => _showAllActivity(
-                            context,
-                            workspaces.first,
-                          ),
+                          onPressed: () =>
+                              _showAllActivity(context, workspaces.first),
                           child: Text(
                             'View All',
                             style: TextStyle(color: theme.primaryColor),
@@ -717,10 +723,8 @@ class WorkspaceOverviewScreen extends ConsumerWidget {
                       ),
                       const Spacer(),
                       TextButton(
-                        onPressed: () => _showAllActivity(
-                          context,
-                          workspaces.first,
-                        ),
+                        onPressed: () =>
+                            _showAllActivity(context, workspaces.first),
                         child: Text(
                           'View All',
                           style: TextStyle(color: theme.primaryColor),
@@ -1073,7 +1077,10 @@ class WorkspaceOverviewScreen extends ConsumerWidget {
   void _showAllActivity(BuildContext context, TeamWorkspace workspace) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => WorkspaceDetailScreen(workspace: workspace, initialTab: 2), // Analytics tab
+        builder: (_) => WorkspaceDetailScreen(
+          workspace: workspace,
+          initialTab: 2,
+        ), // Analytics tab
       ),
     );
   }
