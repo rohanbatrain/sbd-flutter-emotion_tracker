@@ -45,5 +45,8 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<!-- AI Integration permissions -->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>This app needs access to the microphone for voice interactions with AI assistants.</string>
 </dict>
 </plist>

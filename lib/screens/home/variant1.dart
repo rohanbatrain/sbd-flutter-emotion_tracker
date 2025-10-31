@@ -7,6 +7,7 @@ import 'package:emotion_tracker/providers/workspace_provider.dart';
 import 'package:emotion_tracker/screens/home/personal_dashboard_screen.dart';
 import 'package:emotion_tracker/screens/home/family_dashboard_screen.dart';
 import 'package:emotion_tracker/screens/home/team_dashboard_screen.dart';
+import 'package:emotion_tracker/screens/ai/ai_chat_screen.dart';
 
 class HomeScreenV1 extends ConsumerStatefulWidget {
   const HomeScreenV1({Key? key}) : super(key: key);
@@ -26,6 +27,8 @@ class _HomeScreenV1State extends ConsumerState<HomeScreenV1> {
       Navigator.of(
         context,
       ).push(MaterialPageRoute(builder: (_) => const ShopScreenV1()));
+    } else if (item == 'ai_chat') {
+      Navigator.of(context).pushNamed('/ai/chat');
     } else if (item == 'dashboard') {
       // Instead of popping to root, push dashboard if not already on it
       final isDashboard = ModalRoute.of(context)?.settings.name == 'dashboard';

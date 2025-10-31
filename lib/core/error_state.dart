@@ -8,6 +8,12 @@ enum ErrorType {
   serverError,
   cloudflareError,
   generic,
+  // AI-specific error types
+  aiSessionError,
+  aiVoiceError,
+  aiToolError,
+  aiAgentError,
+  aiWebSocketError,
 }
 
 /// Configuration for each error type including UI properties
@@ -166,6 +172,37 @@ class ErrorConfigs {
 
     ErrorType.generic: ErrorConfig(
       icon: Icons.error_outline,
+      color: Colors.red,
+      showRetry: true,
+      showInfo: false,
+    ),
+    // AI-specific error configurations
+    ErrorType.aiSessionError: ErrorConfig(
+      icon: Icons.chat_bubble_outline,
+      color: Colors.orange,
+      showRetry: true,
+      showInfo: true,
+    ),
+    ErrorType.aiVoiceError: ErrorConfig(
+      icon: Icons.mic_off,
+      color: Colors.red,
+      showRetry: true,
+      showInfo: true,
+    ),
+    ErrorType.aiToolError: ErrorConfig(
+      icon: Icons.build_circle_outlined,
+      color: Colors.red,
+      showRetry: true,
+      showInfo: true,
+    ),
+    ErrorType.aiAgentError: ErrorConfig(
+      icon: Icons.smart_toy_outlined,
+      color: Colors.orange,
+      showRetry: true,
+      showInfo: true,
+    ),
+    ErrorType.aiWebSocketError: ErrorConfig(
+      icon: Icons.wifi_off,
       color: Colors.red,
       showRetry: true,
       showInfo: false,

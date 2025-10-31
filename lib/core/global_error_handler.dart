@@ -4,13 +4,17 @@ import 'package:emotion_tracker/core/error_constants.dart';
 import 'package:emotion_tracker/core/error_state.dart';
 import 'package:emotion_tracker/core/session_manager.dart';
 import 'package:emotion_tracker/providers/api_token_service.dart';
+import 'package:emotion_tracker/providers/ai/ai_exceptions.dart' as ai_exceptions;
 import 'package:emotion_tracker/utils/http_util.dart';
 
 /// Global error handler service that processes and categorizes all application errors
 class GlobalErrorHandler {
   /// Processes any error and returns an appropriate ErrorState
   static ErrorState processError(dynamic error) {
-    if (error is UnauthorizedException) {
+    // Handle AI-specific exceptions first
+    if (error is ai_exceptions.AIApiException) {
+      return _createAIError(error);
+    } else if (error is UnauthorizedException) {
       return _createUnauthorizedError(error);
     } else if (error is RateLimitException) {
       return _createRateLimitError(error);
@@ -133,6 +137,222 @@ class GlobalErrorHandler {
     );
   }
 
+  /// Creates an ErrorState for AI-specific exceptions
+  static ErrorState _createAIError(ai_exceptions.AIApiException error) {
+    // Handle AI authentication errors with session management
+    if (error is ai_exceptions.UnauthorizedException || error is ai_exceptions.SessionExpiredException) {
+      return _createAIUnauthorizedError(error);
+    }
+    
+    // Handle AI rate limiting
+    if (error is ai_exceptions.RateLimitException) {
+      return _createAIRateLimitError(error);
+    }
+    
+    // Handle voice-specific errors
+    if (error is ai_exceptions.VoiceException) {
+      return _createAIVoiceError(error);
+    }
+    
+    // Handle WebSocket connection errors
+    if (error is ai_exceptions.WebSocketConnectionException || error is ai_exceptions.WebSocketTimeoutException) {
+      return _createAIWebSocketError(error as ai_exceptions.NetworkException);
+    }
+    
+    // Handle tool execution errors
+    if (error is ai_exceptions.ToolException) {
+      return _createAIToolError(error);
+    }
+    
+    // Handle session-related errors
+    if (error is ai_exceptions.SessionException || error is ai_exceptions.SessionNotFoundException || 
+        error is ai_exceptions.SessionLimitReachedException || error is ai_exceptions.SessionAlreadyActiveException) {
+      return _createAISessionError(error);
+    }
+    
+    // Handle agent-related errors
+    if (error is ai_exceptions.AgentNotFoundException || error is ai_exceptions.AgentAccessDeniedException || 
+        error is ai_exceptions.AdminOnlyAgentException || error is ai_exceptions.InvalidAgentTypeException) {
+      return _createAIAgentError(error);
+    }
+    
+    // Default AI error handling
+    return _createAIGenericError(error);
+  }
+
+  /// Creates an ErrorState for AI authentication errors
+  static ErrorState _createAIUnauthorizedError(ai_exceptions.AIApiException error) {
+    final config = ErrorConfigs.getConfig(ErrorType.unauthorized);
+    return ErrorState.fromConfig(
+      type: ErrorType.unauthorized,
+      config: config,
+      title: 'AI Session Expired',
+      message: 'Your AI session has expired. Please log in again to continue chatting.',
+      metadata: {'originalError': error, 'aiSpecific': true},
+    );
+  }
+
+  /// Creates an ErrorState for AI rate limiting errors
+  static ErrorState _createAIRateLimitError(ai_exceptions.RateLimitException error) {
+    final config = ErrorConfigs.getConfig(ErrorType.rateLimited);
+    final retrySeconds = error.retryAfterSeconds;
+    String message = error.message;
+    
+    if (retrySeconds != null) {
+      message = 'AI rate limit exceeded. Please wait $retrySeconds seconds before trying again.';
+    }
+    
+    return ErrorState.fromConfig(
+      type: ErrorType.rateLimited,
+      config: config,
+      title: 'AI Rate Limit Exceeded',
+      message: message,
+      metadata: {'originalError': error, 'retryAfterSeconds': retrySeconds},
+    );
+  }
+
+  /// Creates an ErrorState for AI voice errors
+  static ErrorState _createAIVoiceError(ai_exceptions.VoiceException error) {
+    final config = ErrorConfigs.getConfig(ErrorType.aiVoiceError);
+    String title = 'Voice Feature Error';
+    String message = error.message;
+    
+    if (error is ai_exceptions.MicrophonePermissionException) {
+      title = 'Microphone Permission Required';
+      message = 'Please grant microphone permission to use voice features with AI assistants.';
+    } else if (error is ai_exceptions.AudioRecordingException) {
+      title = 'Recording Error';
+      message = 'Unable to record audio. Please check your microphone and try again.';
+    } else if (error is ai_exceptions.AudioPlaybackException) {
+      title = 'Audio Playback Error';
+      message = 'Unable to play AI voice response. Please check your audio settings.';
+    }
+    
+    return ErrorState.fromConfig(
+      type: ErrorType.aiVoiceError,
+      config: config,
+      title: title,
+      message: message,
+      metadata: {'originalError': error},
+    );
+  }
+
+  /// Creates an ErrorState for AI WebSocket errors
+  static ErrorState _createAIWebSocketError(ai_exceptions.NetworkException error) {
+    final config = ErrorConfigs.getConfig(ErrorType.aiWebSocketError);
+    String title = 'AI Connection Error';
+    String message = 'Lost connection to AI service. Attempting to reconnect...';
+    
+    if (error is ai_exceptions.WebSocketTimeoutException) {
+      title = 'AI Connection Timeout';
+      message = 'Connection to AI service timed out. Please check your internet connection.';
+    }
+    
+    return ErrorState.fromConfig(
+      type: ErrorType.aiWebSocketError,
+      config: config,
+      title: title,
+      message: message,
+      metadata: {'originalError': error},
+    );
+  }
+
+  /// Creates an ErrorState for AI tool execution errors
+  static ErrorState _createAIToolError(ai_exceptions.ToolException error) {
+    final config = ErrorConfigs.getConfig(ErrorType.aiToolError);
+    String title = 'AI Tool Error';
+    String message = error.message;
+    
+    if (error is ai_exceptions.ToolNotAvailableException) {
+      title = 'AI Tool Unavailable';
+      message = 'The requested AI tool is currently unavailable. Please try again later.';
+    } else if (error is ai_exceptions.ToolExecutionTimeoutException) {
+      title = 'AI Tool Timeout';
+      message = 'AI tool execution timed out. The operation may have been too complex.';
+    } else if (error is ai_exceptions.ToolPermissionException) {
+      title = 'AI Tool Permission Denied';
+      message = 'You don\'t have permission to use this AI tool. Contact your administrator.';
+    }
+    
+    return ErrorState.fromConfig(
+      type: ErrorType.aiToolError,
+      config: config,
+      title: title,
+      message: message,
+      metadata: {'originalError': error},
+    );
+  }
+
+  /// Creates an ErrorState for AI session errors
+  static ErrorState _createAISessionError(ai_exceptions.AIApiException error) {
+    final config = ErrorConfigs.getConfig(ErrorType.aiSessionError);
+    String title = 'AI Session Error';
+    String message = error.message;
+    
+    if (error is ai_exceptions.SessionNotFoundException) {
+      title = 'AI Session Not Found';
+      message = 'Your AI session has ended or expired. Please start a new conversation.';
+    } else if (error is ai_exceptions.SessionLimitReachedException) {
+      title = 'AI Session Limit Reached';
+      final maxSessions = error.maxSessions;
+      if (maxSessions != null) {
+        message = 'You have reached the maximum of $maxSessions concurrent AI sessions. Please close an existing session first.';
+      }
+    } else if (error is ai_exceptions.SessionTimeoutException) {
+      title = 'AI Session Timeout';
+      final timeoutMinutes = error.timeoutMinutes;
+      if (timeoutMinutes != null) {
+        message = 'Your AI session timed out after $timeoutMinutes minutes of inactivity.';
+      }
+    }
+    
+    return ErrorState.fromConfig(
+      type: ErrorType.aiSessionError,
+      config: config,
+      title: title,
+      message: message,
+      metadata: {'originalError': error},
+    );
+  }
+
+  /// Creates an ErrorState for AI agent errors
+  static ErrorState _createAIAgentError(ai_exceptions.AIApiException error) {
+    final config = ErrorConfigs.getConfig(ErrorType.aiAgentError);
+    String title = 'AI Agent Error';
+    String message = error.message;
+    
+    if (error is ai_exceptions.AgentNotFoundException) {
+      title = 'AI Agent Not Found';
+      message = 'The requested AI agent is not available. Please select a different agent.';
+    } else if (error is ai_exceptions.AgentAccessDeniedException) {
+      title = 'AI Agent Access Denied';
+      message = 'You don\'t have access to this AI agent. Please contact your administrator.';
+    } else if (error is ai_exceptions.AdminOnlyAgentException) {
+      title = 'Admin Only AI Agent';
+      message = 'This AI agent is restricted to administrators only.';
+    }
+    
+    return ErrorState.fromConfig(
+      type: ErrorType.aiAgentError,
+      config: config,
+      title: title,
+      message: message,
+      metadata: {'originalError': error},
+    );
+  }
+
+  /// Creates an ErrorState for generic AI errors
+  static ErrorState _createAIGenericError(ai_exceptions.AIApiException error) {
+    final config = ErrorConfigs.getConfig(ErrorType.generic);
+    return ErrorState.fromConfig(
+      type: ErrorType.generic,
+      config: config,
+      title: 'AI Service Error',
+      message: error.message.isNotEmpty ? error.message : 'An error occurred with the AI service. Please try again.',
+      metadata: {'originalError': error, 'aiSpecific': true},
+    );
+  }
+
   /// Gets appropriate server error message based on status code
   static String _getServerErrorMessage(int statusCode, String originalMessage) {
     switch (statusCode) {
@@ -228,6 +448,11 @@ class GlobalErrorHandler {
       case ErrorType.serverError:
       case ErrorType.cloudflareError:
       case ErrorType.generic:
+      case ErrorType.aiSessionError:
+      case ErrorType.aiVoiceError:
+      case ErrorType.aiToolError:
+      case ErrorType.aiAgentError:
+      case ErrorType.aiWebSocketError:
         return true;
     }
   }
@@ -241,8 +466,15 @@ class GlobalErrorHandler {
       case ErrorType.networkError:
       case ErrorType.serverError:
       case ErrorType.cloudflareError:
+      case ErrorType.aiWebSocketError:
         // Exponential backoff for other retryable errors
         return Duration(seconds: (1 << retryCount).clamp(1, 30));
+      case ErrorType.aiSessionError:
+      case ErrorType.aiVoiceError:
+      case ErrorType.aiToolError:
+      case ErrorType.aiAgentError:
+        // AI-specific errors use default delay
+        return ErrorConstants.retryDelay;
       case ErrorType.unauthorized:
         // These errors are not retryable, but return default delay just in case
         return ErrorConstants.retryDelay;

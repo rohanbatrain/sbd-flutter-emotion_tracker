@@ -54,6 +54,14 @@ dependencies:
   timezone: ^0.10.1
   # JSON handling
   json_annotation: ^4.8.1
+  # AI Integration dependencies
+  web_socket_channel: ^3.0.1
+  record: ^6.1.2
+  audioplayers: ^6.1.0
+  permission_handler: ^11.3.1
+  # UI Polish and Animations
+  flutter_animate: ^4.5.0
+  shimmer: ^3.0.0
 
 dev_dependencies:
   flutter_test:

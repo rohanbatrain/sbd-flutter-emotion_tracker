@@ -16,6 +16,7 @@ import 'package:emotion_tracker/screens/auth/login-with-token/variant1.dart';
 import 'package:emotion_tracker/screens/settings/account/family/family_shop_screen.dart';
 import 'package:emotion_tracker/screens/settings/team/enhanced_team_wallet_screen.dart';
 import 'package:emotion_tracker/screens/settings/team/workspace_list_screen.dart';
+import 'package:emotion_tracker/screens/ai/ai_chat_screen.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 
 const String registrationAppId = 'emotion_tracker';
@@ -98,6 +99,8 @@ class MyApp extends ConsumerWidget {
         // Variant 2 Routes
         '/team/wallets': (context) => const EnhancedTeamWalletScreen(),
         '/team/workspaces': (context) => const WorkspaceListScreen(),
+        // AI Routes
+        '/ai/chat': (context) => const AIChatScreen(),
       },
     );
   }
@@ -142,6 +145,10 @@ class MyApp extends ConsumerWidget {
             ? args['familyId'] as String
             : '';
         page = FamilyShopScreen(familyId: familyId);
+        config = PageTransitionService.modalTransition;
+        break;
+      case '/ai/chat':
+        page = const AIChatScreen();
         config = PageTransitionService.modalTransition;
         break;
       default:
