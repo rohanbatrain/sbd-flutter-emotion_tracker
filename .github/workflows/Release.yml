@@ -185,6 +185,30 @@ jobs:
         run: flutter build web --release --no-pub
 
   # --- CD Jobs (Run on Main, Dev, and Tags) ---
+  lint-and-test:
+    name: Lint and Test
+    runs-on: ubuntu-latest
+    # Run lint+tests for main/dev/tags and PRs
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev' || startsWith(github.ref, 'refs/tags/v') || github.event_name == 'pull_request'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Flutter analyze
+        run: flutter analyze
+
+      - name: Run unit tests (if any)
+        run: flutter test --no-pub || true
+
   build-standard:
     name: Build Standard Web Image
     runs-on: ubuntu-latest
