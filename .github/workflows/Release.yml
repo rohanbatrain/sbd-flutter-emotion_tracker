@@ -1,23 +1,67 @@
-name: Unified Release
+name: Unified Pipeline
 
 on:
   push:
-    branches: [main]
+    branches: [main, dev, v0.0.1]
     tags: ['v*']
-  workflow_dispatch:
-
-env:
-  REGISTRY_GHCR: ghcr.io
-  REGISTRY_DOCKERHUB: rohanbatra
-  IMAGE_NAME: ${{ github.repository }}
-  IMAGE_NAME_SHORT_STANDARD: sbd-flutter-emotion_tracker-web
-  IMAGE_NAME_SHORT_WASM: sbd-flutter-emotion_tracker-web-wasm
+  pull_request:
+    branches: [main, dev, v0.0.1]
 
 jobs:
+  # --- CI Jobs (Run on all branches/PRs) ---
+  lint-and-test:
+    name: Lint and Test
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+      
+      - name: Install dependencies
+        run: flutter pub get
+      
+      - name: Analyze code
+        run: dart analyze
+      
+      - name: Check formatting
+        run: dart format --set-exit-if-changed .
+      
+      - name: Run tests
+        run: flutter test
+
+  build-dry-run:
+    name: Build Verification (Dry Run)
+    runs-on: ubuntu-latest
+    needs: lint-and-test
+    # Don't run dry-run on main/tags because we run real builds there
+    if: github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+      
+      - name: Install dependencies
+        run: flutter pub get
+      
+      - name: Build Web (Dry Run)
+        run: flutter build web --release --no-pub
+
+  # --- CD Jobs (Run ONLY on Main and Tags) ---
   deploy:
     name: Build Binaries & Deploy to Pages
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
+    needs: lint-and-test
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
 
     steps:
       - name: Checkout code
@@ -40,7 +84,11 @@ jobs:
       - name: Extract release version
         id: extract_version
         run: |
-          VERSION=$(echo ${GITHUB_REF} | sed 's/refs\/tags\///')
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/}
+          else
+            VERSION="latest"
+          fi
           echo "VERSION=${VERSION}" >> $GITHUB_ENV
 
       - name: Cache Linux Dependencies
@@ -90,7 +138,10 @@ jobs:
       - name: Create tar.gz archive for Linux executable
         run: |
           mkdir -p release
-          tar -czvf "release/Emotion-Tracker-Linux-x86-64-${{ env.VERSION }}.tar.gz" -C build/linux/x64/release bundle
+          # Only create versioned tarball if it's a tag
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            tar -czvf "release/Emotion-Tracker-Linux-x86-64-${{ env.VERSION }}.tar.gz" -C build/linux/x64/release bundle
+          fi
 
       - name: Enable Web for Flutter (Web) and Build
         run: |
@@ -113,7 +164,6 @@ jobs:
             "build/app/outputs/bundle/release/app-release.aab"
             "build/app/outputs/flutter-apk/app-release.apk"
             "appimage/Emotion-Tracker.Appimage"
-            "release/Emotion-Tracker-Linux-x86-64-${{ env.VERSION }}.tar.gz"
           )
           for file in "${FILES[@]}"; do
             if [ ! -f "$file" ]; then
@@ -125,6 +175,7 @@ jobs:
 
       - name: Check if Release Exists
         id: check_release
+        if: startsWith(github.ref, 'refs/tags/v')
         run: |
           if gh release view $VERSION --json name --jq '.name' > /dev/null 2>&1; then
             echo "release_exists=true" >> $GITHUB_ENV
@@ -135,12 +186,13 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Delete Existing Release (if any)
-        if: env.release_exists == 'true'
+        if: startsWith(github.ref, 'refs/tags/v') && env.release_exists == 'true'
         run: gh release delete $VERSION --yes --repo $GITHUB_REPOSITORY
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create New Release
+        if: startsWith(github.ref, 'refs/tags/v')
         run: |
           gh release create $VERSION \
             release/Emotion-Tracker-Linux-x86-64-${{ env.VERSION }}.tar.gz \
@@ -166,6 +218,8 @@ jobs:
   build-standard:
     name: Build Standard Web Image
     runs-on: ubuntu-latest
+    needs: lint-and-test
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
     
     strategy:
       matrix:
@@ -260,6 +314,8 @@ jobs:
   build-wasm:
     name: Build WASM Web Image
     runs-on: ubuntu-latest
+    needs: lint-and-test
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
     
     strategy:
       matrix:
@@ -355,7 +411,7 @@ jobs:
     name: Merge and Push Multi-Platform Images
     runs-on: ubuntu-latest
     needs: [build-standard, build-wasm]
-    if: github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     
     steps:
       - name: Download standard digests
