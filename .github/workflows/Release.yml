@@ -1,0 +1,155 @@
+name: Unified Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Cache Flutter Dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-flutter-${{ hashFiles('**/pubspec.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-flutter-
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Extract release version
+        id: extract_version
+        run: |
+          VERSION=$(echo ${GITHUB_REF} | sed 's/refs\/tags\///')
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+
+      - name: Cache Linux Dependencies
+        uses: actions/cache@v3
+        with:
+          path: /var/cache/apt/archives
+          key: linux-dependencies
+          restore-keys: linux-dependencies
+
+      - name: Install Linux Dependencies (Only if not cached)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev pkg-config
+
+      - name: Generate Keystore (Android)
+        run: |
+          keytool -genkey -v -keystore $HOME/keystore.jks -storetype JKS -keyalg RSA -keysize 2048 -validity 10000 -alias "$ANDROID_KEY_ALIAS" -dname "CN=Rohan Batra, OU=Open Source, O=Second Brain Database, L=Bidholi, ST=UK, C=IN" -storepass $ANDROID_KEYSTORE_PASSWORD -keypass $ANDROID_KEY_PASSWORD
+        env:
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+
+      # --- Run Android, Linux, and Web Builds in Parallel ---
+      - name: Build Android and Linux in Parallel
+        run: |
+          flutter build apk --release & 
+          flutter build appbundle --release & 
+          flutter build linux --release &
+          wait
+
+      - name: Cache AppImage Tool
+        uses: actions/cache@v3
+        with:
+          path: ./appimage/appimagetool-x86_64.AppImage
+          key: appimage-tool
+
+      - name: Ensure AppImage Tool Exists
+        run: |
+          if [ ! -f "./appimage/appimagetool-x86_64.AppImage" ]; then
+            wget -O ./appimage/appimagetool-x86_64.AppImage "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage"
+            chmod +x ./appimage/appimagetool-x86_64.AppImage
+          fi
+
+      - name: Build AppImage
+        run: ./appimage/appimagetool-x86_64.AppImage ./appimage/Emotion-Tracker.AppDir ./appimage/Emotion-Tracker.Appimage
+
+      - name: Create tar.gz archive for Linux executable
+        run: |
+          mkdir -p release
+          tar -czvf "release/Emotion-Tracker-Linux-x86-64-${{ env.VERSION }}.tar.gz" -C build/linux/x64/release bundle
+
+      - name: Enable Web for Flutter (Web) and Build
+        run: |
+          flutter config --enable-web
+          flutter build web --release
+
+      - name: Deploy to GitHub Pages (Web)
+        uses: crazy-max/ghaction-github-pages@v4.1.0
+        with:
+          build_dir: build/web
+          repo: ${{ github.repository }}
+          target_branch: gh-pages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify Files Exist
+        run: |
+          echo "Verifying required files..."
+          FILES=(
+            "build/app/outputs/bundle/release/app-release.aab"
+            "build/app/outputs/flutter-apk/app-release.apk"
+            "appimage/Emotion-Tracker.Appimage"
+            "release/Emotion-Tracker-Linux-x86-64-${{ env.VERSION }}.tar.gz"
+          )
+          for file in "${FILES[@]}"; do
+            if [ ! -f "$file" ]; then
+              echo "Error: $file does not exist!" >&2
+              exit 1
+            fi
+          done
+          echo "All files verified successfully."
+
+      - name: Check if Release Exists
+        id: check_release
+        run: |
+          if gh release view $VERSION --json name --jq '.name' > /dev/null 2>&1; then
+            echo "release_exists=true" >> $GITHUB_ENV
+          else
+            echo "release_exists=false" >> $GITHUB_ENV
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Delete Existing Release (if any)
+        if: env.release_exists == 'true'
+        run: gh release delete $VERSION --yes --repo $GITHUB_REPOSITORY
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create New Release
+        run: |
+          gh release create $VERSION \
+            release/Emotion-Tracker-Linux-x86-64-${{ env.VERSION }}.tar.gz \
+            build/app/outputs/bundle/release/app-release.aab \
+            build/app/outputs/flutter-apk/app-release.apk \
+            appimage/Emotion-Tracker.Appimage \
+            --title "Release $VERSION" \
+            --notes "Release $VERSION for branch $GITHUB_REF" \
+            --repo $GITHUB_REPOSITORY
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Cleanup Temporary Files
+        run: |
+          echo "Cleaning up temporary files..."
+          rm -rf $HOME/keystore.jks
+          rm -rf build/
+          rm -rf release/
+          unset ANDROID_KEY_ALIAS
+          unset ANDROID_KEY_PASSWORD
+          unset ANDROID_KEYSTORE_PASSWORD
