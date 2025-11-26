@@ -1,0 +1,36 @@
+# Multi-stage Dockerfile for Flutter Web (WASM Build)
+# This builds the Flutter web app with skwasm renderer (WASM) and serves it with nginx
+
+# Build stage
+FROM ghcr.io/cirruslabs/flutter:stable AS builder
+
+# Set working directory
+WORKDIR /app
+
+# Copy pubspec files for dependency caching
+COPY pubspec.yaml pubspec.lock ./
+
+# Get dependencies
+RUN flutter pub get
+
+# Copy the rest of the application
+COPY . .
+
+# Enable web support and build for production with WASM
+RUN flutter config --enable-web
+RUN flutter build web --release --wasm
+
+# Production stage
+FROM nginx:alpine
+
+# Copy custom nginx configuration
+COPY nginx.conf /etc/nginx/nginx.conf
+
+# Copy built Flutter web app from builder stage
+COPY --from=builder /app/build/web /usr/share/nginx/html
+
+# Expose port 80
+EXPOSE 80
+
+# Start nginx
+CMD ["nginx", "-g", "daemon off;"]
