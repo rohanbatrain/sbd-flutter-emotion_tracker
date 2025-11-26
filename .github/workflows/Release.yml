@@ -1,0 +1,569 @@
+name: Unified Pipeline
+
+on:
+  push:
+    branches: [main, dev, v0.0.1]
+    tags: ['v*']
+  pull_request:
+    branches: [main, dev, v0.0.1]
+
+jobs:
+  # --- CI Jobs (Run on all branches/PRs) ---
+  lint-and-test:
+    name: Lint and Test
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+      
+      - name: Install dependencies
+        run: flutter pub get
+      
+      - name: Analyze code
+        run: dart analyze
+      
+      - name: Check formatting
+        run: dart format --set-exit-if-changed .
+      
+      - name: Run tests
+        run: flutter test
+
+  build-dry-run:
+    name: Build Verification (Dry Run)
+    runs-on: ubuntu-latest
+    needs: lint-and-test
+    # Don't run dry-run on main/tags because we run real builds there
+    if: github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+      
+      - name: Install dependencies
+        run: flutter pub get
+      
+      - name: Build Web (Dry Run)
+        run: flutter build web --release --no-pub
+
+  # --- CD Jobs (Run ONLY on Main and Tags) ---
+  deploy:
+    name: Build Binaries & Deploy to Pages
+    runs-on: ubuntu-latest
+    needs: lint-and-test
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Cache Flutter Dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-flutter-${{ hashFiles('**/pubspec.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-flutter-
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Extract release version
+        id: extract_version
+        run: |
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/}
+          else
+            VERSION="latest"
+          fi
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+
+      - name: Cache Linux Dependencies
+        uses: actions/cache@v3
+        with:
+          path: /var/cache/apt/archives
+          key: linux-dependencies
+          restore-keys: linux-dependencies
+
+      - name: Install Linux Dependencies (Only if not cached)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev pkg-config
+
+      - name: Generate Keystore (Android)
+        run: |
+          keytool -genkey -v -keystore $HOME/keystore.jks -storetype JKS -keyalg RSA -keysize 2048 -validity 10000 -alias "$ANDROID_KEY_ALIAS" -dname "CN=Rohan Batra, OU=Open Source, O=Second Brain Database, L=Bidholi, ST=UK, C=IN" -storepass $ANDROID_KEYSTORE_PASSWORD -keypass $ANDROID_KEY_PASSWORD
+        env:
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+
+      # --- Run Android, Linux, and Web Builds in Parallel ---
+      - name: Build Android and Linux in Parallel
+        run: |
+          flutter build apk --release & 
+          flutter build appbundle --release & 
+          flutter build linux --release &
+          wait
+
+      - name: Cache AppImage Tool
+        uses: actions/cache@v3
+        with:
+          path: ./appimage/appimagetool-x86_64.AppImage
+          key: appimage-tool
+
+      - name: Ensure AppImage Tool Exists
+        run: |
+          if [ ! -f "./appimage/appimagetool-x86_64.AppImage" ]; then
+            wget -O ./appimage/appimagetool-x86_64.AppImage "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage"
+            chmod +x ./appimage/appimagetool-x86_64.AppImage
+          fi
+
+      - name: Build AppImage
+        run: ./appimage/appimagetool-x86_64.AppImage ./appimage/Emotion-Tracker.AppDir ./appimage/Emotion-Tracker.Appimage
+
+      - name: Create tar.gz archive for Linux executable
+        run: |
+          mkdir -p release
+          # Only create versioned tarball if it's a tag
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            tar -czvf "release/Emotion-Tracker-Linux-x86-64-${{ env.VERSION }}.tar.gz" -C build/linux/x64/release bundle
+          fi
+
+      - name: Enable Web for Flutter (Web) and Build
+        run: |
+          flutter config --enable-web
+          flutter build web --release
+
+      - name: Deploy to GitHub Pages (Web)
+        uses: crazy-max/ghaction-github-pages@v4.1.0
+        with:
+          build_dir: build/web
+          repo: ${{ github.repository }}
+          target_branch: gh-pages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify Files Exist
+        run: |
+          echo "Verifying required files..."
+          FILES=(
+            "build/app/outputs/bundle/release/app-release.aab"
+            "build/app/outputs/flutter-apk/app-release.apk"
+            "appimage/Emotion-Tracker.Appimage"
+          )
+          for file in "${FILES[@]}"; do
+            if [ ! -f "$file" ]; then
+              echo "Error: $file does not exist!" >&2
+              exit 1
+            fi
+          done
+          echo "All files verified successfully."
+
+      - name: Check if Release Exists
+        id: check_release
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          if gh release view $VERSION --json name --jq '.name' > /dev/null 2>&1; then
+            echo "release_exists=true" >> $GITHUB_ENV
+          else
+            echo "release_exists=false" >> $GITHUB_ENV
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Delete Existing Release (if any)
+        if: startsWith(github.ref, 'refs/tags/v') && env.release_exists == 'true'
+        run: gh release delete $VERSION --yes --repo $GITHUB_REPOSITORY
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create New Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          gh release create $VERSION \
+            release/Emotion-Tracker-Linux-x86-64-${{ env.VERSION }}.tar.gz \
+            build/app/outputs/bundle/release/app-release.aab \
+            build/app/outputs/flutter-apk/app-release.apk \
+            appimage/Emotion-Tracker.Appimage \
+            --title "Release $VERSION" \
+            --notes "Release $VERSION for branch $GITHUB_REF" \
+            --repo $GITHUB_REPOSITORY
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Cleanup Temporary Files
+        run: |
+          echo "Cleaning up temporary files..."
+          rm -rf $HOME/keystore.jks
+          rm -rf build/
+          rm -rf release/
+          unset ANDROID_KEY_ALIAS
+          unset ANDROID_KEY_PASSWORD
+          unset ANDROID_KEYSTORE_PASSWORD
+
+  build-standard:
+    name: Build Standard Web Image
+    runs-on: ubuntu-latest
+    needs: lint-and-test
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+    
+    strategy:
+      matrix:
+        platform:
+          - linux/amd64
+          - linux/arm64
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Login to Docker Hub
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          username: rohanbatra
+          password: ${{ secrets.DOCKER_HUB_TOKEN }}
+      
+      - name: Login to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY_GHCR }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ${{ env.REGISTRY_DOCKERHUB }}/${{ env.IMAGE_NAME_SHORT_STANDARD }}
+            ${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha
+      
+      - name: Build and push by digest (Docker Hub)
+        id: build-dockerhub
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: ${{ matrix.platform }}
+          labels: ${{ steps.meta.outputs.labels }}
+          outputs: type=image,name=${{ env.REGISTRY_DOCKERHUB }}/${{ env.IMAGE_NAME_SHORT_STANDARD }},push-by-digest=true,name-canonical=true,push=${{ github.event_name != 'pull_request' }}
+          cache-from: type=gha,scope=standard-${{ matrix.platform }}
+          cache-to: type=gha,mode=max,scope=standard-${{ matrix.platform }}
+      
+      - name: Build and push by digest (GHCR)
+        id: build-ghcr
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: ${{ matrix.platform }}
+          labels: ${{ steps.meta.outputs.labels }}
+          outputs: type=image,name=${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=${{ github.event_name != 'pull_request' }}
+          cache-from: type=gha,scope=standard-${{ matrix.platform }}
+          cache-to: type=gha,mode=max,scope=standard-${{ matrix.platform }}
+      
+      - name: Export digests
+        if: github.event_name != 'pull_request'
+        run: |
+          mkdir -p /tmp/digests-dockerhub-standard
+          mkdir -p /tmp/digests-ghcr-standard
+          
+          digest_dockerhub="${{ steps.build-dockerhub.outputs.digest }}"
+          touch "/tmp/digests-dockerhub-standard/${digest_dockerhub#sha256:}"
+          
+          digest_ghcr="${{ steps.build-ghcr.outputs.digest }}"
+          touch "/tmp/digests-ghcr-standard/${digest_ghcr#sha256:}"
+      
+      - name: Upload digests
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: digests-standard-${{ strategy.job-index }}
+          path: /tmp/digests-*-standard
+          if-no-files-found: error
+          retention-days: 1
+
+  build-wasm:
+    name: Build WASM Web Image
+    runs-on: ubuntu-latest
+    needs: lint-and-test
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+    
+    strategy:
+      matrix:
+        platform:
+          - linux/amd64
+          - linux/arm64
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Login to Docker Hub
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          username: rohanbatra
+          password: ${{ secrets.DOCKER_HUB_TOKEN }}
+      
+      - name: Login to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY_GHCR }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ${{ env.REGISTRY_DOCKERHUB }}/${{ env.IMAGE_NAME_SHORT_WASM }}
+            ${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}/web-wasm
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha
+      
+      - name: Build and push by digest (Docker Hub)
+        id: build-dockerhub
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.wasm
+          platforms: ${{ matrix.platform }}
+          labels: ${{ steps.meta.outputs.labels }}
+          outputs: type=image,name=${{ env.REGISTRY_DOCKERHUB }}/${{ env.IMAGE_NAME_SHORT_WASM }},push-by-digest=true,name-canonical=true,push=${{ github.event_name != 'pull_request' }}
+          cache-from: type=gha,scope=wasm-${{ matrix.platform }}
+          cache-to: type=gha,mode=max,scope=wasm-${{ matrix.platform }}
+      
+      - name: Build and push by digest (GHCR)
+        id: build-ghcr
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.wasm
+          platforms: ${{ matrix.platform }}
+          labels: ${{ steps.meta.outputs.labels }}
+          outputs: type=image,name=${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}/web-wasm,push-by-digest=true,name-canonical=true,push=${{ github.event_name != 'pull_request' }}
+          cache-from: type=gha,scope=wasm-${{ matrix.platform }}
+          cache-to: type=gha,mode=max,scope=wasm-${{ matrix.platform }}
+      
+      - name: Export digests
+        if: github.event_name != 'pull_request'
+        run: |
+          mkdir -p /tmp/digests-dockerhub-wasm
+          mkdir -p /tmp/digests-ghcr-wasm
+          
+          digest_dockerhub="${{ steps.build-dockerhub.outputs.digest }}"
+          touch "/tmp/digests-dockerhub-wasm/${digest_dockerhub#sha256:}"
+          
+          digest_ghcr="${{ steps.build-ghcr.outputs.digest }}"
+          touch "/tmp/digests-ghcr-wasm/${digest_ghcr#sha256:}"
+      
+      - name: Upload digests
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: digests-wasm-${{ strategy.job-index }}
+          path: /tmp/digests-*-wasm
+          if-no-files-found: error
+          retention-days: 1
+
+  merge:
+    name: Merge and Push Multi-Platform Images
+    runs-on: ubuntu-latest
+    needs: [build-standard, build-wasm]
+    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    
+    steps:
+      - name: Download standard digests
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests-standard
+          pattern: digests-standard-*
+          merge-multiple: true
+      
+      - name: Download WASM digests
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests-wasm
+          pattern: digests-wasm-*
+          merge-multiple: true
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: rohanbatra
+          password: ${{ secrets.DOCKER_HUB_TOKEN }}
+      
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY_GHCR }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Extract metadata (Standard)
+        id: meta-standard
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ${{ env.REGISTRY_DOCKERHUB }}/${{ env.IMAGE_NAME_SHORT_STANDARD }}
+            ${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha
+            type=raw,value=latest,enable={{is_default_branch}}
+      
+      - name: Extract metadata (WASM)
+        id: meta-wasm
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ${{ env.REGISTRY_DOCKERHUB }}/${{ env.IMAGE_NAME_SHORT_WASM }}
+            ${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}/web-wasm
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha
+            type=raw,value=latest,enable={{is_default_branch}}
+      
+      - name: Create manifest list and push (Standard - Docker Hub)
+        working-directory: /tmp/digests-standard/digests-dockerhub-standard
+        run: |
+          docker buildx imagetools create \
+            $(jq -cr '.tags | map(select(contains("rohanbatra"))) | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf '${{ env.REGISTRY_DOCKERHUB }}/${{ env.IMAGE_NAME_SHORT_STANDARD }}@sha256:%s ' *)
+        env:
+          DOCKER_METADATA_OUTPUT_JSON: ${{ steps.meta-standard.outputs.json }}
+      
+      - name: Create manifest list and push (Standard - GHCR)
+        working-directory: /tmp/digests-standard/digests-ghcr-standard
+        run: |
+          docker buildx imagetools create \
+            $(jq -cr '.tags | map(select(contains("ghcr.io"))) | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf '${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}@sha256:%s ' *)
+        env:
+          DOCKER_METADATA_OUTPUT_JSON: ${{ steps.meta-standard.outputs.json }}
+      
+      - name: Create manifest list and push (WASM - Docker Hub)
+        working-directory: /tmp/digests-wasm/digests-dockerhub-wasm
+        run: |
+          docker buildx imagetools create \
+            $(jq -cr '.tags | map(select(contains("rohanbatra"))) | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf '${{ env.REGISTRY_DOCKERHUB }}/${{ env.IMAGE_NAME_SHORT_WASM }}@sha256:%s ' *)
+        env:
+          DOCKER_METADATA_OUTPUT_JSON: ${{ steps.meta-wasm.outputs.json }}
+      
+      - name: Create manifest list and push (WASM - GHCR)
+        working-directory: /tmp/digests-wasm/digests-ghcr-wasm
+        run: |
+          docker buildx imagetools create \
+            $(jq -cr '.tags | map(select(contains("ghcr.io"))) | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf '${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}/web-wasm@sha256:%s ' *)
+        env:
+          DOCKER_METADATA_OUTPUT_JSON: ${{ steps.meta-wasm.outputs.json }}
+      
+      - name: Inspect images
+        run: |
+          echo "=== Standard Docker Hub Image ==="
+          docker buildx imagetools inspect ${{ env.REGISTRY_DOCKERHUB }}/${{ env.IMAGE_NAME_SHORT_STANDARD }}:${{ steps.meta-standard.outputs.version }}
+          echo ""
+          echo "=== Standard GHCR Image ==="
+          docker buildx imagetools inspect ${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}:${{ steps.meta-standard.outputs.version }}
+          echo ""
+          echo "=== WASM Docker Hub Image ==="
+          docker buildx imagetools inspect ${{ env.REGISTRY_DOCKERHUB }}/${{ env.IMAGE_NAME_SHORT_WASM }}:${{ steps.meta-wasm.outputs.version }}
+          echo ""
+          echo "=== WASM GHCR Image ==="
+          docker buildx imagetools inspect ${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}/web-wasm:${{ steps.meta-wasm.outputs.version }}
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: merge
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    
+    strategy:
+      matrix:
+        image:
+          - standard
+          - wasm
+    
+    steps:
+      - name: Set image reference
+        id: image
+        run: |
+          if [ "${{ matrix.image }}" = "standard" ]; then
+            echo "IMAGE_REF=${{ env.REGISTRY_DOCKERHUB }}/${{ env.IMAGE_NAME_SHORT_STANDARD }}:latest" >> $GITHUB_OUTPUT
+            echo "IMAGE_NAME=standard" >> $GITHUB_OUTPUT
+          else
+            echo "IMAGE_REF=${{ env.REGISTRY_DOCKERHUB }}/${{ env.IMAGE_NAME_SHORT_WASM }}:latest" >> $GITHUB_OUTPUT
+            echo "IMAGE_NAME=wasm" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ steps.image.outputs.IMAGE_REF }}
+          format: 'sarif'
+          output: 'trivy-results-${{ matrix.image }}.sarif'
+      
+      - name: Upload Trivy results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results-${{ matrix.image }}.sarif'
+          category: 'trivy-${{ matrix.image }}'
+      
+      - name: Run Trivy vulnerability scanner (table output)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ steps.image.outputs.IMAGE_REF }}
+          format: 'table'
+          exit-code: '0'
+          ignore-unfixed: true
+          severity: 'CRITICAL,HIGH'
